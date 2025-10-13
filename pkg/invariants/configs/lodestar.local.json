@@ -1,0 +1,151 @@
+{
+  "alert_config": {
+    "alert_throttle_seconds": 300,
+    "email_recipients": [
+      "security@lodestar.finance"
+    ],
+    "enabled": true,
+    "notification_channels": [
+      "webhook",
+      "email",
+      "telegram"
+    ],
+    "severity": "critical",
+    "webhook_url": "https://your-webhook-endpoint.com/alerts"
+  },
+  "chain_id": 42161,
+  "contracts": [
+    "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+    "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9",
+    "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707",
+    "0x0165878a594ca255338adfa4d48449f69242eb8f",
+    "0xa513e6e4b8f2a923d98304ec87f64353c4d5c853",
+    "0x2279b7a0a67db372996a5fab50d91eaa73d2ebe6",
+    "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+    "0x610178da211fef7d417bc0e6fed39f05609ad788",
+    "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+    "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+    "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+    "0x9a676e781a523b5d0c0e43731313a708cb607508",
+    "0x0b306bf915c4d645ff596e518faf3f9669b97016",
+    "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1",
+    "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+    "0x68b1d87f95878fe05b998f19b66f4baba5de1aed",
+    "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+    "0xc6e7df5e7b4f2a278906862b61205850344d4e7d",
+    "0x59b670e9fa9d0a427751af201d676719a970857b"
+  ],
+  "fuzzing_config": {
+    "auto_trigger": true,
+    "enabled": true,
+    "max_variations": 100,
+    "min_similarity": 0.75,
+    "output_path": "./fuzzing_results",
+    "print_realtime": true,
+    "save_high_similarity": true,
+    "threshold": 0.8,
+    "timeout_seconds": 5,
+    "trigger_contract_types": [
+      "lending",
+      "vault",
+      "oracle"
+    ],
+    "workers": 20,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "lodestar-firewall-v1",
+      "config_path": "pkg/invariants/configs/lodestar.local.json"
+    }
+  },
+  "invariants": [
+    {
+      "contracts": [
+        "0xC55EcAB35944C5A9e09fc77B350c7663e560BdA7"
+      ],
+      "description": "监控 sGLP 与 plvGLP 的比率，防止价格操纵攻击",
+      "id": "plv-glp-ratio-check",
+      "name": "sGLP/plvGLP Ratio Monitor",
+      "parameters": {
+        "alert_threshold": 1.3,
+        "depositor_address": "0x5897f5BAbac89B4EF4b21FD3a7C96d3cC439Edf1",
+        "max_ratio": 1.5,
+        "plvglp_address": "0x5326E71Ff593Ecc2CF7AcaE5Fe57582D6e74CFF1",
+        "sglp_address": "0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf"
+      },
+      "type": "ratio"
+    },
+    {
+      "description": "检测预言机价格的突然变化",
+      "id": "oracle-price-delta",
+      "name": "Oracle Price Sudden Change Detection",
+      "parameters": {
+        "max_change_percentage": 0.2,
+        "monitoring_markets": [
+          "0xC55EcAB35944C5A9e09fc77B350c7663e560BdA7",
+          "0xF19693ae3B35037B22ad2184e3a00B71b96F2c61"
+        ],
+        "oracle_address": "0xfcd17469343c4e315b046f182eb6f23e1558b93b",
+        "time_window": 300
+      },
+      "type": "delta"
+    },
+    {
+      "description": "监控市场利用率，防止异常借贷行为",
+      "id": "utilization-rate-check",
+      "name": "Market Utilization Rate Monitor",
+      "parameters": {
+        "comptroller_address": "0x92489147621bfDE3f6aDbaB16c24AC080Dc6c522",
+        "critical_markets": [
+          "0xF19693ae3B35037B22ad2184e3a00B71b96F2c61",
+          "0xC55EcAB35944C5A9e09fc77B350c7663e560BdA7"
+        ],
+        "max_utilization": 0.95,
+        "warning_utilization": 0.85
+      },
+      "type": "threshold"
+    },
+    {
+      "description": "监控单一账户的借款集中度风险",
+      "id": "borrow-concentration",
+      "name": "Borrow Concentration Risk Monitor",
+      "parameters": {
+        "markets": [
+          "0xF19693ae3B35037B22ad2184e3a00B71b96F2c61",
+          "0xC55EcAB35944C5A9e09fc77B350c7663e560BdA7",
+          "0x0C8e019cf1F898aC9F58f6059E970079f4217D68",
+          "0xaED3c1B66Fe1a88C1CA98218eB1A9fdEDBc97b1b",
+          "0x7396D9095c93Fa7968e8d1bdFa12109F09793Ef2",
+          "0xD387e8637439baEB0196F7c9d7cD6d4FF0c6Ad77",
+          "0xc37dAAc759bD8dD984cB11e31D6d0CCd5cC4a96f",
+          "0xFFEab968bF27B5E8Ad3473E60644d90FdDF69320"
+        ],
+        "max_single_borrower_percentage": 0.3,
+        "max_top_n_percentage": 0.6,
+        "top_n_borrowers": 5
+      },
+      "type": "custom"
+    },
+    {
+      "description": "检测递归借贷攻击模式",
+      "id": "recursive-borrow-detection",
+      "name": "Recursive Borrow Attack Detection",
+      "parameters": {
+        "max_leverage_ratio": 10,
+        "max_recursive_depth": 5,
+        "plvglp_market": "0xC55EcAB35944C5A9e09fc77B350c7663e560BdA7",
+        "time_window_seconds": 60
+      },
+      "type": "custom"
+    }
+  ],
+  "monitoring_config": {
+    "batch_size": 10,
+    "block_lag": 2,
+    "check_interval_seconds": 12,
+    "state_snapshot_frequency": 100
+  },
+  "name": "Lodestar Protocol",
+  "project_id": "lodestar-firewall-v1"
+}

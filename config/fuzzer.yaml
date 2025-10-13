@@ -1,0 +1,198 @@
+# Fuzzer配置文件
+fuzzer:
+  # 是否启用模糊测试
+  enabled: true
+
+  # JUMPDEST序列相似度阈值
+  # 只有相似度大于等于此值的参数组合才会被记录
+  jumpdest_similarity_threshold: 0.8
+
+  # 性能配置
+  # 每个参数生成的最大变体数量
+  max_variations_per_param: 50
+
+  # 并发worker数量
+  concurrent_workers: 20
+
+  # 单个模拟的超时时间
+  timeout_per_simulation: 5s
+
+  # RPC节点配置
+  rpc_url: "http://localhost:8545"
+
+  # 参数生成策略
+  strategies:
+    # 整数类型策略
+    integers:
+      # 包含边界值（0, MAX等）
+      include_boundaries: true
+
+      # 包含百分比变化
+      include_percentages: [1, 5, 10, 25, 50, 75, 90, 95, 99]
+
+      # 包含常见攻击值
+      include_common_values: true
+
+      # 启用位翻转变异
+      bit_flipping: true
+
+    # 地址类型策略
+    addresses:
+      # 包含预编译合约地址
+      include_precompiles: true
+
+      # 包含零地址
+      include_zero: true
+
+      # 包含随机地址
+      include_random: true
+
+      # 随机地址数量
+      random_count: 10
+
+    # 字节类型策略
+    bytes:
+      # 包含空字节
+      include_empty: true
+
+      # 包含特殊模式
+      include_patterns: true
+
+      # 随机字节的最大长度
+      max_random_length: 1024
+
+    # 数组类型策略
+    arrays:
+      # 测试的数组长度
+      test_lengths: [0, 1, 2, 10, 100, 1000]
+
+      # 数组的最大元素数
+      max_elements: 1000
+
+  # 输出配置
+  output:
+    # 输出格式: json, csv, html
+    format: "json"
+
+    # 输出路径
+    path: "./fuzzing_reports/"
+
+    # 是否输出详细日志
+    verbose: true
+
+    # 最大报告文件大小（MB）
+    max_report_size_mb: 100
+
+  # 告警配置
+  alerts:
+    # 是否启用告警
+    enabled: false
+
+    # Webhook URL（用于Slack、Discord等）
+    webhook_url: ""
+
+    # 触发告警的最小相似度
+    min_similarity_for_alert: 0.9
+
+    # Email配置
+    email:
+      enabled: false
+      smtp_server: ""
+      smtp_port: 587
+      username: ""
+      password: ""
+      recipients: []
+
+# 监控配置（与fuzzer集成）
+monitor:
+  # 监控的链
+  chain_id: 1
+
+  # 监控的区块范围
+  start_block: 0
+  end_block: 0  # 0表示最新区块
+
+  # 触发模糊测试的条件
+  fuzzing_triggers:
+    # 在检测到不变量违反时触发
+    on_invariant_violation: true
+
+    # 在检测到特定事件时触发
+    on_specific_events:
+      - "InvariantViolated"
+      - "SuspiciousActivity"
+
+    # 在检测到异常gas使用时触发
+    on_abnormal_gas: true
+    gas_threshold: 1000000
+
+  # 被保护的合约列表
+  protected_contracts:
+    - address: "0x0000000000000000000000000000000000000000"
+      name: "Example Contract"
+      functions:
+        - signature: "transfer(address,uint256)"
+          enabled: true
+        - signature: "approve(address,uint256)"
+          enabled: true
+
+# 开发环境配置
+development:
+  # 使用本地测试网
+  use_local_testnet: true
+
+  # Anvil/Hardhat配置
+  testnet:
+    rpc_url: "http://127.0.0.1:8545"
+    chain_id: 31337
+
+  # 测试数据
+  test_transactions:
+    - hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+      contract: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1"
+      block: 18000000
+
+# 日志配置
+logging:
+  # 日志级别: debug, info, warn, error
+  level: "info"
+
+  # 日志文件路径
+  file: "./logs/fuzzer.log"
+
+  # 日志轮转
+  rotation:
+    max_size_mb: 100
+    max_backups: 10
+    max_age_days: 30
+
+# 性能优化配置
+optimization:
+  # 缓存配置
+  cache:
+    enabled: true
+
+    # 缓存大小（MB）
+    size_mb: 1024
+
+    # 缓存过期时间
+    ttl: 1h
+
+  # 批处理配置
+  batch:
+    # 批处理大小
+    size: 100
+
+    # 批处理间隔
+    interval: 10s
+
+  # 资源限制
+  limits:
+    # 最大内存使用（MB）
+    max_memory_mb: 4096
+
+    # 最大CPU核心数
+    max_cpu_cores: 8
+
+    # 最大并发请求数
+    max_concurrent_requests: 100

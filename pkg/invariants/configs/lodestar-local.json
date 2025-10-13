@@ -1,0 +1,141 @@
+{
+  "project_id": "lodestar-local",
+  "name": "Lodestar Protocol (Local)",
+  "chain_id": 31337,
+  "contracts": [
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "0x9A676e781A523b5d0C0e43731313A708CB607508",
+    "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+    "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
+    "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+    "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+    "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+    "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+    "0x59b670e9fA9D0A427751Af201D676719a970857b",
+    "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+  ],
+  "invariants": [
+    {
+      "id": "plv-glp-ratio-check",
+      "name": "sGLP/plvGLP Ratio Monitor",
+      "type": "ratio",
+      "description": "监控 sGLP 与 plvGLP 的比率，防止价格操纵攻击",
+      "parameters": {
+        "max_ratio": 1.5,
+        "depositor_address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "sglp_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "plvglp_address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "alert_threshold": 1.3
+      },
+      "contracts": [
+        "0x0B306BF915C4d645ff596e518fAf3F9669b97016"
+      ]
+    },
+    {
+      "id": "oracle-price-delta",
+      "name": "Oracle Price Sudden Change Detection",
+      "type": "delta",
+      "description": "检测预言机价格的突然变化",
+      "parameters": {
+        "max_change_percentage": 0.2,
+        "oracle_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "monitoring_markets": [
+          "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+          "0x9A676e781A523b5d0C0e43731313A708CB607508"
+        ],
+        "time_window": 300
+      }
+    },
+    {
+      "id": "utilization-rate-check",
+      "name": "Market Utilization Rate Monitor",
+      "type": "threshold",
+      "description": "监控市场利用率，防止异常借贷行为",
+      "parameters": {
+        "max_utilization": 0.95,
+        "warning_utilization": 0.85,
+        "critical_markets": [
+          "0x9A676e781A523b5d0C0e43731313A708CB607508",
+          "0x0B306BF915C4d645ff596e518fAf3F9669b97016"
+        ],
+        "comptroller_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      }
+    },
+    {
+      "id": "borrow-concentration",
+      "name": "Borrow Concentration Risk Monitor",
+      "type": "custom",
+      "description": "监控单一账户的借款集中度风险",
+      "parameters": {
+        "max_single_borrower_percentage": 0.3,
+        "top_n_borrowers": 5,
+        "max_top_n_percentage": 0.6,
+        "markets": [
+          "0x9A676e781A523b5d0C0e43731313A708CB607508",
+          "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+          "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
+          "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+          "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+          "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+          "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+          "0x59b670e9fA9D0A427751Af201D676719a970857b"
+        ]
+      }
+    },
+    {
+      "id": "recursive-borrow-detection",
+      "name": "Recursive Borrow Attack Detection",
+      "type": "custom",
+      "description": "检测递归借贷攻击模式",
+      "parameters": {
+        "max_recursive_depth": 5,
+        "max_leverage_ratio": 10,
+        "plvglp_market": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+        "time_window_seconds": 60
+      }
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "threshold": 0.8,
+    "max_variations": 120,
+    "workers": 8,
+    "timeout_seconds": 20,
+    "output_path": "./fuzzing_results",
+    "auto_trigger": false,
+    "trigger_contract_types": [
+      "lending",
+      "vault",
+      "oracle"
+    ],
+    "min_similarity": 0.75,
+    "save_high_similarity": true,
+    "print_realtime": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "lodestar-local",
+      "config_path": "pkg/invariants/configs/lodestar-local.json"
+    }
+  },
+  "alert_config": {
+    "enabled": true,
+    "webhook_url": "https://your-webhook-endpoint.com/alerts",
+    "email_recipients": [
+      "security@lodestar.finance"
+    ],
+    "severity": "critical",
+    "alert_throttle_seconds": 300,
+    "notification_channels": [
+      "webhook",
+      "email",
+      "telegram"
+    ]
+  },
+  "monitoring_config": {
+    "block_lag": 2,
+    "batch_size": 10,
+    "check_interval_seconds": 12,
+    "state_snapshot_frequency": 100
+  }
+}

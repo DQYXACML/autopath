@@ -1,0 +1,30 @@
+# 监控配置
+rpc:
+  endpoint: "ws://localhost:8545"
+  timeout: 30s
+  max_retries: 3
+
+monitoring:
+  block_lag: 2          # 延迟几个区块以确保最终性
+  batch_size: 10        # 批处理大小
+  workers: 10           # 工作协程数量
+
+storage:
+  type: "memory"        # memory, postgres, redis
+  connection: ""        # 数据库连接字符串
+
+alerts:
+  webhook_url: "https://your-webhook-endpoint.com/alerts"
+  email_recipients:
+    - "security@firewall.finance"
+  throttle_seconds: 300 # 告警限流时间
+
+logging:
+  level: "info"         # debug, info, warn, error
+  output: "stdout"      # stdout, file
+  file_path: "logs/monitor.log"
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
