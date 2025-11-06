@@ -1,0 +1,91 @@
+{
+  "project_id": "${mimspell2-project_id}",
+  "project_name": "${mimspell2-project_name}",
+  "chain_id": 31337,
+  "contracts": [
+    "${cauldronV4}",
+    "${attacker}",
+    "${attackContract}",
+    "${specialUser}",
+    "${mIM}",
+    "${uSDT}",
+    "${crv3USDBTCETH}",
+    "${yvCurve3Cryptof}",
+    "${uSDC}",
+    "${wETH}",
+    "${degenBox}",
+    "${mIM3LP3CRV}",
+    "${uSDTWBTCWETH}",
+    "${mIMUSDC}",
+    "${uSDCWETH}"
+  ],
+  "invariants": [
+    {
+      "id": "mimspell2-balance-check",
+      "name": "Contract Balance Monitor",
+      "type": "threshold",
+      "description": "监控合约余额异常变化",
+      "parameters": {
+        "max_change_percentage": 0.5,
+        "time_window": 300
+      }
+    },
+    {
+      "id": "mimspell2-state-consistency",
+      "name": "State Consistency Check",
+      "type": "custom",
+      "description": "检查合约状态一致性",
+      "parameters": {
+        "enable_storage_check": true
+      }
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "threshold": 0.1,
+    "max_variations": 100,
+    "workers": 4,
+    "timeout_seconds": 20,
+    "output_path": "./fuzzing_results",
+    "auto_trigger": false,
+    "target_functions": [
+      {
+        "contract": "${mainContract}",
+        "name": "addCollateral",
+        "signature": "addCollateral(address,bool,uint256)"
+      },
+      {
+        "contract": "${mainContract}",
+        "name": "borrow",
+        "signature": "borrow(address,uint256)"
+      },
+      {
+        "contract": "${mainContract}",
+        "name": "repay",
+        "signature": "repay(address,bool,uint256)"
+      },
+      {
+        "contract": "${mainContract}",
+        "name": "repayForAll",
+        "signature": "repayForAll(uint128,bool)"
+      }
+    ],
+    "min_similarity": 0.1,
+    "save_high_similarity": true,
+    "print_realtime": true
+  },
+  "alert_config": {
+    "enabled": true,
+    "webhook_url": "http://localhost:9000/alerts",
+    "severity": "medium",
+    "alert_throttle_seconds": 60,
+    "notification_channels": [
+      "webhook"
+    ]
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": false
+  }
+}

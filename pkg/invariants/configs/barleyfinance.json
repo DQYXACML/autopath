@@ -1,0 +1,236 @@
+{
+  "project_id": "BarleyFinance_exp",
+  "name": "BarleyFinance_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    {
+      "name": "wBARL",
+      "address": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8",
+      "type": "vault"
+    },
+    
+    {
+      "name": "Attacker",
+      "address": "0x7b3a6eff1c9925e509c2b01a389238c1fcc462b6",
+      "type": "other"
+    },
+    
+    {
+      "name": "Attack_Contract",
+      "address": "0x356e7481b957be0165d6751a49b4b7194aef18d5",
+      "type": "other"
+    },
+    
+    {
+      "name": "DAI",
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "type": "other"
+    },
+    
+    {
+      "name": "BARL",
+      "address": "0x3e2324342bF5B8A1Dca42915f0489497203d640E",
+      "type": "other"
+    },
+    
+    {
+      "name": "WETH",
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "type": "other"
+    },
+    
+    {
+      "name": "Router",
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "type": "other"
+    }
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "SINV_001",
+      "name": "Vault share price must not change more than 5% per transaction",
+      "type": "share_price_stability",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 0.05,
+        
+        
+        "contracts": ["0x356e7481b957be0165d6751a49b4b7194aef18d5", "0x04c80Bb477890F3021F03B068238836Ee20aA0b8"],
+        
+        
+        "slots": {"reserves_contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8", "reserves_query": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8.balanceOf(0x356e7481b957be0165d6751a49b4b7194aef18d5)", "totalSupply_contract": "0x356e7481b957be0165d6751a49b4b7194aef18d5", "totalSupply_slot": "2"},
+        
+        
+        "formula": "|(reserves/totalSupply)_after - (reserves/totalSupply)_before| / (reserves/totalSupply)_before <= 0.05"
+        
+      },
+      "monitored_functions": ["bond", "debond", "flash"]
+    },
+    
+    {
+      "id": "SINV_002",
+      "name": "Total supply must be backed by proportional underlying reserves",
+      "type": "supply_backing_consistency",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 1.1,
+        
+        
+        "contracts": ["0x356e7481b957be0165d6751a49b4b7194aef18d5", "0x04c80Bb477890F3021F03B068238836Ee20aA0b8"],
+        
+        
+        "slots": {"totalSupply_contract": "0x356e7481b957be0165d6751a49b4b7194aef18d5", "totalSupply_slot": "2", "underlying_contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8"},
+        
+        
+        "formula": "totalSupply <= reserves * max_leverage_ratio"
+        
+      },
+      "monitored_functions": ["bond", "debond", "flash"]
+    },
+    
+    {
+      "id": "SINV_003",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 0.5,
+        
+        
+        "contracts": ["0x356e7481b957be0165d6751a49b4b7194aef18d5"],
+        
+        
+        "slots": {"contract": "0x356e7481b957be0165d6751a49b4b7194aef18d5", "monitored_slot": "2", "semantic_type": "totalSupply"},
+        
+        
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+        
+      },
+      "monitored_functions": ["bond", "debond", "flash"]
+    },
+    
+    {
+      "id": "SINV_004",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 0.5,
+        
+        
+        "contracts": ["0x04c80Bb477890F3021F03B068238836Ee20aA0b8"],
+        
+        
+        "slots": {"contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8", "monitored_slot": "2", "semantic_type": "totalSupply"},
+        
+        
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+        
+      },
+      "monitored_functions": ["bond", "debond", "flash"]
+    },
+    
+    {
+      "id": "RINV_001",
+      "name": "正常交易的循环次数不应超过 1 次",
+      "type": "runtime_loop_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 1,
+        
+        
+        "contracts": [],
+        
+        
+        "slots": [],
+        
+        
+        "formula": "loop_iterations <= 1"
+        
+      },
+      "monitored_functions": []
+    },
+    
+    {
+      "id": "RINV_004",
+      "name": "单笔交易中关键合约的余额变化率不应超过 0.01%",
+      "type": "runtime_balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        "threshold": 0.0001,
+        
+        
+        "contracts": [],
+        
+        
+        "slots": [],
+        
+        
+        "formula": "max(balance_change_rate) <= 0.0001"
+        
+      },
+      "monitored_functions": []
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8",
+        "function": "bond",
+        "signature": "bond(address,uint256)"
+      },
+      
+      {
+        "contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8",
+        "function": "debond",
+        "signature": "debond(uint256,address[],uint8[])"
+      },
+      
+      {
+        "contract": "0x04c80Bb477890F3021F03B068238836Ee20aA0b8",
+        "function": "flash",
+        "signature": "flash(address,address,uint256,bytes)"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 100,
+    "param_mutation_rate": 0.3
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}
