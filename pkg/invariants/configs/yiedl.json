@@ -1,0 +1,148 @@
+{
+  "project_id": "YIEDL_exp",
+  "name": "YIEDL_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0x4eDda16AB4f4cc46b160aBC42763BA63885862a4",
+    
+    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    
+    "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+    
+    "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+    
+    "0x55d398326f99059fF775485246999027B3197955",
+    
+    "0x1111111111111111111111111111111111111111",
+    
+    "0xBA5Fe23f8a3a24BEd3236F05F2FcF35fd0BF0B5C",
+    
+    "0x90A039797E93f2c671DE25DD24E5333b5e8F9Ab3",
+    
+    "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE",
+    
+    "0x137924D7C36816E0DcAF016eB617Cc2C92C05782",
+    
+    "0x264990fbd0A4796A3E3d8E37C4d5F87a3aCa5Ebf",
+    
+    "0x178bA789e24A1d51E9Ea3Cb1Db3B52917963D71D",
+    
+    "0x9ef1B8c0E4F7dc8bF5719Ea496883DC6401d5b2e",
+    
+    "0xfC3069296a691250fFDf21fe51340fdD415a76ed",
+    
+    "0xB97Ad0E74fa7d920791E90258A6E2085088b4320",
+    
+    "0x2dc202b56A03667cC240B290c2BE2b8453E89eA1",
+    
+    "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
+    
+    "0xca236E327F629f9Fc2c30A4E95775EbF0B89fac8",
+    
+    "0x0B67AD077Fa839F6737A1630c89eE1A1572989c6",
+    
+    "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
+    
+    "0xa767f745331D267c7751297D982b050c93985627",
+    
+    "0x2028b4a27c14263Ba00C75c42cfe524E705031F4",
+    
+    "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF",
+    
+    "0x0E8a53DD9c13589df6382F13dA6B3Ec8F919B323",
+    
+    "0x14E9D15c1EcD428606c443Ed715631b5C444a49e",
+    
+    "0xCC42724C6683B7E57334c4E856f4c9965ED682bD",
+    
+    "0x7CA57b0cA6367191c94C8914d7Df09A57655905f",
+    
+    "0xeC1Ca9c5Dd897F832CDe3D43BB041f5e01380757",
+    
+    "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
+    
+    "0xC333eb0086309a16aa7c8308DfD32c8BBA0a2592",
+    
+    "0xe978DaA50D3A8574F139c1e3Fe5D511dDb323BC5",
+    
+    "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+    
+    "0x93A67D414896A280bF8FFB3b389fE3686E014fda",
+    
+    "0x5C0F367A778857B36E88B553df132b232AC34901",
+    
+    "0x51597f405303C4377E36123cBc172b13269EA163",
+    
+    "0x7008fDEd94a8Ce68D01FEB633C4D81C2be7a1B20",
+    
+    "0x1111111254EEB25477B68fb85Ed929f73A960582",
+    
+    "0xd99c7F6C65857AC913a8f880A4cb84032AB2FC5b",
+    
+    "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    
+    "0x61EB789d75A95CAa3fF50ed7E47b96c132fEc082",
+    
+    "0x74E4716E431f45807DCF19f284c7aA99F18a4fbc",
+    
+    "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    
+    "0x9f0cb550275f55b5f68ad2cfc5ed3b4df3398cb0"
+    
+  ],
+  "invariants": [
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0x4eDda16AB4f4cc46b160aBC42763BA63885862a4",
+        "function": "redeem",
+        "signature": "redeem(uint256,address,uint256,bytes[],bool)"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/yiedl",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "YIEDL_exp",
+      "config_path": "pkg/invariants/configs/yiedl_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "project_id": "mic-adaptive-v2",
+  "name": "MIC Token Protocol (Layer 2 Adaptive)",
+  "chain_id": 1,
+  "contracts": [
+    "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+  ],
+  "invariants": [
+    {
+      "id": "swap-price-check",
+      "name": "Swap Price Manipulation Detection",
+      "type": "delta",
+      "description": "检测swap操作中的价格操纵攻击",
+      "parameters": {
+        "max_price_change_percentage": 0.15,
+        "monitoring_pairs": [
+          "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        ],
+        "time_window": 300
+      }
+    },
+    {
+      "id": "liquidity-check",
+      "name": "Liquidity Drain Detection",
+      "type": "threshold",
+      "description": "监控流动性突然减少的异常行为",
+      "parameters": {
+        "max_drain_percentage": 0.5,
+        "warning_threshold": 0.3,
+        "critical_pairs": [
+          "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        ]
+      }
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "threshold": 0.7,
+    "max_variations": 300,
+    "workers": 8,
+    "timeout_seconds": 20,
+    "output_path": "./fuzzing_results/mic_adaptive",
+    "auto_trigger": false,
+    "trigger_contract_types": [
+      "dex",
+      "liquidity_pool",
+      "swap"
+    ],
+    "min_similarity": 0.65,
+    "save_high_similarity": true,
+    "print_realtime": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "mic-adaptive-v2",
+      "config_path": "pkg/invariants/configs/mic_adaptive.json"
+    },
+    "seed_config": {
+      "enabled": true,
+      "attack_seeds": {
+        "0": [
+          "1000000000000000000"
+        ],
+        "1": [
+          "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        ]
+      },
+      "range_config": {
+        "numeric_range_percent": [1, 2, 5, 10, 20, 50, 100],
+        "address_mutation_types": ["original", "bitflip_1", "bitflip_2", "nearby"],
+        "boundary_exploration": true
+      },
+      "weights": {
+        "seed_based": 0.7,
+        "random": 0.2,
+        "boundary": 0.1
+      },
+      "adaptive_config": {
+        "enabled": true,
+        "max_iterations": 5,
+        "convergence_rate": 0.02,
+        "range_strategies": {
+          "high_similarity": [1, 2, 5],
+          "medium_similarity": [5, 10, 20, 50],
+          "low_similarity": [50, 100, 200]
+        },
+        "zone_threshold": 0.75,
+        "zone_gap_percent": 0.10,
+        "zone_gap_absolute": 1000,
+        "high_sim_threshold": 0.8,
+        "medium_sim_threshold": 0.6
+      }
+    }
+  },
+  "alert_config": {
+    "enabled": true,
+    "webhook_url": "https://your-webhook-endpoint.com/alerts",
+    "email_recipients": [
+      "security@mic-protocol.finance"
+    ],
+    "severity": "critical",
+    "alert_throttle_seconds": 300,
+    "notification_channels": [
+      "webhook",
+      "email",
+      "telegram"
+    ]
+  },
+  "monitoring_config": {
+    "block_lag": 2,
+    "batch_size": 10,
+    "check_interval_seconds": 12,
+    "state_snapshot_frequency": 100
+  }
+}

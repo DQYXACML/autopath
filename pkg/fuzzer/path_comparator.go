@@ -1,6 +1,7 @@
 package fuzzer
 
 import (
+	"fmt"
 	"math"
 	"strings"
 )
@@ -328,6 +329,7 @@ func (p *PathComparator) cosineSimilarity(seq1, seq2 []uint64) float64 {
 
 // CompareContractJumpDests 比较带合约地址的 JUMPDEST 序列
 // 从受保护合约开始的索引截取后比较
+// 🔧 修复：当LCS相似度较低时，自动切换到Jaccard相似度（适用于循环场景）
 func (p *PathComparator) CompareContractJumpDests(
 	original, variant []ContractJumpDest,
 	startIndex int,
@@ -357,7 +359,57 @@ func (p *PathComparator) CompareContractJumpDests(
 	lcsLength := p.lcsContractJumpDests(origSlice, varSlice)
 
 	// Dice 系数
-	return (2.0 * float64(lcsLength)) / float64(len(origSlice)+len(varSlice))
+	diceSimilarity := (2.0 * float64(lcsLength)) / float64(len(origSlice)+len(varSlice))
+
+	// 🔧 循环场景优化：当Dice相似度较低时，尝试使用Jaccard相似度
+	// Jaccard忽略顺序，只关注是否访问了相同的JUMPDEST
+	// 这对于循环攻击很有用，因为单次调用的PC序列与多次循环的PC序列顺序不同
+	if diceSimilarity < 0.3 {
+		jaccardSim := p.jaccardContractJumpDests(origSlice, varSlice)
+		if jaccardSim > diceSimilarity {
+			return jaccardSim
+		}
+	}
+
+	return diceSimilarity
+}
+
+// jaccardContractJumpDests 计算ContractJumpDest的Jaccard相似度（忽略顺序）
+// Jaccard = |A ∩ B| / |A ∪ B|
+func (p *PathComparator) jaccardContractJumpDests(seq1, seq2 []ContractJumpDest) float64 {
+	if len(seq1) == 0 && len(seq2) == 0 {
+		return 1.0
+	}
+
+	// 使用 contract:pc 作为key
+	set1 := make(map[string]bool)
+	set2 := make(map[string]bool)
+
+	for _, jd := range seq1 {
+		key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
+		set1[key] = true
+	}
+	for _, jd := range seq2 {
+		key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
+		set2[key] = true
+	}
+
+	// 计算交集
+	intersection := 0
+	for k := range set1 {
+		if set2[k] {
+			intersection++
+		}
+	}
+
+	// 计算并集
+	union := len(set1) + len(set2) - intersection
+
+	if union == 0 {
+		return 0.0
+	}
+
+	return float64(intersection) / float64(union)
 }
 
 // lcsContractJumpDests LCS 算法 for ContractJumpDest

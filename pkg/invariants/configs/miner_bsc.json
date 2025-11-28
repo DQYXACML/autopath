@@ -1,0 +1,432 @@
+{
+  "project_id": "MINER_bsc_exp",
+  "name": "MINER_bsc_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e",
+    "0x031958a8137745350549fd95055398dd536a07c7",
+    "0xc9716ec1b0503316233e3bcc50853f0df6befd43",
+    "0x81917eb96b397dFb1C6000d28A5bc08c0f05fC1d",
+    "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    "0x7C0BFb9fF0aF660D76fb2bd8865E9b49ff033045",
+    "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D",
+    "0x7f60701206F85354147806a846CE59Bb7467ac53",
+    "0x55d398326f99059fF775485246999027B3197955",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "0x0000000000000000000000000000000000000000"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 1.7,
+        "contracts": [
+          "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "critical",
+            "threshold": 1.7
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 1.7"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x7C0BFb9fF0aF660D76fb2bd8865E9b49ff033045"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "48259718096518538122982104998954971400545880513339580399123833688801416138206",
+            "severity": "critical",
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "20927355914717152835930671404253199863514038344721596127059280510293719901966",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0xc9716ec1b0503316233e3bcc50853f0df6befd43"
+        ],
+        "slots": {
+          "slot_5": {
+            "index": "5",
+            "severity": "critical",
+            "threshold": 0.1
+          },
+          "slot_6": {
+            "index": "6",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_004",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "114460944032702319680420360656282162370968836233209514761103390761440012177535",
+            "severity": "critical",
+            "threshold": 0.1
+          },
+          "slot_1": {
+            "index": "64768511631984239672518054563883907722431260497537281292951756868286801698902",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.12,
+        "contracts": [
+          "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e",
+          "0x7C0BFb9fF0aF660D76fb2bd8865E9b49ff033045",
+          "0xc9716ec1b0503316233e3bcc50853f0df6befd43",
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 0.12
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 1.69,
+        "contracts": [
+          "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 1.69
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 1.69"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x7C0BFb9fF0aF660D76fb2bd8865E9b49ff033045"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "48259718096518538122982104998954971400545880513339580399123833688801416138206",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "20927355914717152835930671404253199863514038344721596127059280510293719901966",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_003",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.16,
+        "contracts": [
+          "0xc9716ec1b0503316233e3bcc50853f0df6befd43"
+        ],
+        "slots": {
+          "slot_5": {
+            "index": "5",
+            "severity": "high",
+            "threshold": 0.16
+          },
+          "slot_6": {
+            "index": "6",
+            "severity": "high",
+            "threshold": 0.16
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.16"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_004",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.16,
+        "contracts": [
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "114460944032702319680420360656282162370968836233209514761103390761440012177535",
+            "severity": "high",
+            "threshold": 0.16
+          },
+          "slot_1": {
+            "index": "64768511631984239672518054563883907722431260497537281292951756868286801698902",
+            "severity": "high",
+            "threshold": 0.16
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.16"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x031958a8137745350549fd95055398dd536a07c7"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "swap",
+        "skim"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e",
+        "function": "swap",
+        "signature": "swap(uint,uint,address,bytes)"
+      },
+      {
+        "contract": "0x2ba9d4a8c41c60b71ff7df2c3f54b008644b954e",
+        "function": "skim",
+        "signature": "skim(address)"
+      }
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/miner_bsc",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "MINER_bsc_exp",
+      "config_path": "pkg/invariants/configs/miner_bsc_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "swap": {
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "13812206382895486344474105465635151798214305861828774195013322963473980719104",
+            "danger_threshold": "46040687942984955552872399235199169556257263229519032235668938767474472504494",
+            "attack_values": [
+              "46040687942984955552872399235199169556257263229519032235668938767474472504494",
+              "13812206382895486344474105465635151798214305861828774195013322963473980719104"
+            ],
+            "range": {
+              "min": "13812206382895486344474105465635151798214305861828774195013322963473980719104",
+              "max": "46040687942984955552872399235199169556257263229519032235668938767474472504494"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "3_500_751_853_374_879_579"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "1": [
+          "6906103191447743172237052732817575899107152930914387097506661481736990359552",
+          "12430985744605937549332890493172609064196666041529636523291691288847299117056",
+          "13812206382895486344474105465635151798214305861828774195013322963473980719104",
+          "15193427021185036746553364697087970074194038023290514388937948420893497622528",
+          "20718309574343228713242136068957589926340412622161860031418487553814553427968",
+          "23020343971492477776436190529055344844344540550102157832423202866720912965632",
+          "23020343971492477776436199617599584778128631614759516117834469383737236252247",
+          "27624412765790972688948210931270303596428611723657548390026645926947961438208",
+          "32228481560089468887010679464639418689380084260663322564968257137232130753145",
+          "41436619148686463854236449173876282020529194608974130151648950238800448061440",
+          "46040687942984955552872399235199169556257263229519032235668938767474472504494",
+          "50644756737283453679260489978306199524697336956084911266855836359254545006592",
+          "69061031914477433329308571587166034533033621650306473497269608600162738896896",
+          "92081375885969911105744798470398339112514526459038064471337877534948945008988"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

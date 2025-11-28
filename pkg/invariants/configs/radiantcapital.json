@@ -1,0 +1,589 @@
+{
+  "project_id": "RadiantCapital_exp",
+  "name": "RadiantCapital_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1",
+    "0x826d5f4d8084980366f975e10db6c4cf1f9dde6d",
+    "0x39519c027b503f40867548fb0c890b11728faa8f",
+    "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+    "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "0x3a2d44e354f2d88EF6DA7A5A4646fd70182A7F55",
+    "0x0dF5dfd95966753f01cb80E76dc20EA958238C46",
+    "0xC6962004f452bE9203591991D15f6b388e09E8D0",
+    "0x8b194bEae1d3e0788A1a35173978001ACDFba668",
+    "0xbCb167bDCF14a8F791d6f4A6EDd964aed2F8813B",
+    "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+    "0xa72636CbcAa8F5FF95B2cc47F3CDEe83F3294a0B",
+    "0x0A62276bFBF1Ad8443f37Da8630d407408085c8b",
+    "0x724dc807b04555b71ed48a6896b6F41593b8C637",
+    "0x1Be1798b70aEe431c2986f7ff48d9D1fa350786a",
+    "0x86E721b43d4ECFa71119Dd38c0f938A75Fdb57B3",
+    "0xd1B589C00C940C4C3F7b25e53c8d921C44eF9140",
+    "0xbC3c93356A346a9C678D45D796A0a26d0D3Eefb8",
+    "0xD69b772bfFe78165c152Fd2e370b6CaE239E3BDb",
+    "0x2dE0697aEe08843d4975c55eeD60E209AdF92502",
+    "0x887c5b40c521d8b88CA6D78d0e50a723BBD0D7a4",
+    "0x23B7bFd4690729748AEec9DAD904DBC01Bd5b31d",
+    "0x4c39ec61956AED20A43D2c7912d1d31C7C32CeBE",
+    "0x091d52CacE1edc5527C99cDCFA6937C1635330E4",
+    "0xec21Dd035aE1712b070AEcBDCa2A82226856B716",
+    "0xc0249d743a17ed44b4F9Ee611B51D26AB2E26444",
+    "0xebC85d44cefb1293707b11f707bd3CEc34B4D5fA",
+    "0x1Eb356137F1499961F3DaEB80D971fd1275ADC03",
+    "0xE10997B8d5C6e8b660451f61accF4BBA00bc901f",
+    "0x0a6833f275B20Ce547804182190b3f62369C9c34",
+    "0xd4966DC49a10aa5467D65f4fA4b1449b5d874399",
+    "0x69a42aD24F45270A98604194441FBe557bC07ab4",
+    "0x76663727c39Dd46Fed5414d6801c4E8890df85cF",
+    "0x73d06381ebC956e5FBC593bd93A0819c9e0ddD54",
+    "0x910b5Ec2bCE6254F44Cd786978d122EAd51bf5ca",
+    "0xAF50aa763c73064DFFc3dAB2E0C7898333478659",
+    "0x76ba3eC5f5adBf1C58c91e86502232317EeA72dE",
+    "0xf604DB44CFB2040DFa6Fc0c9351f3E05E0f2F35d",
+    "0x15Fd84532A445442D0821a479d2AA42f43A12D74",
+    "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+    "0xC1303BBBaf172C55848D3Cb91606d8E27FF38428",
+    "0x20d0Fcab0ECFD078B036b6CAf1FaC69A6453b352",
+    "0x94cD888Bea0dE39DD0b41396a9311c5212635EB7",
+    "0x10fECC2a3453DA04c63C0f1fd33EF958628fAdd9",
+    "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+    "0x3607e46698d218B3a5Cae44bF381475C0a5e2ca7",
+    "0xfC05ec21b106E0c1e035Ec4718C1394f098FBb57",
+    "0x7A8051E7a7CddB6Ccfade5df1585db9dD9dC1095",
+    "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "0x32dF62dc3aEd2cD6224193052Ce665DC18165841",
+    "0xC0cE5De939aaD880b0bdDcf9aB5750a53EDa454b",
+    "0x47336aF78d2EeE94fF31e9993Cf6F0b8c5b3D489",
+    "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+    "0x2946220288DbBF77dF0030fCecc2a8348CbBE32C",
+    "0x65F3D635cbef4f0efAB12B3fc7AB6f10493d74Fa",
+    "0xab04c0841f39596C9F18A981a2BD32F63AB7a817",
+    "0xfe91B5A00506944ae9D09Fd6249eA0363CD88809",
+    "0x3fF5d74866984571CE6A67d17a014a0e438ee871",
+    "0xf611aEb5013fD2c0511c9CD55c7dc5C1140741A6",
+    "0x5E76E98E0963EcDC6A065d1435F84065b7523f39",
+    "0xDC1fad70953Bb3918592b6fCc374fe05F5811B6a",
+    "0x0c2C95b24529664fE55D4437D7A31175CFE6c4f7",
+    "0x44CaDF6E49895640D9De85ac01d97D44429Ad0A4",
+    "0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "0x000000000000000000000000f4b1486dd74d0770",
+    "0x000000000000000000000000a72636cbcaa8f5ff",
+    "0x0000000000000000000000000000000000000000",
+    "0x00000000000000000000000076ba3ec5f5adbf1c",
+    "0x3082CC23568eA640225c2467653dB90e9250AaA0",
+    "0xffffffffffffffffffffffffffffffffffffffff",
+    "0x00000000000000000000000000000000015aaada",
+    "0x0000000000000000000000000000000002b555b4",
+    "0x000000000000000000000000000000000410008e",
+    "0x00000000000000000000000000000000056aab68",
+    "0x0000000000000000000000000000000006c55642",
+    "0x000000000000000000000000000000000820011c",
+    "0x00000000000000000000000000000000097aabf6",
+    "0x000000000000000000000000000000000ad556d0",
+    "0x000000000000000000000000000000000c3001aa",
+    "0x000000000000000000000000000000000d8aac84",
+    "0x000000000000000000000000000000000ee5575e",
+    "0x0000000000000000000000000000000010400238",
+    "0x00000000000000000000000000000000119aad12",
+    "0x0000000000000000000000000000000012f557ec",
+    "0x00000000000000000000000000000000145002c7",
+    "0x0000000000000000000000000000000015aaada1",
+    "0x000000000000000000000000000000001705587b",
+    "0x0000000000000000000000000000000018600355",
+    "0x0000000000000000000000000000000019baae2f",
+    "0x000000000000000000000000000000001b155909",
+    "0x000000000000000000000000000000001c7003e3",
+    "0x000000000000000000000000000000001dcaaebd",
+    "0x000000000000000000000000000000001f255997",
+    "0x0000000000000000000000000000000020800471",
+    "0x0000000000000000000000000000000021daaf4b",
+    "0x0000000000000000000000000000000023355a25",
+    "0x00000000000000000000000000000000249004ff",
+    "0x0000000000000000000000000000000025eaafd9",
+    "0x0000000000000000000000000000000027455ab4",
+    "0x0000000000000000000000000000000028a0058e",
+    "0x0000000000000000000000000000000029fab068",
+    "0x000000000000000000000000000000002b555b42",
+    "0x000000000000000000000000000000002cb0061c",
+    "0x000000000000000000000000000000002e0ab0f6",
+    "0x000000000000000000000000000000002f655bd0",
+    "0x0000000000000000000000000000000030c006aa",
+    "0x00000000000000000000000000000000321ab184",
+    "0x0000000000000000000000000000000033755c5e",
+    "0x0000000000000000000000000000000034d00738",
+    "0x00000000000000000000000000000000362ab212",
+    "0x0000000000000000000000000000000037855cec",
+    "0x0000000000000000000000000000000038e007c6",
+    "0x000000000000000000000000000000003a3ab2a1",
+    "0x000000000000000000000000000000003b955d7b",
+    "0x000000000000000000000000000000003cf00855",
+    "0x000000000000000000000000000000003e4ab32f",
+    "0x000000000000000000000000000000003fa55e09",
+    "0x00000000000000000000000000000000410008e3",
+    "0x00000000000000000000000000000000425ab3bd",
+    "0x0000000000000000000000000000000043b55e97",
+    "0x0000000000000000000000000000000045100971",
+    "0x00000000000000000000000000000000466ab44b",
+    "0x0000000000000000000000000000000047c55f25",
+    "0x00000000000000000000000000000000492009ff",
+    "0x000000000000000000000000000000004a7ab4d9",
+    "0x000000000000000000000000000000004bd55fb3",
+    "0x000000000000000000000000000000004d300a8e",
+    "0x000000000000000000000000000000004e8ab568",
+    "0x000000000000000000000000000000004fe56042",
+    "0x0000000000000000000000000000000051400b1c",
+    "0x00000000000000000000000000000000529ab5f6",
+    "0x0000000000000000000000000000000053f560d0",
+    "0x0000000000000000000000000000000055500baa",
+    "0x0000000000000000000000000000000056aab684",
+    "0x000000000000000000000000000000005805615e",
+    "0x0000000000000000000000000000000059600c38",
+    "0x000000000000000000000000000000005abab712",
+    "0x000000000000000000000000000000005c1561ec",
+    "0x000000000000000000000000000000005d700cc6",
+    "0x000000000000000000000000000000005ecab7a0",
+    "0x000000000000000000000000000000006025627b",
+    "0x0000000000000000000000000000000061800d55",
+    "0x0000000000000000000000000000000062dab82f",
+    "0x0000000000000000000000000000000064356309",
+    "0x0000000000000000000000000000000065900de3",
+    "0x0000000000000000000000000000000066eab8bd",
+    "0x0000000000000000000000000000000068456397",
+    "0x0000000000000000000000000000000069a00e71",
+    "0x000000000000000000000000000000006afab94b",
+    "0x000000000000000000000000000000006c556425",
+    "0x000000000000000000000000000000006db00eff",
+    "0x000000000000000000000000000000006f0ab9d9",
+    "0x00000000000000000000000000000000706564b3",
+    "0x0000000000000000000000000000000071c00f8d",
+    "0x00000000000000000000000000000000731aba67",
+    "0x0000000000000000000000000000000074756542",
+    "0x0000000000000000000000000000000075d0101c",
+    "0x00000000000000000000000000000000772abaf6",
+    "0x00000000000000000000000000000000788565d0",
+    "0x0000000000000000000000000000000079e010aa",
+    "0x000000000000000000000000000000007b3abb84",
+    "0x000000000000000000000000000000007c95665e",
+    "0x000000000000000000000000000000007df01138",
+    "0x000000000000000000000000000000007f4abc12",
+    "0x0000000000000000000000000000000080a566ec",
+    "0x00000000000000000000000000000000820011c6",
+    "0x00000000000000000000000000000000835abca0",
+    "0x0000000000000000000000000000000084b5677a",
+    "0x0000000000000000000000000000000086101254",
+    "0x00000000000000000000000000000000876abd2f",
+    "0x0000000000000000000000000000000088c56809",
+    "0x000000000000000000000000000000008a2012e3",
+    "0x000000000000000000000000000000008b7abdbd",
+    "0x000000000000000000000000000000008cd56897",
+    "0x000000000000000000000000000000008e301371",
+    "0x000000000000000000000000000000008f8abe4b",
+    "0x0000000000000000000000000000000090e56925",
+    "0x00000000000000000000000000000000924013ff",
+    "0x00000000000000000000000000000000939abed9",
+    "0x0000000000000000000000000000000094f569b3",
+    "0x000000000000000000000000000000009650148d",
+    "0x0000000000000000000000000000000097aabf67",
+    "0x0000000000000000000000000000000099056a41",
+    "0x000000000000000000000000000000009a60151c",
+    "0x000000000000000000000000000000009bbabff6",
+    "0x000000000000000000000000000000009d156ad0",
+    "0x000000000000000000000000000000009e7015aa",
+    "0x000000000000000000000000000000009fcac084",
+    "0x00000000000000000000000000000000a1256b5e",
+    "0x00000000000000000000000000000000a2801638",
+    "0x00000000000000000000000000000000a3dac112",
+    "0x00000000000000000000000000000000a5356bec",
+    "0x00000000000000000000000000000000a69016c6",
+    "0x00000000000000000000000000000000a7eac1a0",
+    "0x00000000000000000000000000000000a9456c7a",
+    "0x00000000000000000000000000000000aaa01754",
+    "0x00000000000000000000000000000000abfac22e",
+    "0x00000000000000000000000000000000ad556d09",
+    "0x00000000000000000000000000000000aeb017e3",
+    "0x00000000000000000000000000000000b00ac2bd",
+    "0x00000000000000000000000000000000b1656d97",
+    "0x00000000000000000000000000000000b2c01871",
+    "0x00000000000000000000000000000000b41ac34b",
+    "0x00000000000000000000000000000000b5756e25",
+    "0x00000000000000000000000000000000b6d018ff",
+    "0x00000000000000000000000000000000b82ac3d9",
+    "0x00000000000000000000000000000000b9856eb3",
+    "0x00000000000000000000000000000000bae0198d",
+    "0x00000000000000000000000000000000bc3ac467",
+    "0x00000000000000000000000000000000bd956f41",
+    "0x00000000000000000000000000000000bef01a1b",
+    "0x00000000000000000000000000000000c04ac4f6",
+    "0x00000000000000000000000000000000c1a56fd0",
+    "0x00000000000000000000000000000000c3001aaa",
+    "0x00000000000000000000000000000000c45ac584",
+    "0x00000000000000000000000000000000c5b5705e",
+    "0x00000000000000000000000000000000c7101b38",
+    "0x00000000000000000000000000000000c86ac612",
+    "0x00000000000000000000000000000000c9c570ec",
+    "0x00000000000000000000000000000000cb201bc6",
+    "0x00000000000000000000000000000000cc7ac6a0"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x0dF5dfd95966753f01cb80E76dc20EA958238C46"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "68423337455819866977494315547698213563185817166897692916429032503085347528664",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "83560280942775862046894021934750233012217831995640112757625239660694931732871",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "96568755110846509362245362021344370985405705439376477906403841861368347570184",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "37225363757100051602534729449307574226820704653371942402363976045439546061237",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "111856369257767047988408249503874338194835605272249013973338436140521176371642",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x39519c027b503f40867548fb0c890b11728faa8f"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "0",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "1",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "2",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "24179570679758128221233659617575354846114634045232952638756566553913147213818",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "114602915526701980224388508927217007353527133621584771407605054800654931480964",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "52772315207760477647369640939864875969380992695327734173285015624482850012190",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_3": {
+            "index": "78144211390192376349752967295294448715648681544525023403211808049836214038687",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x3a2d44e354f2d88EF6DA7A5A4646fd70182A7F55"
+        ],
+        "slots": {
+          "slot_54": {
+            "index": "54",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xab04c0841f39596C9F18A981a2BD32F63AB7a817"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "22626008077060535269568297773713628607831287965692971503080544840818579407632",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "borrow"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1",
+        "function": "borrow",
+        "signature": "borrow(address,uint256,uint256,uint16,address)"
+      }
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/radiantcapital",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "RadiantCapital_exp",
+      "config_path": "pkg/invariants/configs/radiantcapital_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "attack_seeds": {
+        "0": [
+          "USDC",
+          "WETH"
+        ],
+        "1": [
+          "000",
+          "amountToBorrow",
+          "rUSDCnBalanceBeforeTransfer - 1"
+        ],
+        "2": [
+          "2",
+          "this"
+        ],
+        "3": [],
+        "4": [
+          "this"
+        ]
+      },
+      "range_config": {
+        "numeric_range_percent": [
+          1,
+          2,
+          5,
+          10,
+          20,
+          50,
+          100
+        ],
+        "address_mutation_types": [
+          "original",
+          "bitflip_1",
+          "bitflip_2",
+          "nearby"
+        ],
+        "boundary_exploration": true
+      },
+      "weights": {
+        "seed_based": 0.6,
+        "random": 0.2,
+        "boundary": 0.2
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "z3",
+        "max_constraints": 30,
+        "solver_timeout": "3s",
+        "extraction": {
+          "max_trace_depth": 5000,
+          "focus_opcodes": [
+            "JUMPI",
+            "LT",
+            "GT",
+            "EQ",
+            "ISZERO",
+            "SLT",
+            "SGT"
+          ],
+          "ignore_loops": true,
+          "max_branches": 15
+        },
+        "solver": {
+          "strategy": "z3",
+          "max_solutions": 8,
+          "use_cache": true,
+          "cache_size": 1000,
+          "parallel": true,
+          "workers": 8
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.5,
+          "max_symbolic_seeds": 20
+        }
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

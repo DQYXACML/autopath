@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
 
@@ -74,6 +75,22 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		// 仅在存在有效字段时记录，否则跳过该账户
 		if override.Balance != "" || override.Nonce != "" || override.Code != "" || len(override.State) > 0 {
 			overrides[strings.ToLower(addr)] = override
+		}
+	}
+
+	// 🔧 补充本地已部署合约的代码
+	// 处理场景：攻击合约通过 anvil_setCode 注入但 prestateTracer 未包含
+	for addr, override := range overrides {
+		if override.Code == "" || override.Code == "0x" {
+			// 查询本地节点上的合约代码
+			var localCode string
+			if err := s.rpcClient.CallContext(ctx, &localCode, "eth_getCode", addr, "latest"); err == nil {
+				if localCode != "" && localCode != "0x" && len(localCode) > 2 {
+					override.Code = strings.ToLower(localCode)
+					log.Printf("[StateOverride] 🔧 从本地节点补充合约代码: %s (size=%d bytes)",
+						addr, (len(localCode)-2)/2)
+				}
+			}
 		}
 	}
 

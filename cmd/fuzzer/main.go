@@ -119,6 +119,7 @@ func main() {
 		common.HexToHash(*txHash),
 		common.HexToAddress(*contractAddr),
 		*blockNum,
+		nil, // 命令行工具没有预先获取的交易对象，传nil让Fuzzer自行查询
 	)
 
 	if err != nil {

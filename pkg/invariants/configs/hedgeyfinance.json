@@ -1,0 +1,148 @@
+{
+  "project_id": "HedgeyFinance_exp",
+  "name": "HedgeyFinance_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0xBc452fdC8F851d7c5B72e1Fe74DFB63bb793D511",
+    
+    "0xDed2b1a426E1b7d415A40Bcad44e98F47181dda2",
+    
+    "0xC793113F1548B97E37c409f39244EE44241bF2b3",
+    
+    "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    
+    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    
+    "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
+    
+    "0xce88686553686DA562CE7Cea497CE749DA109f9F",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    
+    "0xce04f3b9b2dfc43b1d1e78376db74a3b32c0a78d",
+    
+    "0x08e5218da97ab939144e67510d646e499712fb36"
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.15,
+        "contracts": ["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"],
+        "slots": {"slot_0": {"index": "56522839540691169057613967758777148022649144153718075172029520304989781422879", "severity": "critical", "threshold": 0.15}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+        
+      },
+      "monitored_functions": ["createLockedCampaign", "cancelCampaign"]
+    },
+    
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.15,
+        "contracts": ["0xDed2b1a426E1b7d415A40Bcad44e98F47181dda2"],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.15"
+        
+      },
+      "monitored_functions": ["createLockedCampaign", "cancelCampaign"]
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0xBc452fdC8F851d7c5B72e1Fe74DFB63bb793D511",
+        "function": "createLockedCampaign",
+        "signature": "createLockedCampaign(bytes16,Campaign,ClaimLockup,Donation)"
+      },
+      
+      {
+        "contract": "0xBc452fdC8F851d7c5B72e1Fe74DFB63bb793D511",
+        "function": "cancelCampaign",
+        "signature": "cancelCampaign(bytes16)"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/hedgeyfinance",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "HedgeyFinance_exp",
+      "config_path": "pkg/invariants/configs/hedgeyfinance_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

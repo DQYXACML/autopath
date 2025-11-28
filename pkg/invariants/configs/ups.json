@@ -1,0 +1,460 @@
+{
+  "project_id": "UPS_exp",
+  "name": "UPS_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984",
+    
+    "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    
+    "0x55d398326f99059fF775485246999027B3197955",
+    
+    "0x3dA4828640aD831F3301A4597821Cc3461B06678",
+    
+    "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D",
+    
+    "0x4f31Fa980a675570939B737Ebdde0471a4Be40Eb",
+    
+    "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    
+    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    
+    "0xBA5Fe23f8a3a24BEd3236F05F2FcF35fd0BF0B5C",
+    
+    "0x6613ea7300000001adeda2654c1804a508620000",
+    
+    "0x6613ea730000000281afbe341905a5a508620000",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    
+    "0xb38645331535d8a24250bd866c230d0d85c11b90",
+    
+    "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f",
+    
+    "0xcd007bbf706780d463d4844f08fcdd0e250465c2",
+    
+    "0x1988df5549120bd3ea36a8503d468d18ae5a35bc",
+    
+    "0x40efe119f1031eb281b5b195ed42e00327d441da",
+    
+    "0x87540d415975cc0544d14bbec3514a2ae56bc502",
+    
+    "0x55ddFA0Aad3750FBB1daF96d1CAF028a9aF66f03",
+    
+    "0xbB6e4DE517A983059AA4785d385B87827616464B",
+    
+    "0x93b5d67ebc16E1fD99E73bad869BC2e4A07905a0",
+    
+    "0x2C165Aef26c95eFD5ae9FC257fbBDE206cdc3C92",
+    
+    "0x2027bB47b3f6c84961BB2B7f07906Fb301426D38",
+    
+    "0xCB80747dfb32f96bbee7d21B620B908dd6E306EA",
+    
+    "0x79e94023094DcDc09F4e9B85baD874dE23d3D1D8",
+    
+    "0x184d5eB0bbFc7dEaA9c378630FC6EB6E7E0D02A6",
+    
+    "0xF80bB30CC4f285035F85198Fb11a603bFF217170",
+    
+    "0xdD2644e5E139c284C7195B4Db23c7130EeE9d155",
+    
+    "0xB9e907A3cC7140917AF5C9EeC3df3d90DC89e69D",
+    
+    "0x8a2714586EA7876683E7Ea992373A50516Ecb7E1",
+    
+    "0x673B869580A783628c0F910Cd6A462887ACcA7C4",
+    
+    "0xCa5C874CC87FC837571c21bACFAe5364A547b484",
+    
+    "0x9636C8D6a0e94dF64421699B6A816cFF2489329D",
+    
+    "0xa84C4ef1Fd4767616c7D55083bd394A069633f67",
+    
+    "0x506bDFC96efc345286EB66Cd860a9BEB604B3c3a",
+    
+    "0x3E97B1F2d8eb21532060e59333949dc6Ca93E9aB",
+    
+    "0xa20C4B632B76ED5DCF132efA34336Cd37ABA5E01",
+    
+    "0x4A40b92B6173FB5B18B9209b324033198B281f7a",
+    
+    "0xb051D3668a5ce75EC00Ac7e26Db0Db2f817f4d8d",
+    
+    "0x601301B815d2d91c2BE0790D4a35813103436597",
+    
+    "0x66916C2e0217Ae489ceb28d398937f31CDD0FF93",
+    
+    "0x9174e2772A7c30917016F23774412A1cdFDD0018",
+    
+    "0xAEe6DF8163675FF4727B8CEC7d348462B668dc51",
+    
+    "0x1b97f24C64991347aC142e7d9aCA93e2F64AF3e5",
+    
+    "0xA5F27f8ee8bfdFF435Ad7f970fb7fe142b550973",
+    
+    "0xF92841EE81ab713f28d31c155dBEaCaB60891D48",
+    
+    "0xf0A920088DAC6bB2e353520118aA14E36C85dc37",
+    
+    "0x73feE7006a456dae10fd601f5d2c8E3ba4639e4c",
+    
+    "0x72cd56874ed7B4e81b4496388e7D1705ffB7f142",
+    
+    "0x00A8D4E7aB8070ab69BE795eC74D8Da522DfaC24",
+    
+    "0xab366524b6C55427d3e6C9959E9564721C84cFeC",
+    
+    "0x085C0666817d8Fb1276FE32B84D7B461b401Ca23",
+    
+    "0xf4d6A8FE251058E93a4825b179E614358250baC6",
+    
+    "0x21b20cbD9Ab7e225f132869b1e06cae1ff828E44",
+    
+    "0x761fdc514a834725430f8a765ad12529586D2350",
+    
+    "0x7727f0dF06D0F126d85cfAdE4d14301a486230fE",
+    
+    "0x8fE0d1bA291722fDAccBc2b7e783c7035dcD555C",
+    
+    "0x976fFA02b3B4AeE589907c3A2C69326fA2EA7bc0",
+    
+    "0x0b3a0a5d0a0766f38eeca1b88092cd7596a181c6",
+    
+    "0xd0a15405d2801847abdcb5337524d1b22fbef6d6",
+    
+    "0x3456a7be528c5ed7b1ea6e2070e71a92b8cc0d96",
+    
+    "0x497c344c76acadbaacfdf8ee6667b6ce8ddc0366",
+    
+    "0x24966745c6cd52f3faab7c31d490abe44aa95e5a",
+    
+    "0x07b82ed1ed8c51e36f20aaec36ad7f8ebe26da95",
+    
+    "0xd3c6f0eadde33c2a716fcc288b5a10b1569a0c85",
+    
+    "0xae4cef27381343287d43f950d1225b2da9f9bad5",
+    
+    "0x7008aee79ab5e9764ce26b7843bd24b4511c5923",
+    
+    "0x01130ff3dafe67d498f9209033872aa164ba3495",
+    
+    "0x9f1c11e971ea8c56c304516525d571ddd7a6ae41",
+    
+    "0x61e7457e095ed7fd5056ecc332658e391bf878b4",
+    
+    "0x62780f97b47bbc50b541ae9c826d07b9f659d7db",
+    
+    "0xb7328f210c6d1cf9647d984525a8122cb0d1df4d",
+    
+    "0x4349283c4a69d17b5d59c3036a5e51d7aeda67c0",
+    
+    "0xbcb05f28bd2c236b06a51e91c6606600b8eb3608",
+    
+    "0xd67259c04914e247c779a698d5a9b77405fb7eee",
+    
+    "0xc9fc0022634c18e751b9d841212b96933be8bb28",
+    
+    "0xff2630fdef0addb417768bb3a94e81216f93c9d3",
+    
+    "0x44639cbdf74c14351cf3b1d996bb44b078bb5ae9",
+    
+    "0x80fd06006ce0156c8e048d6f9e824b14db297275",
+    
+    "0x5c9775d1f4c3f4dbc0da463b03399bdcefef3748",
+    
+    "0xa46c9543726322b6ee24f08d07babbbd034da614",
+    
+    "0xcbf85e1552715ec8b000544bf30ff70cff3627f5",
+    
+    "0x9c490d3411557dec31617a2cf19ea4952db500a2",
+    
+    "0xf3164e2d9e3c05afb64fc11d2e51cf375902c8cb",
+    
+    "0x0d68fe863498c55893c1a74004eeec74965be530",
+    
+    "0x183e32406355e89d35d87fe2bb0535f69774d10b",
+    
+    "0x1290304cc1bf2d387b1956f2815de65bcbb3a997",
+    
+    "0x10542b72054877118f3bb6cbc16efb7b0cf3f2a6",
+    
+    "0x7eb3c7938a4644643abdf436e5d4d94d4971a62c",
+    
+    "0xdc87416482bb470e60e5afd1d4c0819d20601ee6",
+    
+    "0x6b65f1b63ae7c0f60d3d4014ee95adf66754666b",
+    
+    "0xa20386346ed70a61540604ea1263b9c77fdbe2ba",
+    
+    "0xb29cca82c8fddc2dfc22637a879caae4d33c98a1",
+    
+    "0x8cd5d3b036d6b0d621be720fd7bf1a01deca8fd5",
+    
+    "0xef993cb2019264af68ba1a6777a0ef607f9d89f2",
+    
+    "0xa7a80faa574006703fe02e66b7b17eadabf1f366",
+    
+    "0x626f1e15d7d1bdf4f02e80f0130ba311c50cdd23",
+    
+    "0xe5e10624012ec55f4b1c40407ea48653e72bc8b6"
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.15,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "97908713888959479155704534268421961172808258024764404370293984161020627956876", "severity": "critical", "threshold": 0.15}, "slot_1": {"index": "107320256156263509680909337903686328934897519082638407400170681116488273252321", "severity": "critical", "threshold": 0.15}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0x3dA4828640aD831F3301A4597821Cc3461B06678"],
+        "slots": {"slot_10": {"index": "10", "severity": "critical", "threshold": 5.0}},
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    },
+    
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.18,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955", "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984", "0x3dA4828640aD831F3301A4597821Cc3461B06678"],
+        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 0.18}},
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.18"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.24,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "97908713888959479155704534268421961172808258024764404370293984161020627956876", "severity": "high", "threshold": 0.24}, "slot_1": {"index": "107320256156263509680909337903686328934897519082638407400170681116488273252321", "severity": "high", "threshold": 0.24}},
+        "formula": "(value_after - value_before) / value_before <= 0.24"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.5,
+        "contracts": ["0xA2633ca9Eb7465E7dB54be30f62F577f039a2984"],
+        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 0.5}},
+        "formula": "(value_after - value_before) / value_before <= 0.5"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_003",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0x3dA4828640aD831F3301A4597821Cc3461B06678"],
+        "slots": {"slot_10": {"index": "10", "severity": "high", "threshold": 5.0}},
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "skim", "sync"]
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984",
+        "function": "getReserves",
+        "signature": "getReserves()"
+      },
+      
+      {
+        "contract": "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984",
+        "function": "swap",
+        "signature": "swap(uint,uint,address,bytes)"
+      },
+      
+      {
+        "contract": "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984",
+        "function": "skim",
+        "signature": "skim(address)"
+      },
+      
+      {
+        "contract": "0xA2633ca9Eb7465E7dB54be30f62F577f039a2984",
+        "function": "sync",
+        "signature": "sync()"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/ups",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "UPS_exp",
+      "config_path": "pkg/invariants/configs/ups_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

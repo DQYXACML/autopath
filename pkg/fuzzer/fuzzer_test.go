@@ -3,6 +3,7 @@ package fuzzer
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,7 @@ func TestParameterGeneration(t *testing.T) {
 
 		assert.True(t, hasZero, "Should include zero")
 		assert.True(t, hasOriginal, "Should include original value")
+		assert.True(t, hasMax, "Should include max uint256")
 	})
 
 	t.Run("AddressGeneration", func(t *testing.T) {

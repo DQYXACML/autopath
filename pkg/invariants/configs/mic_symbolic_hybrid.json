@@ -1,0 +1,76 @@
+{
+  "project_id": "mic-symbolic-hybrid",
+  "name": "MIC Token Protocol (Hybrid Solver Strategy)",
+  "chain_id": 1,
+  "contracts": [
+    "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+  ],
+  "invariants": [
+    {
+      "id": "swap-price-check",
+      "name": "Swap Price Manipulation Detection",
+      "type": "delta",
+      "description": "检测swap操作中的价格操纵攻击",
+      "parameters": {
+        "max_price_change_percentage": 0.15,
+        "monitoring_pairs": [
+          "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        ]
+      }
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "threshold": 0.7,
+    "max_variations": 300,
+    "workers": 8,
+    "timeout_seconds": 20,
+    "seed_config": {
+      "enabled": true,
+      "attack_seeds": {
+        "0": ["1000000000000000000"]
+      },
+      "range_config": {
+        "numeric_range_percent": [1, 2, 5, 10, 20, 50],
+        "boundary_exploration": true
+      },
+      "adaptive_config": {
+        "enabled": true,
+        "max_iterations": 5,
+        "convergence_rate": 0.02
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "hybrid",
+        "max_constraints": 40,
+        "solver_timeout": "5s",
+        "extraction": {
+          "max_trace_depth": 7000,
+          "focus_opcodes": ["JUMPI", "LT", "GT", "EQ", "ISZERO", "SLT", "SGT", "MOD", "AND"],
+          "ignore_loops": true,
+          "max_branches": 20
+        },
+        "solver": {
+          "strategy": "hybrid",
+          "max_solutions": 10,
+          "use_cache": true,
+          "cache_size": 1500,
+          "parallel": false,
+          "workers": 4,
+          "comment": "hybrid模式: 简单约束(LT/GT/EQ/RANGE)使用本地求解器, 复杂约束(MOD/AND/OR/MASK)自动切换到Z3"
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.55,
+          "max_symbolic_seeds": 25
+        }
+      }
+    }
+  },
+  "monitoring_config": {
+    "block_lag": 2,
+    "batch_size": 10,
+    "check_interval_seconds": 12
+  }
+}

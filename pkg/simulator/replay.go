@@ -4,10 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+
+	apptypes "autopath/pkg/types"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -34,84 +40,19 @@ func NewEVMSimulator(rpcURL string) (*EVMSimulator, error) {
 	}, nil
 }
 
-// ContractJumpDest 合约维度的 JUMPDEST
-type ContractJumpDest struct {
-	Contract string `json:"contract"` // 合约地址
-	PC       uint64 `json:"pc"`       // 程序计数器
-}
-
-// ReplayResult 重放结果
-type ReplayResult struct {
-	Success             bool                   `json:"success"`
-	GasUsed             uint64                 `json:"gas_used"`
-	ReturnData          string                 `json:"return_data"`
-	Logs                []Log                  `json:"logs"`
-	StateChanges        map[string]StateChange `json:"state_changes"`
-	JumpDests           []uint64               `json:"jump_dests"`            // 保留向后兼容
-	ContractJumpDests   []ContractJumpDest     `json:"contract_jump_dests"`   // 新增：带合约地址的路径
-	ProtectedStartIndex int                    `json:"protected_start_index"` // 新增：受保护合约开始索引
-	ProtectedEndIndex   int                    `json:"protected_end_index"`   // 新增：受保护合约结束索引
-	ExecutionPath       []PathStep             `json:"execution_path"`
-	Error               string                 `json:"error,omitempty"`
-}
-
-// Log 日志
-type Log struct {
-	Address common.Address `json:"address"`
-	Topics  []common.Hash  `json:"topics"`
-	Data    string         `json:"data"`
-}
-
-// StorageUpdate 存储槽位的前后状态
-type StorageUpdate struct {
-	Before string `json:"before"`
-	After  string `json:"after"`
-}
-
-// StateChange 状态变化
-type StateChange struct {
-	BalanceBefore  string                   `json:"balance_before"`
-	BalanceAfter   string                   `json:"balance_after"`
-	StorageChanges map[string]StorageUpdate `json:"storage_changes"`
-}
-
-// PathStep 执行路径步骤
-type PathStep struct {
-	PC       uint64         `json:"pc"`       // 程序计数器
-	Op       string         `json:"op"`       // 操作码
-	Gas      uint64         `json:"gas"`      // 剩余Gas
-	GasCost  uint64         `json:"gas_cost"` // Gas消耗
-	Depth    int            `json:"depth"`    // 调用深度
-	Stack    []string       `json:"stack"`    // 栈内容（简化）
-	Memory   string         `json:"memory"`   // 内存内容（简化）
-	Contract common.Address `json:"contract"` // 当前合约地址
-}
-
-// ForkAndReplay Fork状态并重放交易
-func (s *EVMSimulator) ForkAndReplay(ctx context.Context, blockNumber uint64, txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
-	// 使用 debug_traceTransaction 获取执行轨迹
-	result, err := s.traceTransactionWithCustomTracer(txHash, protectedContract)
-	if err != nil {
-		// 兼容不支持JS Tracer的节点（如某些 anvil 版本）
-		if strings.Contains(err.Error(), "unsupported tracer type") || strings.Contains(err.Error(), "unsupported tracer") {
-			// 回退到 callTracer，并使用伪 JumpDests 表示调用序列
-			return s.traceTransactionWithCallTracer(txHash)
-		}
-		return nil, fmt.Errorf("failed to trace transaction: %w", err)
+// NewEVMSimulatorWithClients 使用现有的RPC客户端创建EVM模拟器
+// 这个方法允许复用现有的连接，避免创建多个独立的RPC连接
+func NewEVMSimulatorWithClients(rpcClient *rpc.Client, client *ethclient.Client) *EVMSimulator {
+	fmt.Printf("[Simulator] ✅ 使用共享的RPC客户端创建模拟器（避免创建新连接）\n")
+	return &EVMSimulator{
+		client:    client,
+		rpcClient: rpcClient,
 	}
-
-	return result, nil
 }
 
-// traceTransactionWithCustomTracer 使用自定义追踪器追踪交易
-func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
-	recordAll := protectedContract == (common.Address{})
-	protectedAddr := ""
-	if !recordAll {
-		protectedAddr = strings.ToLower(protectedContract.Hex())
-	}
-
-	tracerCode := fmt.Sprintf(`{
+// buildReplayTracerCode 生成重放交易的 JS tracer 代码
+func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
+	return fmt.Sprintf(`{
 		data: {
 			jumpDests: [],
 			contractJumpDests: [],
@@ -120,12 +61,19 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 			recordAll: %t,
 			protectedStartIndex: -1,
 			protectedEndIndex: -1,
-			executionPath: [],
+			// executionPath: [],  // 注释掉：记录15万+步骤会导致内存/性能问题
 			stateChanges: {},
 			logs: [],
 			gasUsed: 0,
 			success: true,
-			returnData: ""
+			returnData: "",
+			debugInfo: {
+				totalSteps: 0,
+				protectedSteps: 0,
+				jumpDestCount: 0,
+				firstProtectedContract: "",
+				recordingTrigger: ""
+			}
 		},
 		formatHex: function(value) {
 			var hex = toHex(value);
@@ -159,6 +107,8 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 			var currentContract = toHex(log.contract.getAddress());
 			var currentLower = currentContract.toLowerCase();
 
+			this.data.debugInfo.totalSteps++;
+
 			if (this.data.recordAll && this.data.protectedStartIndex === -1) {
 				this.data.protectedStartIndex = 0;
 			}
@@ -166,6 +116,8 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 			if (!this.data.recordAll && this.data.protectedContract !== "" && currentLower === this.data.protectedContract) {
 				if (!this.data.recordingStarted) {
 					this.data.recordingStarted = true;
+					this.data.debugInfo.recordingTrigger = "matched_protected_contract";
+					this.data.debugInfo.firstProtectedContract = currentContract;
 					if (this.data.protectedStartIndex === -1) {
 						this.data.protectedStartIndex = this.data.contractJumpDests.length;
 					}
@@ -177,7 +129,10 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 				return;
 			}
 
+			this.data.debugInfo.protectedSteps++;
+
 			if (log.op.toString() === "JUMPDEST") {
+				this.data.debugInfo.jumpDestCount++;
 				this.data.jumpDests.push(log.getPC());
 				this.data.contractJumpDests.push({
 					contract: currentContract,
@@ -185,23 +140,29 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 				});
 			}
 
-			var step = {
-				pc: log.getPC(),
-				op: log.op.toString(),
-				gas: log.getGas(),
-				gasCost: log.getCost(),
-				depth: log.getDepth(),
-				stack: [],
-				memory: "",
-				contract: currentContract
-			};
-
-			var stackLength = log.stack.length();
-			for (var i = 0; i < Math.min(3, stackLength); i++) {
-				step.stack.push(this.formatWord(log.stack.peek(i)));
+			// 记录状态变化
+			if (log.op.toString() === "SSTORE") {
+				var addrKey = currentLower;
+				if (!this.data.stateChanges[addrKey]) {
+					var balance = this.formatHex(db.getBalance(log.contract.getAddress()));
+					this.data.stateChanges[addrKey] = {
+						address: currentContract,
+						balanceBefore: balance,
+						balanceAfter: balance,
+						storageChanges: {}
+					};
+				}
+				var state = this.data.stateChanges[addrKey];
+				var slotKey = this.formatWord(log.stack.peek(0));
+				var newValue = this.formatWord(log.stack.peek(1));
+				var previousValue = db.getState(log.contract.getAddress(), log.stack.peek(0));
+				var formattedPrev = previousValue ? this.formatWord(previousValue) : "0x0";
+				state.storageChanges[slotKey] = {
+					before: formattedPrev,
+					after: newValue
+				};
+				state.balanceAfter = this.formatHex(db.getBalance(log.contract.getAddress()));
 			}
-
-			this.data.executionPath.push(step);
 
 			if (log.op.toString() === "SSTORE") {
 				var addrKey = currentLower;
@@ -279,18 +240,11 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 			return this.data;
 		}
 	}`, protectedAddr, recordAll)
+}
 
-	var result json.RawMessage
-	err := s.rpcClient.Call(&result, "debug_traceTransaction", txHash, map[string]interface{}{
-		"tracer": tracerCode,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// 解析结果（注意：JS tracer 返回为驼峰命名）
-	var raw struct {
+// parseReplayResult 将 tracer 原始输出解码为 ReplayResult
+func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
+	var decoded struct {
 		Success             bool               `json:"success"`
 		GasUsed             uint64             `json:"gasUsed"`
 		ReturnData          string             `json:"returnData"`
@@ -308,39 +262,31 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 				After  string `json:"after"`
 			} `json:"storageChanges"`
 		} `json:"stateChanges"`
-		Logs []Log `json:"logs"`
+		Logs      []Log `json:"logs"`
+		DebugInfo struct {
+			TotalSteps             int    `json:"totalSteps"`
+			ProtectedSteps         int    `json:"protectedSteps"`
+			JumpDestCount          int    `json:"jumpDestCount"`
+			FirstProtectedContract string `json:"firstProtectedContract"`
+			RecordingTrigger       string `json:"recordingTrigger"`
+		} `json:"debugInfo"`
 	}
-	if err := json.Unmarshal(result, &raw); err != nil {
+
+	if err := json.Unmarshal(raw, &decoded); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal trace result: %w", err)
 	}
 
-	// 若 jumpDests 为空但有执行路径，做一次兜底提取
-	jumpDests := raw.JumpDests
-	if len(jumpDests) == 0 && len(raw.ExecutionPath) > 0 {
-		for _, s := range raw.ExecutionPath {
-			if s.Op == "JUMPDEST" {
-				jumpDests = append(jumpDests, s.PC)
-			}
-		}
-	}
-	if len(jumpDests) == 0 && len(raw.ExecutionPath) > 0 {
-		for _, s := range raw.ExecutionPath {
-			jumpDests = append(jumpDests, s.PC)
-		}
-	}
+	fmt.Printf("[DEBUG tracer result] totalSteps=%d, protectedSteps=%d, jumpDestCount=%d, trigger=%s, firstContract=%s\n",
+		decoded.DebugInfo.TotalSteps, decoded.DebugInfo.ProtectedSteps, decoded.DebugInfo.JumpDestCount,
+		decoded.DebugInfo.RecordingTrigger, decoded.DebugInfo.FirstProtectedContract)
+	fmt.Printf("[DEBUG tracer result] raw.JumpDests length=%d, raw.ContractJumpDests length=%d\n",
+		len(decoded.JumpDests), len(decoded.ContractJumpDests))
 
-	contractJumpDests := raw.ContractJumpDests
-	if len(contractJumpDests) == 0 && len(raw.ExecutionPath) > 0 {
-		for _, s := range raw.ExecutionPath {
-			contractJumpDests = append(contractJumpDests, ContractJumpDest{
-				Contract: s.Contract.Hex(),
-				PC:       s.PC,
-			})
-		}
-	}
+	contractJumpDests := decoded.ContractJumpDests
 
-	stateChanges := make(map[string]StateChange, len(raw.StateChanges))
-	for addr, change := range raw.StateChanges {
+	// 组装状态变更
+	stateChanges := make(map[string]StateChange, len(decoded.StateChanges))
+	for addr, change := range decoded.StateChanges {
 		updates := make(map[string]StorageUpdate, len(change.StorageChanges))
 		for slot, diff := range change.StorageChanges {
 			updates[slot] = StorageUpdate{
@@ -356,19 +302,345 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 	}
 
 	replay := &ReplayResult{
-		Success:             raw.Success,
-		GasUsed:             raw.GasUsed,
-		ReturnData:          raw.ReturnData,
-		JumpDests:           jumpDests,
+		Success:             decoded.Success,
+		GasUsed:             decoded.GasUsed,
+		ReturnData:          decoded.ReturnData,
+		JumpDests:           decoded.JumpDests,
 		ContractJumpDests:   contractJumpDests,
-		ProtectedStartIndex: raw.ProtectedStartIndex,
-		ProtectedEndIndex:   raw.ProtectedEndIndex,
-		ExecutionPath:       raw.ExecutionPath,
+		ProtectedStartIndex: decoded.ProtectedStartIndex,
+		ProtectedEndIndex:   decoded.ProtectedEndIndex,
+		ExecutionPath:       decoded.ExecutionPath,
 		StateChanges:        stateChanges,
-		Logs:                raw.Logs,
-		Error:               raw.Error,
+		Logs:                decoded.Logs,
+		Error:               decoded.Error,
 	}
 	return replay, nil
+}
+
+// ContractJumpDest 合约维度的 JUMPDEST
+type ContractJumpDest struct {
+	Contract string `json:"contract"` // 合约地址
+	PC       uint64 `json:"pc"`       // 程序计数器
+}
+
+// CallFrame callTracer 的调用帧
+type CallFrame struct {
+	Type    string                  `json:"type"`
+	From    string                  `json:"from"`
+	To      string                  `json:"to"`
+	Value   string                  `json:"value"`
+	Gas     apptypes.FlexibleUint64 `json:"gas"`
+	GasUsed apptypes.FlexibleUint64 `json:"gasUsed"`
+	Input   string                  `json:"input"`
+	Output  string                  `json:"output"`
+	Error   string                  `json:"error"`
+	Calls   []CallFrame             `json:"calls"`
+}
+
+// ReplayResult 重放结果
+type ReplayResult struct {
+	Success             bool                   `json:"success"`
+	GasUsed             uint64                 `json:"gas_used"`
+	ReturnData          string                 `json:"return_data"`
+	Logs                []Log                  `json:"logs"`
+	StateChanges        map[string]StateChange `json:"state_changes"`
+	JumpDests           []uint64               `json:"jump_dests"`            // 保留向后兼容
+	ContractJumpDests   []ContractJumpDest     `json:"contract_jump_dests"`   // 新增：带合约地址的路径
+	ProtectedStartIndex int                    `json:"protected_start_index"` // 新增：受保护合约开始索引
+	ProtectedEndIndex   int                    `json:"protected_end_index"`   // 新增：受保护合约结束索引
+	ExecutionPath       []PathStep             `json:"execution_path"`
+	Error               string                 `json:"error,omitempty"`
+}
+
+// Log 日志
+type Log struct {
+	Address common.Address `json:"address"`
+	Topics  []common.Hash  `json:"topics"`
+	Data    string         `json:"data"`
+}
+
+// StorageUpdate 存储槽位的前后状态
+type StorageUpdate struct {
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+
+// StateChange 状态变化
+type StateChange struct {
+	BalanceBefore  string                   `json:"balance_before"`
+	BalanceAfter   string                   `json:"balance_after"`
+	StorageChanges map[string]StorageUpdate `json:"storage_changes"`
+}
+
+// PathStep 执行路径步骤
+type PathStep struct {
+	PC       uint64         `json:"pc"`       // 程序计数器
+	Op       string         `json:"op"`       // 操作码
+	Gas      uint64         `json:"gas"`      // 剩余Gas
+	GasCost  uint64         `json:"gas_cost"` // Gas消耗
+	Depth    int            `json:"depth"`    // 调用深度
+	Stack    []string       `json:"stack"`    // 栈内容（简化）
+	Memory   string         `json:"memory"`   // 内存内容（简化）
+	Contract common.Address `json:"contract"` // 当前合约地址
+}
+
+// ForkAndReplay Fork状态并重放交易
+func (s *EVMSimulator) ForkAndReplay(ctx context.Context, blockNumber uint64, txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
+	// 使用 debug_traceTransaction 获取执行轨迹
+	result, err := s.traceTransactionWithCustomTracer(txHash, protectedContract)
+	if err != nil {
+		fmt.Printf("[DEBUG ForkAndReplay] traceTransactionWithCustomTracer失败: %v\n", err)
+		// 兼容不支持JS Tracer的节点（如某些 anvil 版本）
+		if strings.Contains(err.Error(), "unsupported tracer type") || strings.Contains(err.Error(), "unsupported tracer") {
+			fmt.Printf("[DEBUG ForkAndReplay] 触发callTracer fallback!\n")
+			// 回退到 callTracer，并使用伪 JumpDests 表示调用序列
+			return s.traceTransactionWithCallTracer(txHash)
+		}
+		return nil, fmt.Errorf("failed to trace transaction: %w", err)
+	}
+
+	fmt.Printf("[DEBUG ForkAndReplay] 成功! JumpDests=%d, ContractJumpDests=%d, ProtectedStart=%d\n",
+		len(result.JumpDests), len(result.ContractJumpDests), result.ProtectedStartIndex)
+	return result, nil
+}
+
+// traceTransactionWithCustomTracer 使用自定义追踪器追踪交易
+func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
+	recordAll := protectedContract == (common.Address{})
+	protectedAddr := ""
+	if !recordAll {
+		protectedAddr = strings.ToLower(protectedContract.Hex())
+	}
+
+	fmt.Printf("[DEBUG tracer] recordAll=%v, protectedAddr=%s\n", recordAll, protectedAddr)
+
+	tracerCode := buildReplayTracerCode(protectedAddr, recordAll)
+
+	var result json.RawMessage
+
+	// 🔍 诊断日志：记录RPC调用详情
+	fmt.Printf("[DEBUG Trace] 即将调用debug_traceTransaction:\n")
+	fmt.Printf("  - txHash: %s\n", txHash.Hex())
+	fmt.Printf("  - protectedContract: %s\n", protectedAddr)
+	fmt.Printf("  - recordAll: %v\n", recordAll)
+	fmt.Printf("  - RPC Client类型: %T\n", s.rpcClient)
+
+	startTime := time.Now()
+	err := s.rpcClient.Call(&result, "debug_traceTransaction", txHash, map[string]interface{}{
+		"tracer": tracerCode,
+	})
+	elapsed := time.Since(startTime)
+
+	fmt.Printf("[DEBUG Trace] debug_traceTransaction完成:\n")
+	fmt.Printf("  - 耗时: %v\n", elapsed)
+	fmt.Printf("  - 错误: %v\n", err)
+	if err == nil {
+		fmt.Printf("  - 结果长度: %d bytes\n", len(result))
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 输出原始JSON用于调试
+	fmt.Printf("[DEBUG tracer raw JSON] %s\n", string(result)[:min(500, len(result))])
+
+	return parseReplayResult(result)
+}
+
+// ReplayTransactionWithOverride 使用 prestate 覆盖离线重放原始交易
+func (s *EVMSimulator) ReplayTransactionWithOverride(
+	ctx context.Context,
+	tx *types.Transaction,
+	blockNumber uint64,
+	override StateOverride,
+	protectedContract common.Address,
+) (*ReplayResult, error) {
+	msg, err := buildCallMessageFromTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	recordAll := protectedContract == (common.Address{})
+	protectedAddr := ""
+	if !recordAll {
+		protectedAddr = strings.ToLower(protectedContract.Hex())
+	}
+
+	tracerCode := buildReplayTracerCode(protectedAddr, recordAll)
+
+	options := map[string]interface{}{
+		"tracer": tracerCode,
+	}
+
+	params := []interface{}{
+		msg,
+		fmt.Sprintf("0x%x", blockNumber),
+		options,
+	}
+	if override != nil && len(override) > 0 {
+		params = append(params, override)
+	}
+
+	var result json.RawMessage
+	err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
+
+	if err != nil && override != nil && len(override) > 0 {
+		errStr := err.Error()
+		if strings.Contains(errStr, "stateOverrides") ||
+			strings.Contains(errStr, "unexpected EOF") ||
+			strings.Contains(errStr, "invalid length") {
+			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+
+			paramsFallback := []interface{}{
+				msg,
+				fmt.Sprintf("0x%x", blockNumber),
+				map[string]interface{}{"tracer": tracerCode},
+			}
+			var retryRaw json.RawMessage
+			if retryErr := s.rpcClient.CallContext(ctx, &retryRaw, "debug_traceCall", paramsFallback...); retryErr == nil {
+				result = retryRaw
+				err = nil
+			} else {
+				err = retryErr
+			}
+		}
+	}
+
+	if err != nil {
+		// 某些节点不支持 stateOverrides 或返回未标记的枚举错误
+		errStr := err.Error()
+		if override != nil && len(override) > 0 &&
+			(strings.Contains(errStr, "stateOverrides") ||
+				strings.Contains(errStr, "unexpected EOF") ||
+				strings.Contains(errStr, "invalid length") ||
+				strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall")) {
+			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+
+			paramsFallback := []interface{}{
+				msg,
+				fmt.Sprintf("0x%x", blockNumber),
+				map[string]interface{}{"tracer": tracerCode},
+			}
+			var retryRaw json.RawMessage
+			if retryErr := s.rpcClient.CallContext(ctx, &retryRaw, "debug_traceCall", paramsFallback...); retryErr == nil {
+				result = retryRaw
+				err = nil
+			} else {
+				err = retryErr
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to trace call with override: %w", err)
+	}
+
+	fmt.Printf("[DEBUG tracer raw JSON] %s\n", string(result)[:min(500, len(result))])
+	return parseReplayResult(result)
+}
+
+// TraceCallTreeWithOverride 使用 callTracer 在 prestate 上重放交易，获取完整调用树
+func (s *EVMSimulator) TraceCallTreeWithOverride(
+	ctx context.Context,
+	tx *types.Transaction,
+	blockNumber uint64,
+	override StateOverride,
+) (*CallFrame, error) {
+	msg, err := buildCallMessageFromTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	options := map[string]interface{}{
+		"tracer": "callTracer",
+		"tracerConfig": map[string]interface{}{
+			"onlyTopCall": false,
+		},
+	}
+
+	params := []interface{}{
+		msg,
+		fmt.Sprintf("0x%x", blockNumber),
+		options,
+	}
+	if override != nil && len(override) > 0 {
+		params = append(params, override)
+	}
+
+	var raw json.RawMessage
+	callErr := s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", params...)
+	if callErr != nil && override != nil && len(override) > 0 {
+		errStr := callErr.Error()
+		if strings.Contains(errStr, "stateOverrides") ||
+			strings.Contains(errStr, "unexpected EOF") ||
+			strings.Contains(errStr, "invalid length") {
+			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+
+			paramsFallback := []interface{}{
+				msg,
+				fmt.Sprintf("0x%x", blockNumber),
+				options,
+			}
+			if retryErr := s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", paramsFallback...); retryErr == nil {
+				callErr = nil
+			} else {
+				callErr = retryErr
+			}
+		}
+	}
+
+	if callErr != nil {
+		return nil, fmt.Errorf("failed to trace call tree: %w", callErr)
+	}
+
+	var frame CallFrame
+	if err := json.Unmarshal(raw, &frame); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal callTracer frame: %w", err)
+	}
+	return &frame, nil
+}
+
+// buildCallMessageFromTx 将已上链交易转换为 debug_traceCall 所需的消息结构
+func buildCallMessageFromTx(tx *types.Transaction) (map[string]interface{}, error) {
+	msg := map[string]interface{}{
+		"data": hexutil.Encode(tx.Data()),
+		"gas":  fmt.Sprintf("0x%x", tx.Gas()),
+	}
+
+	if tx.To() != nil {
+		msg["to"] = tx.To().Hex()
+	}
+
+	if tx.Value() != nil && tx.Value().Sign() > 0 {
+		msg["value"] = fmt.Sprintf("0x%x", tx.Value())
+	}
+
+	chainID := tx.ChainId()
+	var signer types.Signer
+	if chainID != nil {
+		signer = types.LatestSignerForChainID(chainID)
+	} else {
+		signer = types.HomesteadSigner{}
+	}
+
+	from, err := types.Sender(signer, tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive sender from tx: %w", err)
+	}
+	msg["from"] = from.Hex()
+
+	// 为避免余额检查失败，使用零 gas 价格模拟执行
+	msg["gasPrice"] = "0x0"
+	if tx.Type() == types.DynamicFeeTxType {
+		msg["maxFeePerGas"] = "0x0"
+		msg["maxPriorityFeePerGas"] = "0x0"
+	}
+
+	return msg, nil
 }
 
 // SimulateTransaction 模拟交易执行
@@ -583,6 +855,64 @@ func (s *EVMSimulator) GetRpcClient() *rpc.Client {
 	return s.rpcClient
 }
 
+// applyOverrideOnChain 尝试将 stateOverride 直接写入本地节点（如Anvil），用于不支持stateOverride参数的节点
+func (s *EVMSimulator) applyOverrideOnChain(ctx context.Context, override StateOverride) (int, int) {
+	if override == nil || len(override) == 0 {
+		return 0, 0
+	}
+	setAccounts := 0
+	setSlots := 0
+
+	normalizeWord := func(val string) string {
+		raw := strings.TrimSpace(val)
+		if !strings.HasPrefix(raw, "0x") && !strings.HasPrefix(raw, "0X") {
+			raw = strings.TrimLeft(raw, "0")
+			if raw == "" {
+				raw = "0"
+			}
+			raw = "0x" + raw
+		}
+		body := strings.TrimPrefix(strings.ToLower(raw), "0x")
+		body = strings.TrimLeft(body, "0")
+		if body == "" {
+			body = "0"
+		}
+		if len(body) < 64 {
+			body = strings.Repeat("0", 64-len(body)) + body
+		} else if len(body) > 64 {
+			body = body[len(body)-64:]
+		}
+		return "0x" + body
+	}
+
+	for addr, ov := range override {
+		if ov == nil {
+			continue
+		}
+		lowerAddr := strings.ToLower(addr)
+		setAccounts++
+
+		if ov.Balance != "" {
+			_ = s.rpcClient.CallContext(ctx, nil, "anvil_setBalance", lowerAddr, ov.Balance)
+		}
+		if ov.Nonce != "" {
+			_ = s.rpcClient.CallContext(ctx, nil, "anvil_setNonce", lowerAddr, ov.Nonce)
+		}
+		if len(ov.State) > 0 {
+			for slot, val := range ov.State {
+				slotHex := normalizeWord(slot)
+				valHex := normalizeWord(val)
+				if callErr := s.rpcClient.CallContext(ctx, nil, "anvil_setStorageAt", lowerAddr, slotHex, valHex); callErr == nil {
+					setSlots++
+				} else {
+					log.Printf("[Simulator] ⚠️ 写入storage失败 addr=%s slot=%s err=%v", lowerAddr, slotHex, callErr)
+				}
+			}
+		}
+	}
+	return setAccounts, setSlots
+}
+
 // SimulateWithCallData 使用自定义calldata模拟交易执行
 // 这个方法专门为模糊测试设计，返回带合约地址的JUMPDEST序列
 func (s *EVMSimulator) SimulateWithCallData(
@@ -601,7 +931,32 @@ func (s *EVMSimulator) SimulateWithCallData(
 			contractJumpDests: [],
 			gasUsed: 0,
 			success: true,
-			returnData: ""
+			returnData: "",
+			stateChanges: {}
+		},
+		formatHex: function(value) {
+			var hex = toHex(value);
+			if (hex === "0x") {
+				return "0x0";
+			}
+			var body = hex.slice(2);
+			if (body.length === 0) {
+				return "0x0";
+			}
+			if (body.length % 2 === 1) {
+				body = "0" + body;
+			}
+			return "0x" + body.toLowerCase();
+		},
+		formatWord: function(value) {
+			var body = this.formatHex(value).slice(2);
+			while (body.length < 64) {
+				body = "0" + body;
+			}
+			if (body.length > 64) {
+				body = body.slice(body.length - 64);
+			}
+			return "0x" + body;
 		},
 		fault: function(log, db) {
 			this.data.success = false;
@@ -624,6 +979,52 @@ func (s *EVMSimulator) SimulateWithCallData(
 				};
 				this.data.contractJumpDests.push(jumpDest);
 			}
+
+			// 记录状态变化
+			if (log.op.toString() === "SSTORE") {
+				var addrKey = currentContract.toLowerCase();
+				if (!this.data.stateChanges[addrKey]) {
+					var balance = this.formatHex(db.getBalance(log.contract.getAddress()));
+					this.data.stateChanges[addrKey] = {
+						address: currentContract,
+						balanceBefore: balance,
+						balanceAfter: balance,
+						storageChanges: {}
+					};
+				}
+				var state = this.data.stateChanges[addrKey];
+				var slotKey = this.formatWord(log.stack.peek(0));
+				var newValue = this.formatWord(log.stack.peek(1));
+				var previousValue = db.getState(log.contract.getAddress(), log.stack.peek(0));
+				var formattedPrev = previousValue ? this.formatWord(previousValue) : "0x0";
+				state.storageChanges[slotKey] = {
+					before: formattedPrev,
+					after: newValue
+				};
+				state.balanceAfter = this.formatHex(db.getBalance(log.contract.getAddress()));
+			}
+
+			// 🔧 新增：捕获 CALL 操作的 ETH 转账
+			var opName = log.op.toString();
+			if (opName === "CALL" || opName === "CALLCODE") {
+				var callValue = log.stack.peek(2);
+				if (callValue) {
+					var valueHex = toHex(callValue);
+					if (valueHex && valueHex !== "0x0" && valueHex !== "0x") {
+						var fromAddr = currentContract.toLowerCase();
+
+						// 记录发送方余额变更
+						if (!this.data.stateChanges[fromAddr]) {
+							this.data.stateChanges[fromAddr] = {
+								address: currentContract,
+								balanceBefore: this.formatHex(db.getBalance(log.contract.getAddress())),
+								balanceAfter: "0x0",
+								storageChanges: {}
+							};
+						}
+					}
+				}
+			}
 		},
 		result: function(ctx, db) {
 			this.data.gasUsed = ctx.gasUsed;
@@ -632,6 +1033,13 @@ func (s *EVMSimulator) SimulateWithCallData(
 				this.data.returnData = toHex(ctx.output);
 			} else {
 				this.data.returnData = toHex(ctx.output);
+			}
+
+			// 收尾：填充 balanceAfter
+			for (var addrKey in this.data.stateChanges) {
+				var entry = this.data.stateChanges[addrKey];
+				var addr = toAddress(entry.address);
+				entry.balanceAfter = this.formatHex(db.getBalance(addr));
 			}
 			return this.data;
 		}
@@ -649,12 +1057,15 @@ func (s *EVMSimulator) SimulateWithCallData(
 	}
 
 	// 使用debug_traceCall执行模拟
+	options := map[string]interface{}{"tracer": tracerCode}
+
 	params := []interface{}{
 		msg,
 		fmt.Sprintf("0x%x", blockNumber),
-		map[string]interface{}{"tracer": tracerCode},
+		options,
 	}
 	if override != nil && len(override) > 0 {
+		// 兼容部分节点需要单独传递 stateOverrides 参数
 		params = append(params, override)
 	}
 
@@ -663,8 +1074,18 @@ func (s *EVMSimulator) SimulateWithCallData(
 
 	if err != nil {
 		errStr := err.Error()
-		// Anvil 等节点尚未支持 stateOverride 作为第4参数，回退为无 override 调用
-		if len(params) == 4 && (strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall") || strings.Contains(errStr, "unexpected EOF") || strings.Contains(errStr, "invalid length")) {
+		// 某些节点可能仍然不识别 stateOverrides，回退为无覆盖调用，并尝试写链
+		if override != nil && len(override) > 0 &&
+			(strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall") ||
+				strings.Contains(errStr, "unexpected EOF") ||
+				strings.Contains(errStr, "invalid length") ||
+				strings.Contains(errStr, "stateOverrides")) {
+			if override != nil {
+				log.Printf("[Simulator] ⚠️ debug_traceCall 不支持 stateOverride，回退为无覆盖调用 (override账户数=%d, err=%v)", len(override), err)
+				// 尝试直接将 stateOverride 写入本地节点，再以无覆盖方式重放
+				setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+				log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+			}
 			paramsFallback := []interface{}{
 				msg,
 				fmt.Sprintf("0x%x", blockNumber),
@@ -695,11 +1116,35 @@ func (s *EVMSimulator) SimulateWithCallData(
 		GasUsed           uint64             `json:"gasUsed"`
 		Success           bool               `json:"success"`
 		ReturnData        string             `json:"returnData"`
-		Error             string             `json:"error,omitempty"`
+		StateChanges      map[string]struct {
+			BalanceBefore  string `json:"balanceBefore"`
+			BalanceAfter   string `json:"balanceAfter"`
+			StorageChanges map[string]struct {
+				Before string `json:"before"`
+				After  string `json:"after"`
+			} `json:"storageChanges"`
+		} `json:"stateChanges"`
+		Error string `json:"error,omitempty"`
 	}
 
 	if err := json.Unmarshal(result, &traceResult); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal trace result: %w", err)
+	}
+
+	stateChanges := make(map[string]StateChange, len(traceResult.StateChanges))
+	for addr, change := range traceResult.StateChanges {
+		updates := make(map[string]StorageUpdate, len(change.StorageChanges))
+		for slot, diff := range change.StorageChanges {
+			updates[slot] = StorageUpdate{
+				Before: diff.Before,
+				After:  diff.After,
+			}
+		}
+		stateChanges[addr] = StateChange{
+			BalanceBefore:  change.BalanceBefore,
+			BalanceAfter:   change.BalanceAfter,
+			StorageChanges: updates,
+		}
 	}
 
 	// 转换为ReplayResult
@@ -711,6 +1156,7 @@ func (s *EVMSimulator) SimulateWithCallData(
 		JumpDests:           traceResult.JumpDests,
 		ContractJumpDests:   traceResult.ContractJumpDests,
 		ProtectedStartIndex: 0, // 直接调用受保护合约，从头开始
+		StateChanges:        stateChanges,
 		Error:               traceResult.Error,
 	}
 
@@ -719,15 +1165,7 @@ func (s *EVMSimulator) SimulateWithCallData(
 
 // --- 回退：使用 callTracer 提取调用序列并转换为伪 JumpDests ---
 
-type callTracerFrame struct {
-	Type   string            `json:"type"`
-	From   string            `json:"from"`
-	To     string            `json:"to"`
-	Input  string            `json:"input"`
-	Output string            `json:"output"`
-	Error  string            `json:"error"`
-	Calls  []callTracerFrame `json:"calls"`
-}
+type callTracerFrame = CallFrame
 
 // traceTransactionWithCallTracer 使用内置 callTracer 追踪已上链交易
 func (s *EVMSimulator) traceTransactionWithCallTracer(txHash common.Hash) (*ReplayResult, error) {
@@ -879,4 +1317,11 @@ type SimulateRequest struct {
 	Data        []byte
 	Value       *big.Int
 	BlockNumber uint64
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

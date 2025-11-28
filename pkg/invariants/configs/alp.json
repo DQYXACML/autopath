@@ -1,0 +1,554 @@
+{
+  "project_id": "ALP_exp",
+  "name": "ALP_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d",
+    
+    "0xff61Ba33Ed51322BB716EAb4137Adf985644b94d",
+    
+    "0x0edf13f6bd033f0f267d46c6e9dff9c7190e0fa0",
+    
+    "0x55d398326f99059fF775485246999027B3197955",
+    
+    "0xD188492217F09D18f2B0ecE3F8948015981e961a",
+    
+    "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D",
+    
+    "0x50609E7499A1203e68598Ef73BC2251c175b12E0",
+    
+    "0x1EaBb7B90fac3B4143c551a02B41e741f7457EfA",
+    
+    "0x1111111254EEB25477B68fb85Ed929f73A960582",
+    
+    "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0",
+    
+    "0xEC050cfDF99002b6A5cea9c4b1602B241c11e5F5",
+    
+    "0x4E47057f45adF24ba41375a175dA0357cB3480E5",
+    
+    "0x96CBCD9bbD63C8568DEc83A991eF05F29058767D",
+    
+    "0xd05BF7ddbEc20126E49D321D6Ad7258d93c620B3",
+    
+    "0xb3f48DE72155e866dfdc301f55B435D1Ee805ef4",
+    
+    "0x6Caa8FE103243CD25306adBe4C5d8a14963a57c9",
+    
+    "0x264990fbd0A4796A3E3d8E37C4d5F87a3aCa5Ebf",
+    
+    "0x178bA789e24A1d51E9Ea3Cb1Db3B52917963D71D",
+    
+    "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE",
+    
+    "0x137924D7C36816E0DcAF016eB617Cc2C92C05782",
+    
+    "0xC4DD107F80aAA0038b0648375648eEa28C7dd8E9",
+    
+    "0xCA03A93D81e6bE1ef1Cf0EC42D56D4ef6b5C6Df6",
+    
+    "0x55328A2dF78C5E379a3FeE693F47E6d4279C2193",
+    
+    "0xfFdF63a40962386753C0586cA97E4Ea4fF49D209",
+    
+    "0xF25c370c3955Ca6391ac6Ceb354601E48536f974",
+    
+    "0x0bf79F617988C472DcA68ff41eFe1338955b9A80",
+    
+    "0xD2528B74ca91Bb07B9bd9685ce533367C6fa657C",
+    
+    "0x9ef1B8c0E4F7dc8bF5719Ea496883DC6401d5b2e",
+    
+    "0xfC3069296a691250fFDf21fe51340fdD415a76ed",
+    
+    "0x50997F0A357B6f63719C35ae93B07775C72453D1",
+    
+    "0xb298E7E57Bf4538029D3722B3828f12d37b357a4",
+    
+    "0x93A67D414896A280bF8FFB3b389fE3686E014fda",
+    
+    "0x5C0F367A778857B36E88B553df132b232AC34901",
+    
+    "0xDE5cE83899a8e5E43A46627bD972Fd8a36b51Bc3",
+    
+    "0x7D9BE1CdC048008EBB30d702770697571f303fA4",
+    
+    "0x503896170E85a0e1deab984f84F1ff8e69Dcdc4C",
+    
+    "0x854fcF0faa8Eb615fa00d9c7b2Ea3624288402bb",
+    
+    "0xC333eb0086309a16aa7c8308DfD32c8BBA0a2592",
+    
+    "0xe978DaA50D3A8574F139c1e3Fe5D511dDb323BC5",
+    
+    "0x0Fe4D87883005fCAFaF56B81d09473D9A29dCDC3",
+    
+    "0x40B8039e1A5A831b493C15164228A1839dd5b62a",
+    
+    "0x74E72F37A8c415c8f1a98Ed42E78Ff997435791D",
+    
+    "0xB92B265908775B59517eC1fC6C6635f7E1D60f1D",
+    
+    "0xc9E7f05EE7aB7332D6ff2632576202Ca50a04372",
+    
+    "0xB9d550F82F385c23A51Ed4c71Fbff04EbF1B1e0A",
+    
+    "0xca236E327F629f9Fc2c30A4E95775EbF0B89fac8",
+    
+    "0x0B67AD077Fa839F6737A1630c89eE1A1572989c6",
+    
+    "0x0E8a53DD9c13589df6382F13dA6B3Ec8F919B323",
+    
+    "0x14E9D15c1EcD428606c443Ed715631b5C444a49e",
+    
+    "0xB6064eD41d4f67e353768aA239cA86f4F73665a1",
+    
+    "0x7935a51aDDaB8550D346FEEf34e02F67C9330109",
+    
+    "0x22Db8397a6E77E41471dE256a7803829fDC8bC57",
+    
+    "0x6f3f35Cc510232E41179F9010Cf12b1B48538a91",
+    
+    "0xa767f745331D267c7751297D982b050c93985627",
+    
+    "0x2028b4a27c14263Ba00C75c42cfe524E705031F4",
+    
+    "0xb57f259E7C24e56a1dA00F66b55A5640d9f9E7e4",
+    
+    "0x52Bd76d61D59a4F4B740FD31B97aFaD6217F960D",
+    
+    "0x7CA57b0cA6367191c94C8914d7Df09A57655905f",
+    
+    "0xeC1Ca9c5Dd897F832CDe3D43BB041f5e01380757",
+    
+    "0x3AB0A0d137D4F946fBB19eecc6e92E64660231C8",
+    
+    "0xd0A597FfC7075E1449eCE7fEaA9880488dDB34FD",
+    
+    "0x5974855ce31EE8E1fff2e76591CbF83D7110F151",
+    
+    "0xB4C0F8F07a5e5d870bC02457213809B9cb5F56C4",
+    
+    "0x63A9133cd7c611d6049761038C16f238FddA71d7",
+    
+    "0x4d70d497CeF3674be370586230F9a2f4b30CFF11",
+    
+    "0xCF55B6089B689862c357C4dd2aE5687FE6919072",
+    
+    "0xd8BC44096b06a18C2aA7D7e48DeC281E6c832bBb",
+    
+    "0xF4C5e535756D11994fCBB12Ba8adD0192D9b88be",
+    
+    "0xb7EE93d3E0586571D481F9d967d82383BB460B38",
+    
+    "0xbCF1CeA719E486C746E2533e32Ab5F1ebeb6e3Ac",
+    
+    "0x4866F933c6f79553cDb48329D5f3fFEDc8Bec67a",
+    
+    "0x6228fa4Ac8e9C8951C75C77c8927e6780D93DcA0",
+    
+    "0xB97Ad0E74fa7d920791E90258A6E2085088b4320",
+    
+    "0x2dc202b56A03667cC240B290c2BE2b8453E89eA1",
+    
+    "0x51597f405303C4377E36123cBc172b13269EA163",
+    
+    "0x7008fDEd94a8Ce68D01FEB633C4D81C2be7a1B20",
+    
+    "0xC02780d15B021FD2574A331982753FB5DE542CC5",
+    
+    "0x9921dF420DfD1Ef889798132C919cA4B3b4A4792",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    
+    "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+    
+    "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    
+    "0x7C71E04A1C6EDAeb91df5946626fb6CFd3e33604",
+    
+    "0x912CE59144191C1204E64559FE8253a0e49E6548",
+    
+    "0xA452Dc8129BC7D39D4d297D3288b5483Cf0fEdc4",
+    
+    "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+    
+    "0x43B9cE0394d9AFfc97501359646A410A48c21a11",
+    
+    "0x1B4F0F256C1Da5Ac4339469233e99ED8DaA81a29",
+    
+    "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+    
+    "0xf0Fb3a6d5114aAe4488Ad9C135d09774dEDa7114",
+    
+    "0x4a79e80F77CF0A5917A38cd25A249f9b072dA943",
+    
+    "0x91aa3EC0B9df98162A262e25d3d2362C62F4e412",
+    
+    "0x9188642F6ADA7c12D94c1ffCb1D3A513E62aC319",
+    
+    "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
+    
+    "0x1Fa4a73a3F0133f0025378af00236f3aBDEE5D63",
+    
+    "0x4338665CBB7B2485A8855A139b75D5e34AB0DB94",
+    
+    "0x1B54194a5B0E011302d027420C34767483112B04",
+    
+    "0x986854779804799C1d68867F5E03e601E781e41b",
+    
+    "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
+    
+    "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF",
+    
+    "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
+    
+    "0xDd956fA28d0B1f4cd2784fe894E48e1F5F1Ab4f2",
+    
+    "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
+    
+    "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1",
+    
+    "0xCC42724C6683B7E57334c4E856f4c9965ED682bD",
+    
+    "0xbA2aE424d960c26247Dd6c32edC70B295c744C43",
+    
+    "0x1CE0c2827e2eF14D5C4f29a091d735A204794041",
+    
+    "0xa2B726B1145A4773F68593CF171187d8EBe4d495",
+    
+    "0x582c36EdF09B88259876447a84Ed2Fc812F218c3",
+    
+    "0x0095bddEF31BB264E45D7e11Ef0489d9f8a9D03C",
+    
+    "0xCE7de646e7208a4Ef112cb6ed5038FA6cC6b12e3",
+    
+    "0x8581cc815e40615998F4561F3e24e68066293595",
+    
+    "0xD89aE81e55b1Bd46591CB5555209fdF8fFb43b76",
+    
+    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    
+    "0x0782b6d8c4551B9760e74c0545a9bCD90bdc41E5"
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0"],
+        "slots": {"slot_0": {"index": "20647932464013215381256184627475055198507511985713889082419612026063034874445", "severity": "critical", "threshold": 5.0}},
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0x7935a51aDDaB8550D346FEEf34e02F67C9330109"],
+        "slots": {"slot_0": {"index": "1678626865955094398970526650868020240554221811938427274524654480365261639199", "severity": "critical", "threshold": 0.1}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0x137924D7C36816E0DcAF016eB617Cc2C92C05782"],
+        "slots": {"slot_0": {"index": "84628515386998770631445290100801485000514981588570835866084568292811492249380", "severity": "critical", "threshold": 0.1}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_004",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "27503809767721641530853151666381335057482654087777542512371412474044821239409", "severity": "critical", "threshold": 0.1}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_005",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d"],
+        "slots": {"slot_0": {"index": "39029880596598232772960491230663750223049196716992431284755558720543775761507", "severity": "critical", "threshold": 0.1}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.12,
+        "contracts": ["0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0", "0x7935a51aDDaB8550D346FEEf34e02F67C9330109", "0x137924D7C36816E0DcAF016eB617Cc2C92C05782", "0x55d398326f99059fF775485246999027B3197955", "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d"],
+        "slots": {"slot_0": {"index": "153", "severity": "high", "threshold": 0.12}},
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    },
+    
+    {
+      "id": "PATTERN_reentrancy_balance_002",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.1,
+        "contracts": ["0xff61Ba33Ed51322BB716EAb4137Adf985644b94d"],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+        
+      },
+      "monitored_functions": ["redeem", "redeem", "maxRedeem", "redeem"]
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d",
+        "function": "redeem",
+        "signature": "redeem(RedeemData)"
+      },
+      
+      {
+        "contract": "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d",
+        "function": "redeem",
+        "signature": "redeem(uint256,RedeemData)"
+      },
+      
+      {
+        "contract": "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d",
+        "function": "maxRedeem",
+        "signature": "maxRedeem(address)"
+      },
+      
+      {
+        "contract": "0x9Ad45D46e2A2ca19BBB5D5a50Df319225aD60e0d",
+        "function": "redeem",
+        "signature": "redeem(uint256,address,address)"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/alp",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "ALP_exp",
+      "config_path": "pkg/invariants/configs/alp_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

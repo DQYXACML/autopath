@@ -73,6 +73,9 @@ type AttackParameterReport struct {
 	// 不变量检查相关（新增）
 	HasInvariantCheck bool `json:"has_invariant_check"` // 标识是否经过不变量检查
 	ViolationCount    int  `json:"violation_count"`     // 违规次数统计
+
+	// 约束规则（由高相似样本生成）
+	ConstraintRule *ConstraintRule `json:"constraint_rule,omitempty"`
 }
 
 // ParameterSummary 参数摘要
@@ -110,6 +113,33 @@ type PublicResult struct {
 	Parameters []PublicParamValue `json:"parameters"`
 	GasUsed    uint64             `json:"gas_used"`
 	Success    bool               `json:"success"`
+}
+
+// ParamConstraint 参数约束
+type ParamConstraint struct {
+	Index    int      `json:"index"`
+	Type     string   `json:"type"`
+	IsRange  bool     `json:"is_range"`
+	RangeMin string   `json:"range_min,omitempty"`
+	RangeMax string   `json:"range_max,omitempty"`
+	Values   []string `json:"values,omitempty"` // 离散值
+}
+
+// StateConstraint 状态约束（针对受保护合约）
+type StateConstraint struct {
+	Slot   string   `json:"slot"`
+	Values []string `json:"values,omitempty"`
+}
+
+// ConstraintRule 由高相似样本生成的拦截规则
+type ConstraintRule struct {
+	ContractAddress   common.Address    `json:"contract_address"`
+	FunctionSelector  string            `json:"function_selector"`
+	SampleCount       int               `json:"sample_count"`
+	ParamConstraints  []ParamConstraint `json:"param_constraints,omitempty"`
+	StateConstraints  []StateConstraint `json:"state_constraints,omitempty"`
+	SimilarityTrigger float64           `json:"similarity_trigger"`
+	GeneratedAt       time.Time         `json:"generated_at"`
 }
 
 // ValueToString 将参数值转为字符串，便于 JSON 输出
@@ -184,6 +214,9 @@ type Config struct {
 	// RPC配置
 	RPCURL string `yaml:"rpc_url"`
 
+	// 项目标识（用于定位attack_state.json等外部资料）
+	ProjectID string `yaml:"project_id"`
+
 	// 相似度阈值
 	Threshold float64 `yaml:"jumpdest_similarity_threshold"`
 
@@ -200,6 +233,23 @@ type Config struct {
 
 	// 不变量检查配置（新增）
 	InvariantCheck InvariantCheckConfig `yaml:"invariant_check"`
+
+	// 种子驱动模糊测试配置（新增）
+	SeedConfig *SeedConfig `yaml:"seed_config"`
+
+	// 🆕 无限制fuzzing模式配置
+	TargetSimilarity  float64 `yaml:"target_similarity"`    // 目标相似度阈值（如0.95），达到后可停止
+	MaxHighSimResults int     `yaml:"max_high_sim_results"` // 找到N个高相似度结果后停止（0=不限制）
+	UnlimitedMode     bool    `yaml:"unlimited_mode"`       // 无限制模式：忽略迭代次数限制
+
+	// Entry Call 限制
+	EntryCallProtectedOnly bool `yaml:"entry_call_protected_only"` // 仅对受保护合约启用Entry模式
+
+	// 🆕 本地执行模式配置
+	LocalExecution bool `yaml:"local_execution"` // 使用本地EVM执行替代RPC调用
+
+	// 🆕 新架构开关（配合本地执行）
+	EnableNewArch bool `yaml:"enable_new_arch" json:"enable_new_arch"`
 }
 
 // InvariantCheckConfig 不变量检查配置
@@ -303,4 +353,38 @@ type FuzzerStats struct {
 	ValidCombinations  int
 	FailedSimulations  int
 	AverageSimTime     time.Duration
+}
+
+// ========== Layer 2: 自适应范围缩放数据结构 ==========
+
+// AdaptiveRangeConfig 自适应范围配置
+type AdaptiveRangeConfig struct {
+	Enabled         bool             `yaml:"enabled" json:"enabled"`                   // 是否启用自适应
+	MaxIterations   int              `yaml:"max_iterations" json:"max_iterations"`     // 最大迭代轮数(建议3-5)
+	ConvergenceRate float64          `yaml:"convergence_rate" json:"convergence_rate"` // 收敛阈值(默认0.02)
+	RangeStrategies map[string][]int `yaml:"range_strategies" json:"range_strategies"` // 分层范围策略
+	UnlimitedMode   bool             `yaml:"unlimited_mode" json:"unlimited_mode"`     // 🆕 无限制模式：忽略迭代次数限制
+
+	// Layer 2: 高级配置（可选）
+	ZoneThreshold      float64 `yaml:"zone_threshold" json:"zone_threshold"`             // 高相似度区域识别阈值(默认0.75)
+	ZoneGapPercent     float64 `yaml:"zone_gap_percent" json:"zone_gap_percent"`         // 区域合并间隔百分比(默认0.10)
+	ZoneGapAbsolute    int64   `yaml:"zone_gap_absolute" json:"zone_gap_absolute"`       // 区域合并间隔绝对值(默认1000)
+	HighSimThreshold   float64 `yaml:"high_sim_threshold" json:"high_sim_threshold"`     // 高相似度策略阈值(默认0.8)
+	MediumSimThreshold float64 `yaml:"medium_sim_threshold" json:"medium_sim_threshold"` // 中等相似度策略阈值(默认0.6)
+}
+
+// SimilarityFeedback 相似度反馈数据
+type SimilarityFeedback struct {
+	ParamIndex   int                `json:"param_index"`    // 参数索引
+	ValueToSim   map[string]float64 `json:"value_to_sim"`   // 参数值 → 相似度映射(热力图)
+	HighSimZones []ValueRange       `json:"high_sim_zones"` // 高相似度区域
+	AvgSim       float64            `json:"avg_similarity"` // 平均相似度
+}
+
+// ValueRange 值范围
+type ValueRange struct {
+	Min        *big.Int `json:"min"`         // 范围最小值
+	Max        *big.Int `json:"max"`         // 范围最大值
+	AvgSim     float64  `json:"avg_sim"`     // 平均相似度
+	SampleSize int      `json:"sample_size"` // 样本数量
 }

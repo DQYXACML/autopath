@@ -1,0 +1,251 @@
+{
+  "project_id": "IT_exp",
+  "name": "IT_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0x7265553986a81c838867aA6B3625ABA97B961f00",
+    
+    "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D",
+    
+    "0x92b7807bF19b7DDdf89b706143896d05228f3121",
+    
+    "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    
+    "0x55d398326f99059fF775485246999027B3197955",
+    
+    "0x1AC5Fac863c0a026e029B173f2AE4D33938AB473",
+    
+    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    
+    "0xBA5Fe23f8a3a24BEd3236F05F2FcF35fd0BF0B5C",
+    
+    "0x2429CC121d6D7d7a27737104ca82356fd2D2AdA9",
+    
+    "0x0AB42666dD68f37e070820550671659883A0754F",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    
+    "0xf66C906920E09126907DEf2B7DaeEb9688DdD694"
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "32932052610908350085506172213986690236613673164754488921167112884909938137888", "severity": "critical", "threshold": 5.0}, "slot_1": {"index": "41993076903579049023152137489280670203320564609029188952622701398003146669474", "severity": "critical", "threshold": 5.0}, "slot_2": {"index": "65949705005096175147947656197886159808832791445982697591068951647708306171218", "severity": "critical", "threshold": 5.0}, "slot_3": {"index": "29335721218654311889629717212671903641732450681303549532489850873721865728474", "severity": "critical", "threshold": 5.0}},
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "token0"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 1.3,
+        "contracts": ["0x1AC5Fac863c0a026e029B173f2AE4D33938AB473"],
+        "slots": {"slot_0": {"index": "47320847209667959387160676031208439300194164381976920664657077761201799535684", "severity": "critical", "threshold": 1.3}, "slot_1": {"index": "3088336192256883802198010026737913575199484050555096590277415119387991013218", "severity": "critical", "threshold": 1.3}, "slot_2": {"index": "114036380166125703056490702316862312239760110704886976066769323173038438819011", "severity": "critical", "threshold": 1.3}, "slot_3": {"index": "57947805765008383865764761552302358499782339345299437826744794494589369473064", "severity": "critical", "threshold": 1.3}, "slot_4": {"index": "13799642024948964773793197949351697238327299323793340454258470720188790235400", "severity": "critical", "threshold": 1.3}, "slot_5": {"index": "3231605733694293991478341719003067735068790635255680610079995446410078621425", "severity": "critical", "threshold": 1.3}},
+        "formula": "abs(value_after - value_before) / value_before <= 1.3"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "token0"]
+    },
+    
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.12,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955", "0x1AC5Fac863c0a026e029B173f2AE4D33938AB473"],
+        "slots": {"slot_3": {"index": "3", "severity": "high", "threshold": 0.12}},
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "token0"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "32932052610908350085506172213986690236613673164754488921167112884909938137888", "severity": "high", "threshold": 5.0}, "slot_1": {"index": "41993076903579049023152137489280670203320564609029188952622701398003146669474", "severity": "high", "threshold": 5.0}, "slot_2": {"index": "65949705005096175147947656197886159808832791445982697591068951647708306171218", "severity": "high", "threshold": 5.0}, "slot_3": {"index": "29335721218654311889629717212671903641732450681303549532489850873721865728474", "severity": "high", "threshold": 5.0}},
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "token0"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 1.3,
+        "contracts": ["0x1AC5Fac863c0a026e029B173f2AE4D33938AB473"],
+        "slots": {"slot_3": {"index": "3", "severity": "high", "threshold": 1.3}},
+        "formula": "(value_after - value_before) / value_before <= 1.3"
+        
+      },
+      "monitored_functions": ["getReserves", "swap", "token0"]
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0x7265553986a81c838867aA6B3625ABA97B961f00",
+        "function": "getReserves",
+        "signature": "getReserves()"
+      },
+      
+      {
+        "contract": "0x7265553986a81c838867aA6B3625ABA97B961f00",
+        "function": "swap",
+        "signature": "swap(uint,uint,address,bytes)"
+      },
+      
+      {
+        "contract": "0x7265553986a81c838867aA6B3625ABA97B961f00",
+        "function": "token0",
+        "signature": "token0()"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/it",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "IT_exp",
+      "config_path": "pkg/invariants/configs/it_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

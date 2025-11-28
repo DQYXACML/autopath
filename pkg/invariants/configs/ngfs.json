@@ -1,0 +1,305 @@
+{
+  "project_id": "NGFS_exp",
+  "name": "NGFS_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    
+    "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+    
+    "0xd03d360dfc1dac7935e114d564a088077e6754a0",
+    
+    "0xc73781107d086754314f7720ca14ab8c5ad035e4",
+    
+    "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+    
+    "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    
+    "0x55d398326f99059fF775485246999027B3197955",
+    
+    "0x687756C50f6B3172E29DF21C2537c37086b679A5",
+    
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+    
+  ],
+  "invariants": [
+    
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.25,
+        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4"],
+        "slots": {"slot_1": {"index": "1", "severity": "critical", "threshold": 0.25}, "slot_11": {"index": "11", "severity": "critical", "threshold": 0.25}, "slot_12": {"index": "12", "severity": "critical", "threshold": 0.25}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.25,
+        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
+        "slots": {"slot_0": {"index": "68593895021720662111744383906949511483711148596956706030159053753751192787893", "severity": "critical", "threshold": 0.25}},
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0xa608985f5b40cdf6862bec775207f84280a91e3a"],
+        "slots": {"slot_10": {"index": "10", "severity": "critical", "threshold": 5.0}, "slot_13": {"index": "13", "severity": "critical", "threshold": 5.0}},
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.3,
+        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4", "0x687756C50f6B3172E29DF21C2537c37086b679A5", "0x55d398326f99059fF775485246999027B3197955", "0xa608985f5b40cdf6862bec775207f84280a91e3a"],
+        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 0.3}},
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 0.4,
+        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4"],
+        "slots": {"slot_1": {"index": "1", "severity": "high", "threshold": 0.4}, "slot_11": {"index": "11", "severity": "high", "threshold": 0.4}, "slot_12": {"index": "12", "severity": "high", "threshold": 0.4}},
+        "formula": "(value_after - value_before) / value_before <= 0.4"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 1.09,
+        "contracts": ["0x687756C50f6B3172E29DF21C2537c37086b679A5"],
+        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 1.09}},
+        "formula": "(value_after - value_before) / value_before <= 1.09"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    },
+    
+    {
+      "id": "PATTERN_monotonic_increase_003",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        "threshold": 5.0,
+        "contracts": ["0xa608985f5b40cdf6862bec775207f84280a91e3a"],
+        "slots": {"slot_10": {"index": "10", "severity": "high", "threshold": 5.0}, "slot_13": {"index": "13", "severity": "high", "threshold": 5.0}},
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+        
+      },
+      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+    }
+    
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      
+      {
+        "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+        "function": "setProxySync",
+        "signature": "setProxySync(address)"
+      },
+      
+      {
+        "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+        "function": "delegateCallReserves",
+        "signature": "delegateCallReserves()"
+      },
+      
+      {
+        "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+        "function": "reserveMultiSync",
+        "signature": "reserveMultiSync(address,uint256)"
+      }
+      
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/ngfs",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "NGFS_exp",
+      "config_path": "pkg/invariants/configs/ngfs_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

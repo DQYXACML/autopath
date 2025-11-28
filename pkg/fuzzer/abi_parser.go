@@ -2,8 +2,12 @@ package fuzzer
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -292,9 +296,9 @@ func (p *ABIParser) encodeValue(value interface{}) ([]byte, error) {
 func (p *ABIParser) encodeDynamicBytes(data []byte) []byte {
 	// 动态数据编码：offset + length + data
 	// 这是简化版本，完整的ABI编码更复杂
-	result := make([]byte, 32) // offset
+	result := make([]byte, 32)                                                // offset
 	result = append(result, p.encodeUint256(big.NewInt(int64(len(data))))...) // length
-	result = append(result, data...) // actual data
+	result = append(result, data...)                                          // actual data
 
 	// 填充到32字节边界
 	padding := (32 - (len(data) % 32)) % 32
@@ -347,6 +351,102 @@ func (p *ABIParser) SetABI(address common.Address, contractABI *abi.ABI) {
 func (p *ABIParser) GetABI(address common.Address) (*abi.ABI, bool) {
 	abi, exists := p.abis[address]
 	return abi, exists
+}
+
+// LoadABIForAddress 尝试从本地extracted_contracts中加载指定地址的ABI
+func (p *ABIParser) LoadABIForAddress(address common.Address) (*abi.ABI, error) {
+	if cached, ok := p.GetABI(address); ok {
+		return cached, nil
+	}
+
+	baseDir, searchErr := p.locateExtractedRoot()
+	if searchErr != nil {
+		return nil, fmt.Errorf("未找到ABI根目录: %w", searchErr)
+	}
+
+	lowerAddr := strings.ToLower(address.Hex()[2:])
+	var matched string
+	errStop := errors.New("abi-found")
+
+	walkErr := filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		// 目录名中包含地址且文件名为 abi.json
+		if strings.EqualFold(d.Name(), "abi.json") && strings.Contains(strings.ToLower(path), lowerAddr) {
+			matched = path
+			return errStop
+		}
+		return nil
+	})
+
+	if walkErr != nil && !errors.Is(walkErr, errStop) {
+		return nil, walkErr
+	}
+
+	if matched == "" {
+		return nil, fmt.Errorf("未找到地址 %s 对应的ABI文件", address.Hex())
+	}
+
+	file, err := os.Open(matched)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	contractABI, err := abi.JSON(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// 缓存结果，避免重复扫描
+	p.SetABI(address, &contractABI)
+	return &contractABI, nil
+}
+
+// locateExtractedRoot 查找 extracted_contracts 根目录，兼容不同工作目录
+func (p *ABIParser) locateExtractedRoot() (string, error) {
+	candidates := []string{}
+
+	if wd, err := os.Getwd(); err == nil {
+		for depth := 0; depth <= 3; depth++ {
+			up := wd
+			for i := 0; i < depth; i++ {
+				up = filepath.Dir(up)
+			}
+			candidates = append(candidates, filepath.Join(up, "DeFiHackLabs", "extracted_contracts"))
+		}
+	}
+
+	candidates = append(candidates, filepath.Join("DeFiHackLabs", "extracted_contracts"))
+
+	for _, cand := range candidates {
+		clean := filepath.Clean(cand)
+		if st, err := os.Stat(clean); err == nil && st.IsDir() {
+			return clean, nil
+		}
+	}
+
+	var found string
+	errStop := errors.New("found-extracted-root")
+	_ = filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && strings.EqualFold(d.Name(), "extracted_contracts") {
+			found = path
+			return errStop
+		}
+		return nil
+	})
+	if found != "" {
+		return found, nil
+	}
+
+	return "", fmt.Errorf("在候选路径中未找到extracted_contracts目录")
 }
 
 // SelectorToHex 将选择器转换为十六进制字符串

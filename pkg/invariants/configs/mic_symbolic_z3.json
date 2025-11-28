@@ -1,0 +1,70 @@
+{
+  "project_id": "mic-symbolic-z3",
+  "name": "MIC Token Protocol (Z3 Solver Mode)",
+  "chain_id": 1,
+  "contracts": [
+    "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+  ],
+  "invariants": [
+    {
+      "id": "swap-price-check",
+      "name": "Swap Price Manipulation Detection",
+      "type": "delta",
+      "description": "检测swap操作中的价格操纵攻击",
+      "parameters": {
+        "max_price_change_percentage": 0.15,
+        "monitoring_pairs": [
+          "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        ]
+      }
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "threshold": 0.7,
+    "max_variations": 300,
+    "workers": 8,
+    "timeout_seconds": 20,
+    "seed_config": {
+      "enabled": true,
+      "attack_seeds": {
+        "0": ["1000000000000000000"]
+      },
+      "range_config": {
+        "numeric_range_percent": [1, 2, 5, 10, 20],
+        "boundary_exploration": true
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "z3",
+        "max_constraints": 50,
+        "solver_timeout": "10s",
+        "extraction": {
+          "max_trace_depth": 10000,
+          "focus_opcodes": ["JUMPI", "LT", "GT", "EQ", "ISZERO", "SLT", "SGT", "MOD", "AND", "OR"],
+          "ignore_loops": false,
+          "max_branches": 30
+        },
+        "solver": {
+          "strategy": "z3",
+          "max_solutions": 15,
+          "use_cache": true,
+          "cache_size": 2000,
+          "parallel": true,
+          "workers": 8
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.6,
+          "max_symbolic_seeds": 30
+        }
+      }
+    }
+  },
+  "monitoring_config": {
+    "block_lag": 2,
+    "batch_size": 10,
+    "check_interval_seconds": 12
+  }
+}

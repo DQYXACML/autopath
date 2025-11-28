@@ -48,9 +48,9 @@ func DefaultStrategyConfig() *StrategyConfig {
 			RandomCount:        10,
 		},
 		Bytes: BytesStrategy{
-			IncludeEmpty:     true,
-			IncludePatterns:  true,
-			MaxRandomLength:  1024,
+			IncludeEmpty:    true,
+			IncludePatterns: true,
+			MaxRandomLength: 1024,
 		},
 		Arrays: ArrayStrategy{
 			TestLengths: []int{0, 1, 2, 10, 100, 1000},
@@ -176,9 +176,9 @@ func (g *ParamGenerator) generateIntegerVariations(param Parameter, signed bool)
 	// 位翻转
 	if g.strategy.Integers.BitFlipping && original.Sign() >= 0 {
 		variations = append(variations,
-			g.flipBit(original, 0),           // 翻转最低位
-			g.flipBit(original, bitSize-1),   // 翻转最高位
-			g.flipBit(original, bitSize/2),   // 翻转中间位
+			g.flipBit(original, 0),         // 翻转最低位
+			g.flipBit(original, bitSize-1), // 翻转最高位
+			g.flipBit(original, bitSize/2), // 翻转中间位
 		)
 	}
 
@@ -208,52 +208,11 @@ func (g *ParamGenerator) generateAddressVariations(param Parameter) []interface{
 		}
 	}
 
-	variations := make([]interface{}, 0)
-
-	// 零地址
-	if g.strategy.Addresses.IncludeZero {
-		variations = append(variations, common.HexToAddress("0x0000000000000000000000000000000000000000"))
+	// 禁止地址随机化/变异：仅保留原始地址（若无法解析则为零地址）
+	if (original == common.Address{}) {
+		return []interface{}{common.HexToAddress("0x0000000000000000000000000000000000000000")}
 	}
-
-	// 原地址
-	variations = append(variations, original)
-
-	// 预编译合约地址
-	if g.strategy.Addresses.IncludePrecompiles {
-		for i := 1; i <= 9; i++ {
-			addr := common.HexToAddress(string(rune('0'+i)))
-			variations = append(variations, addr)
-		}
-	}
-
-	// 特殊地址
-	variations = append(variations,
-		common.HexToAddress("0xdEaDbEeF00000000000000000000000000000000"), // 死地址
-		common.HexToAddress("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), // 最大地址
-		common.HexToAddress("0x1111111111111111111111111111111111111111"), // 模式地址
-	)
-
-	// 随机地址
-	if g.strategy.Addresses.IncludeRandom {
-		for i := 0; i < g.strategy.Addresses.RandomCount; i++ {
-			variations = append(variations, g.generateRandomAddress())
-		}
-	}
-
-	// 基于原地址的变体
-	if original != (common.Address{}) {
-		// 修改最后一个字节
-		modified := original
-		modified[19] = byte((int(modified[19]) + 1) % 256)
-		variations = append(variations, modified)
-
-		// 修改第一个字节
-		modified2 := original
-		modified2[0] = byte((int(modified2[0]) + 1) % 256)
-		variations = append(variations, modified2)
-	}
-
-	return variations
+	return []interface{}{original}
 }
 
 // generateBoolVariations 生成布尔值变体
@@ -336,10 +295,10 @@ func (g *ParamGenerator) generateBytesVariations(param Parameter) []interface{} 
 	// 特殊模式
 	if g.strategy.Bytes.IncludePatterns {
 		patterns := [][]byte{
-			[]byte("\x00\x00\x00\x00"),                     // SQL注入尝试
-			[]byte("A" + strings.Repeat("A", 100)),          // 缓冲区溢出测试
-			[]byte{0xDE, 0xAD, 0xBE, 0xEF},                  // 经典模式
-			[]byte{0xCA, 0xFE, 0xBA, 0xBE},                  // Java类文件魔数
+			[]byte("\x00\x00\x00\x00"),             // SQL注入尝试
+			[]byte("A" + strings.Repeat("A", 100)), // 缓冲区溢出测试
+			[]byte{0xDE, 0xAD, 0xBE, 0xEF},         // 经典模式
+			[]byte{0xCA, 0xFE, 0xBA, 0xBE},         // Java类文件魔数
 		}
 		variations = append(variations, g.convertToInterface(patterns)...)
 	}
@@ -359,21 +318,21 @@ func (g *ParamGenerator) generateStringVariations(param Parameter) []interface{}
 	}
 
 	variations := []interface{}{
-		"",                                     // 空串
-		" ",                                    // 空格
-		original,                               // 原值
-		strings.ToUpper(original),              // 大写
-		strings.ToLower(original),              // 小写
-		g.reverseString(original),              // 反转
-		strings.Repeat("A", 1000),              // 长字符串
-		"'; DROP TABLE users; --",             // SQL注入
-		"<script>alert('xss')</script>",       // XSS
-		"../../../etc/passwd",                  // 路径遍历
-		"%00",                                  // 空字节注入
-		"\x00\x01\x02\x03",                    // 控制字符
-		"0x" + strings.Repeat("41", 20),       // 假地址
-		`{"key":"value"}`,                      // JSON
-		"!@#$%^&*()_+-=[]{}|;:,.<>?",          // 特殊字符
+		"",                              // 空串
+		" ",                             // 空格
+		original,                        // 原值
+		strings.ToUpper(original),       // 大写
+		strings.ToLower(original),       // 小写
+		g.reverseString(original),       // 反转
+		strings.Repeat("A", 1000),       // 长字符串
+		"'; DROP TABLE users; --",       // SQL注入
+		"<script>alert('xss')</script>", // XSS
+		"../../../etc/passwd",           // 路径遍历
+		"%00",                           // 空字节注入
+		"\x00\x01\x02\x03",              // 控制字符
+		"0x" + strings.Repeat("41", 20), // 假地址
+		`{"key":"value"}`,               // JSON
+		"!@#$%^&*()_+-=[]{}|;:,.<>?",    // 特殊字符
 	}
 
 	return variations
@@ -386,6 +345,22 @@ func (g *ParamGenerator) generateArrayVariations(param Parameter) []interface{} 
 
 	// 创建不同长度的数组
 	variations := make([]interface{}, 0)
+
+	// 地址数组禁止随机化：仅保留原始数组
+	if elementType == "address" {
+		switch v := param.Value.(type) {
+		case []interface{}:
+			return []interface{}{v}
+		case []common.Address:
+			arr := make([]interface{}, len(v))
+			for i, item := range v {
+				arr[i] = item
+			}
+			return []interface{}{arr}
+		default:
+			return []interface{}{[]interface{}{}}
+		}
+	}
 
 	// 空数组
 	variations = append(variations, []interface{}{})

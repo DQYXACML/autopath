@@ -1,0 +1,335 @@
+{
+  "project_id": "NBLGAME_exp",
+  "name": "NBLGAME_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x5499178919C79086fd580d6c5f332a4253244D91",
+    "0x1fd0a6a5e232eeba8020a40535ad07013ec4ef12",
+    "0xe4d41bdd6459198b33cc795ff280cee02d91087b",
+    "0x534e1a8a89548C44BE7abA1c3c27951801940C10",
+    "0x4B03afC91295ed778320c2824bAd5eb5A1d852DD",
+    "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+    "0x4200000000000000000000000000000000000006",
+    "0xfAF037caAfA9620bFAebc04C298Bf4A104963613",
+    "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "0x770b279678105B378f90055aAd1B22D2a0306baF",
+    "0x64185ec6705f2Ed9F5F3f87f199BBF6B2f18706f",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "0x0000000000000000000000000000000000000000",
+    "0x3993e4d57fF30984912b09B330BC66656fb99E08"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "99154678505405458075631346645292484843014239350090203290839295219801025601301",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "110221438191334832283520401482791463834089283998091182801562061814426286303697",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "18547093780310098905473584991980275069662848324666464190467359480352156871560",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "unlockSlot",
+        "depositNft",
+        "depositNbl",
+        "withdrawNft"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x534e1a8a89548C44BE7abA1c3c27951801940C10"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "24756711612286591898719543952310250700057205090139362898200087921558675053805",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "65506543228379857546777537054648711108005398197033641331868161655592005304361",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "60535025142468658941743819152366451233368569887872005672040927697761747345865",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "unlockSlot",
+        "depositNft",
+        "depositNbl",
+        "withdrawNft"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x4B03afC91295ed778320c2824bAd5eb5A1d852DD"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "99154678505405458075631346645292484843014239350090203290839295219801025601301",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "110221438191334832283520401482791463834089283998091182801562061814426286303697",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "unlockSlot",
+        "depositNft",
+        "depositNbl",
+        "withdrawNft"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x5499178919C79086fd580d6c5f332a4253244D91"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "98343832320418092463269668786136727249934652323436325678843722256626848040442",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "unlockSlot",
+        "depositNft",
+        "depositNbl",
+        "withdrawNft"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x4200000000000000000000000000000000000006"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "35282191177575977801504426245098657852514632069710417371291900039431358945326",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "unlockSlot",
+        "depositNft",
+        "depositNbl",
+        "withdrawNft"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0x5499178919C79086fd580d6c5f332a4253244D91",
+        "function": "unlockSlot",
+        "signature": "unlockSlot()"
+      },
+      {
+        "contract": "0x5499178919C79086fd580d6c5f332a4253244D91",
+        "function": "depositNft",
+        "signature": "depositNft(uint256,uint256)"
+      },
+      {
+        "contract": "0x5499178919C79086fd580d6c5f332a4253244D91",
+        "function": "depositNbl",
+        "signature": "depositNbl(uint256,uint256)"
+      },
+      {
+        "contract": "0x5499178919C79086fd580d6c5f332a4253244D91",
+        "function": "withdrawNft",
+        "signature": "withdrawNft(uint256)"
+      }
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/nblgame",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "NBLGAME_exp",
+      "config_path": "pkg/invariants/configs/nblgame_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "depositNft": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "1",
+            "attack_values": [
+              "1"
+            ],
+            "range": {
+              "min": "0",
+              "max": "1"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.5,
+            "value_expr": "737"
+          }
+        },
+        "depositNbl": {
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "1",
+            "attack_values": [
+              "1"
+            ],
+            "range": {
+              "min": "0",
+              "max": "1"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.5,
+            "value_expr": "NBL.balanceOf(address(this"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "1",
+          "2"
+        ],
+        "1": [
+          "1",
+          "2"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

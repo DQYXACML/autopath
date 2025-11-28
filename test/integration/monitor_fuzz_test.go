@@ -140,7 +140,7 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 	tx := types.NewTransaction(0, contractAddr, big.NewInt(0), 21_000, big.NewInt(1), []byte{0x12, 0x34, 0x56, 0x78})
 
 	ctx := context.Background()
-	result, report, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr)
+	result, report, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
 	if err != nil {
 		t.Fatalf("process transaction: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 
-	cached, _, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr)
+	cached, _, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
 	if err != nil {
 		t.Fatalf("process transaction (cached): %v", err)
 	}
@@ -175,7 +175,7 @@ type stubFuzzDriver struct {
 	calls  int
 }
 
-func (s *stubFuzzDriver) FuzzTransaction(ctx context.Context, txHash common.Hash, contractAddr common.Address, blockNumber uint64) (*fuzzer.AttackParameterReport, error) {
+func (s *stubFuzzDriver) FuzzTransaction(ctx context.Context, txHash common.Hash, contractAddr common.Address, blockNumber uint64, tx *types.Transaction) (*fuzzer.AttackParameterReport, error) {
 	s.calls++
 	return s.report, nil
 }

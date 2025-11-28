@@ -1,0 +1,173 @@
+{
+  "project_id": "MIC_exp",
+  "name": "MIC_exp Firewall Monitor (Layer 1-3 Integrated)",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xb38c2d2d6a168d41aa8eb4cead47e01badbdcf57",
+    "0x1703062d657c1ca439023f0993d870f4707a37ff",
+    "0xafebc0a9e26fea567cc9e6dd7504800c67f4e3fe",
+    "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "0x92b7807bF19b7DDdf89b706143896d05228f3121",
+    "0xB3611B1cbDDB14bC847906BfB9c443AC724A54dC",
+    "0xfEe55F16FD5Aec503B73146045b1474925a74dec",
+    "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    "0x55d398326f99059fF775485246999027B3197955",
+    "0x9f779d61a7139960577CF7392892296F30D86df7",
+    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    "0xBA5Fe23f8a3a24BEd3236F05F2FcF35fd0BF0B5C",
+    "0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE",
+    "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+    "0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f",
+    "0x2e234DAe75C793f67A35089C9d99245E1C58470b",
+    "0xF62849F9A0B5Bf2913b396098F7c7019b51A820a",
+    "0x5991A2dF15A8F6A256D3Ec51E99254Cd3fb576A9",
+    "0xc7183455a4C133Ae270771860664b6B7ec320bB1",
+    "0xa0Cb889707d426A7A386870A03bc70d1b0697598",
+    "0x1d1499e622D69689cdf9004d05Ec547d650Ff211",
+    "0xA4AD4f68d0b91CFD19687c881e50f3A00242828c",
+    "0x03A6a84cD762D9707A21605b548aaaB891562aAb",
+    "0xD6BbDE9174b1CdAa358d2Cf4D57D1a9F7178FBfF",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "0xb38645331535d8a24250bd866c230d0d85c11b90",
+    "0x0000000000000000000000000000000000000000",
+    "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f",
+    "0x1864F7cb1eE4F392716713fB8760f9A0D2793A3D",
+    "0xc5f6E6eAB516bbdcf9F96043779c3DB9de7bF5Ef",
+    "0xF8fE3df51D109226623419DB451BaCB3E38ADB9A",
+    "0x0ED943Ce24BaEBf257488771759F9BF482C39706"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes in MIC_WBNB Pair reserves",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": ["0xfEe55F16FD5Aec503B73146045b1474925a74dec"],
+        "slots": {
+          "slot_8": {"index": "8", "severity": "critical", "threshold": 0.05},
+          "slot_9": {"index": "9", "severity": "critical", "threshold": 0.05}
+        }
+      },
+      "monitored_functions": ["swapManual", "addLiquidityETH", "removeLiquidityETHSupportingFeeOnTransferTokens"]
+    },
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme MIC Token balance changes",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": ["0xb38c2d2d6a168d41aa8eb4cead47e01badbdcf57"],
+        "slots": {
+          "slot_0": {"index": "0", "severity": "critical", "threshold": 0.05},
+          "slot_1": {"index": "1", "severity": "critical", "threshold": 0.05},
+          "slot_2": {"index": "2", "severity": "critical", "threshold": 0.05}
+        }
+      },
+      "monitored_functions": ["swapManual", "transfer", "transferFrom"]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0xb38c2d2d6a168d41aa8eb4cead47e01badbdcf57",
+        "function": "swapManual",
+        "signature": "swapManual()"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 300,
+    "workers": 8,
+    "timeout_seconds": 20,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/mic",
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "MIC_exp",
+      "config_path": "pkg/invariants/configs/mic.json"
+    },
+    "seed_config": {
+      "enabled": true,
+      "attack_seeds": {
+        "0": ["1000000000000000000"]
+      },
+      "range_config": {
+        "numeric_range_percent": [1, 2, 5, 10, 20, 50, 100],
+        "address_mutation_types": ["original", "bitflip_1", "bitflip_2", "nearby"],
+        "boundary_exploration": true
+      },
+      "weights": {
+        "seed_based": 0.6,
+        "random": 0.2,
+        "boundary": 0.2
+      },
+      "adaptive_config": {
+        "enabled": true,
+        "max_iterations": 5,
+        "convergence_rate": 0.02,
+        "range_strategies": {
+          "high_similarity": [1, 2, 5],
+          "medium_similarity": [5, 10, 20, 50],
+          "low_similarity": [50, 100, 200]
+        },
+        "zone_threshold": 0.75,
+        "zone_gap_percent": 0.10,
+        "zone_gap_absolute": 1000,
+        "high_sim_threshold": 0.8,
+        "medium_sim_threshold": 0.6
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "lightweight",
+        "max_constraints": 30,
+        "solver_timeout": "3s",
+        "extraction": {
+          "max_trace_depth": 5000,
+          "focus_opcodes": ["JUMPI", "LT", "GT", "EQ", "ISZERO", "SLT", "SGT"],
+          "ignore_loops": true,
+          "max_branches": 15
+        },
+        "solver": {
+          "strategy": "local",
+          "max_solutions": 8,
+          "use_cache": true,
+          "cache_size": 1000,
+          "parallel": false,
+          "workers": 4
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.5,
+          "max_symbolic_seeds": 20
+        }
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

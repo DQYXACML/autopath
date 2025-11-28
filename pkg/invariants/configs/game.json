@@ -1,0 +1,276 @@
+{
+  "project_id": "Game_exp",
+  "name": "Game_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+    "0x145766a51ae96e69810fe76f6f68fd0e95675a0b",
+    "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a",
+    "0x1298EF04e9e878DaE51e605816ce3E6A99aD9B80",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.12,
+        "contracts": [
+          "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a"
+        ],
+        "slots": {
+          "slot_1": {
+            "index": "1",
+            "severity": "high",
+            "threshold": 0.12
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+      },
+      "monitored_functions": [
+        "newBidEtherMin",
+        "makeBid"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 2.0,
+        "contracts": [
+          "0x52d69c67536f55EfEfe02941868e5e762538dBD6"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "1160",
+            "severity": "high",
+            "threshold": 2.0
+          },
+          "slot_1": {
+            "index": "1161",
+            "severity": "high",
+            "threshold": 2.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 2.0"
+      },
+      "monitored_functions": [
+        "newBidEtherMin",
+        "makeBid"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x52d69c67536f55EfEfe02941868e5e762538dBD6"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "newBidEtherMin",
+        "makeBid"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_002",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "newBidEtherMin",
+        "makeBid"
+      ]
+    },
+    {
+      "id": "CROSS_balance_conservation",
+      "name": "Balance transfer conservation between contracts",
+      "type": "balance_conservation",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.01,
+        "contracts": [
+          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a",
+          "0x1298EF04e9e878DaE51e605816ce3E6A99aD9B80"
+        ],
+        "slots": {},
+        "formula": "abs(balance_change_A + balance_change_B) <= gas_tolerance"
+      },
+      "monitored_functions": [
+        "newBidEtherMin",
+        "makeBid"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+        "function": "newBidEtherMin",
+        "signature": "newBidEtherMin()"
+      },
+      {
+        "contract": "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+        "function": "makeBid",
+        "signature": "makeBid()"
+      }
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/game",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "Game_exp",
+      "config_path": "pkg/invariants/configs/game_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "attack_seeds": {
+        "0": [
+          "1000000000000000000",
+          "1000000",
+          "10000000000000000000",
+          "100000000000000000000"
+        ]
+      },
+      "range_config": {
+        "numeric_range_percent": [
+          1,
+          2,
+          5,
+          10,
+          20,
+          50,
+          100
+        ],
+        "address_mutation_types": [
+          "original",
+          "bitflip_1",
+          "bitflip_2",
+          "nearby"
+        ],
+        "boundary_exploration": true
+      },
+      "weights": {
+        "seed_based": 0.6,
+        "random": 0.2,
+        "boundary": 0.2
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "z3",
+        "max_constraints": 30,
+        "solver_timeout": "3s",
+        "extraction": {
+          "max_trace_depth": 5000,
+          "focus_opcodes": [
+            "JUMPI",
+            "LT",
+            "GT",
+            "EQ",
+            "ISZERO",
+            "SLT",
+            "SGT"
+          ],
+          "ignore_loops": true,
+          "max_branches": 15
+        },
+        "solver": {
+          "strategy": "z3",
+          "max_solutions": 8,
+          "use_cache": true,
+          "cache_size": 1000,
+          "parallel": true,
+          "workers": 8
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.5,
+          "max_symbolic_seeds": 20
+        }
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

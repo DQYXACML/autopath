@@ -107,6 +107,13 @@ go run cmd/monitor/main.go \
 - 推送逻辑：Fuzzing 发现满足阈值的有效参数后，自动调用 `ParamCheckModule.updateFromAutopatch(project, funcSig, summaries, threshold)` 写入规则。
 - 说明：当前链上 `detect` 仅支持静态参数类型（uint256/int256/address/bool/bytes32）。动态类型（bytes/string/数组）仍按照偏移字读取，尚未在链上解码。
 
+### 链下 Autopath 自定义执行器（调用改写）
+
+- 基于 go-ethereum 的 `vm`/`state` 直接构建自定义执行器，复用 `vm.EVM` 驱动交易执行，避免重写核心 opcode 逻辑。
+- 重写 CALL 系列入口（`Call`/`DelegateCall`/`StaticCall`/`CallCode`），在真正执行前检查目标地址与 selector，调用链下回调生成新的 calldata，并将改写后的 `vm.Contract`/消息重新交给解释器继续执行。
+- 严格维护 `StateDB`、Gas 计费、异常传播与返回值语义，必要时覆盖 `CREATE`/`SELFDESTRUCT` 等边缘指令，确保与官方节点结果一致。
+- 需对比官方节点执行路径与状态：校验 storage/state root、余额变更、日志、Gas 消耗及异常类型，保证 fuzz 相似度与状态变更不偏离真实链上执行。
+
 
 ## 配置说明
 

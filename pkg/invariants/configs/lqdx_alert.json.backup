@@ -1,0 +1,492 @@
+{
+  "project_id": "LQDX_alert_exp",
+  "name": "LQDX_alert_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x364f17A23AE4350319b7491224d10dF5796190bC",
+    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26",
+    "0x1884C3D0ac1A3ACF0698b2a19866cee4cE27c31A",
+    "0xBC7D212939FBe696e514226F3FAfA3697B96Bf59",
+    "0xeba22665C355457FA4e5A07B3A7559F22fd74923",
+    "0x21e6fA0156a91142342469f75278a1A715d46691"
+  ],
+  "invariants": [
+    {
+      "id": "SINV_001",
+      "name": "Vault share price must not change more than 5% per transaction",
+      "type": "share_price_stability",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26"
+        ],
+        "slots": {
+          "reserves_contract": "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26",
+          "reserves_query": "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26.balanceOf(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)",
+          "totalSupply_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "totalSupply_slot": "2"
+        },
+        "formula": "|(reserves/totalSupply)_after - (reserves/totalSupply)_before| / (reserves/totalSupply)_before <= 0.05"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_002",
+      "name": "Total supply must be backed by proportional underlying reserves",
+      "type": "supply_backing_consistency",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 1.1,
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26"
+        ],
+        "slots": {
+          "totalSupply_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "totalSupply_slot": "2",
+          "underlying_contract": "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26"
+        },
+        "formula": "totalSupply <= reserves * max_leverage_ratio"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_003",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "slots": {
+          "contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_004",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26"
+        ],
+        "slots": {
+          "contract": "0x872952d3c1Caf944852c5ADDa65633F1Ef218A26",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_005",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x364f17A23AE4350319b7491224d10dF5796190bC"
+        ],
+        "slots": {
+          "contract": "0x364f17A23AE4350319b7491224d10dF5796190bC",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_006",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x1884C3D0ac1A3ACF0698b2a19866cee4cE27c31A"
+        ],
+        "slots": {
+          "contract": "0x1884C3D0ac1A3ACF0698b2a19866cee4cE27c31A",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_007",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0xBC7D212939FBe696e514226F3FAfA3697B96Bf59"
+        ],
+        "slots": {
+          "contract": "0xBC7D212939FBe696e514226F3FAfA3697B96Bf59",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_008",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0xeba22665C355457FA4e5A07B3A7559F22fd74923"
+        ],
+        "slots": {
+          "contract": "0xeba22665C355457FA4e5A07B3A7559F22fd74923",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_009",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x21e6fA0156a91142342469f75278a1A715d46691"
+        ],
+        "slots": {
+          "contract": "0x21e6fA0156a91142342469f75278a1A715d46691",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "SINV_010",
+      "name": "totalSupply should not change more than 50% in single transaction",
+      "type": "bounded_change_rate",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x91f6AA43c190E317E4D02698127aA7A629CF4b23"
+        ],
+        "slots": {
+          "contract": "0x91f6AA43c190E317E4D02698127aA7A629CF4b23",
+          "monitored_slot": "2",
+          "semantic_type": "totalSupply"
+        },
+        "formula": "|slot_2_after - slot_2_before| / slot_2_before <= 0.5"
+      },
+      "monitored_functions": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "RINV_004",
+      "name": "单笔交易中关键合约的余额变化率不应超过 0.08%",
+      "type": "runtime_balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.0007538932826574114,
+        "contracts": [],
+        "slots": {},
+        "formula": "max(balance_change_rate) <= 0.0007538932826574114"
+      },
+      "monitored_functions": []
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_functions": [
+      {
+        "contract": "0x364f17A23AE4350319b7491224d10dF5796190bC",
+        "function": "deposit",
+        "signature": "deposit(address,address,address,swapPath,address,address,uint256,uint256)"
+      }
+    ],
+    "threshold": 0.1,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 300,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/lqdx_alert",
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "LQDX_alert_exp",
+      "config_path": "pkg/invariants/configs/lqdx_alert_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "startPrank": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "attacker"
+          }
+        },
+        "deposit": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "victim"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(WETH)"
+          },
+          "2": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(WETH)"
+          },
+          "3": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "ILiquidXv2Zap.swapPath({path: path})"
+          },
+          "4": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(WETH)"
+          },
+          "5": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(LQDX)"
+          },
+          "6": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "amounts"
+          },
+          "7": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "0"
+          }
+        },
+        "swapPath": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "{path: path}"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": []
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

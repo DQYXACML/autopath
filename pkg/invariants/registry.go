@@ -65,6 +65,37 @@ func (r *Registry) LoadProjectConfig(configPath string) error {
 		if inv.Evaluator == nil {
 			inv.Evaluator = r.getDefaultEvaluator(inv.Type, inv.ID)
 		}
+
+		// 对于flash_change_prevention类型，使用专门的工厂函数创建评估器
+		if inv.Type == FlashChangePreventionInvariant {
+			inv.Evaluator = CreateFlashChangePreventionEvaluator(inv)
+		}
+
+		// 【修复】从不变量的Contracts字段中注册额外的受保护合约地址
+		// 这解决了invariants中硬编码主网地址导致monitor跳过交易的问题
+
+		// 情况1: 顶层 inv.Contracts 字段
+		for _, contractAddr := range inv.Contracts {
+			addr := common.HexToAddress(contractAddr)
+			// 只在该地址尚未注册时才添加，避免覆盖已有的项目映射
+			if _, exists := r.contractToProject[addr]; !exists {
+				r.contractToProject[addr] = config.ProjectID
+			}
+		}
+
+		// 情况2: parameters["contracts"] 字段（如 flash_change_prevention 类型）
+		if contractsParam, ok := inv.Parameters["contracts"]; ok {
+			if contractsSlice, ok := contractsParam.([]interface{}); ok {
+				for _, c := range contractsSlice {
+					if contractAddr, ok := c.(string); ok {
+						addr := common.HexToAddress(contractAddr)
+						if _, exists := r.contractToProject[addr]; !exists {
+							r.contractToProject[addr] = config.ProjectID
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return nil
@@ -196,4 +227,47 @@ func (r *Registry) UpdateProjectContracts(projectID string, contracts []string) 
 	}
 
 	return nil
+}
+
+// GetFuzzingTargetContracts 获取配置中定义的Fuzzing目标合约地址
+// 这些是明确注入了防火墙代码的合约，应该优先被Fuzz
+func (r *Registry) GetFuzzingTargetContracts() []common.Address {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	targetContracts := make(map[common.Address]bool)
+
+	for _, project := range r.projects {
+		if project.FuzzingConfig != nil && len(project.FuzzingConfig.TargetFunctions) > 0 {
+			for _, tf := range project.FuzzingConfig.TargetFunctions {
+				if tf.Contract != "" {
+					addr := common.HexToAddress(tf.Contract)
+					targetContracts[addr] = true
+				}
+			}
+		}
+	}
+
+	var result []common.Address
+	for addr := range targetContracts {
+		result = append(result, addr)
+	}
+	return result
+}
+
+// HasFuzzingTargetFunction 检查合约是否是配置中定义的Fuzzing目标
+func (r *Registry) HasFuzzingTargetFunction(addr common.Address) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, project := range r.projects {
+		if project.FuzzingConfig != nil {
+			for _, tf := range project.FuzzingConfig.TargetFunctions {
+				if common.HexToAddress(tf.Contract) == addr {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

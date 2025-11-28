@@ -1,0 +1,28 @@
+{
+  "project_id": "MIC_exp",
+  "contracts": [
+    "0xfEe55F16FD5Aec503B73146045b1474925a74dec"
+  ],
+  "invariants": [
+    {
+      "id": "mic_flash_change_001",
+      "name": "MIC Flash Change Prevention",
+      "type": "flash_change_prevention",
+      "description": "Detect extreme reserve changes in Uniswap V2 pool",
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xfEe55F16FD5Aec503B73146045b1474925a74dec"
+        ],
+        "slots": {
+          "slot_8": {
+            "index": "8",
+            "threshold": 0.05,
+            "severity": "critical"
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      }
+    }
+  ]
+}

@@ -40,6 +40,8 @@ CONFIG_PATH=""
 RPC_URL="ws://localhost:8545"
 BUILD_BINARY=1
 EXTRA_VARS=()
+# 本地执行开关（默认开启，保证Fuzz走本地EVM+Hook）
+USE_LOCAL_EXECUTION="${USE_LOCAL_EXECUTION:-true}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -197,6 +199,14 @@ stop_existing_monitor() {
 }
 
 MONITOR_CMD="./monitor -rpc ${RPC_URL} -config ${CONFIG_PATH}"
+
+# 启用本地执行模式（默认开启，可通过USE_LOCAL_EXECUTION控制）
+if [ "${USE_LOCAL_EXECUTION}" = "true" ]; then
+    MONITOR_CMD="$MONITOR_CMD -local-execution"
+    echo -e "${YELLOW}启用本地EVM执行模式 (USE_LOCAL_EXECUTION=true)${NC}"
+else
+    echo -e "${YELLOW}未启用本地EVM执行模式 (USE_LOCAL_EXECUTION=${USE_LOCAL_EXECUTION})${NC}"
+fi
 
 PMC=""
 DOMAIN=""
