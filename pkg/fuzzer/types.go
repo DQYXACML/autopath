@@ -58,6 +58,7 @@ type AttackParameterReport struct {
 
 	// 有效参数组合
 	ValidParameters []ParameterSummary `json:"valid_parameters"`
+	ExpressionRules []ExpressionRule   `json:"expression_rules,omitempty"`
 
 	// 统计信息
 	TotalCombinations int     `json:"total_combinations_tested"`
@@ -140,6 +141,29 @@ type ConstraintRule struct {
 	StateConstraints  []StateConstraint `json:"state_constraints,omitempty"`
 	SimilarityTrigger float64           `json:"similarity_trigger"`
 	GeneratedAt       time.Time         `json:"generated_at"`
+}
+
+// LinearTerm 表示线性不等式中的单个项
+type LinearTerm struct {
+	Kind       string `json:"kind"`                  // param/state
+	ParamIndex int    `json:"param_index,omitempty"` // 当kind=param时有效
+	Slot       string `json:"slot,omitempty"`        // 当kind=state时有效
+	Coeff      string `json:"coeff"`                 // 系数，十六进制
+}
+
+// ExpressionRule 基于样本生成的乘法/线性约束
+type ExpressionRule struct {
+	Type         string         `json:"type"` // ratio/linear
+	Contract     common.Address `json:"contract"`
+	Selector     string         `json:"selector"`
+	Terms        []LinearTerm   `json:"terms"`          // 左侧线性组合项
+	Threshold    string         `json:"threshold"`      // 右侧阈值（十六进制）
+	Scale        string         `json:"scale"`          // 精度放大倍数（十六进制）
+	Confidence   float64        `json:"confidence"`     // 样本覆盖度
+	SampleCount  int            `json:"sample_count"`   // 样本数
+	MinMarginHex string         `json:"min_margin_hex"` // 样本中最小剩余（便于调试）
+	GeneratedAt  time.Time      `json:"generated_at"`
+	Strategy     string         `json:"strategy,omitempty"` // ratio/linear 具体描述
 }
 
 // ValueToString 将参数值转为字符串，便于 JSON 输出

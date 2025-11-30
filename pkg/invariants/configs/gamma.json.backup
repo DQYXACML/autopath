@@ -41,65 +41,6 @@
       "parameters": {
         "threshold": 0.15,
         "contracts": [
-          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "85311776980466124172592233613827772135755806679569714364894111367541150327553",
-            "severity": "critical",
-            "threshold": 0.15
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.15"
-      },
-      "monitored_functions": [
-        "deposit",
-        "deposit",
-        "deposit",
-        "deposit"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_002",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "769",
-            "severity": "critical",
-            "threshold": 5.0
-          },
-          "slot_1": {
-            "index": "768",
-            "severity": "critical",
-            "threshold": 5.0
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "deposit",
-        "deposit",
-        "deposit",
-        "deposit"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_003",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.15,
-        "contracts": [
           "0x61A7b3dae70D943C6f2eA9ba4FfD2fEcc6AF15E4"
         ],
         "slots": {
@@ -119,7 +60,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_004",
+      "id": "PATTERN_flash_change_002",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -146,7 +87,39 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_007",
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "768",
+            "severity": "critical",
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "769",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "deposit",
+        "deposit",
+        "deposit",
+        "deposit"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_004",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -173,7 +146,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_009",
+      "id": "PATTERN_flash_change_005",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -185,17 +158,17 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922270",
-            "severity": "critical",
-            "threshold": 5.0
-          },
-          "slot_1": {
             "index": "77338518811735476697080666527048432370145113824356797988220997501596230420178",
             "severity": "critical",
             "threshold": 5.0
           },
+          "slot_1": {
+            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922271",
+            "severity": "critical",
+            "threshold": 5.0
+          },
           "slot_2": {
-            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787689",
+            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922270",
             "severity": "critical",
             "threshold": 5.0
           },
@@ -205,7 +178,7 @@
             "threshold": 5.0
           },
           "slot_4": {
-            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922271",
+            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787689",
             "severity": "critical",
             "threshold": 5.0
           },
@@ -225,7 +198,34 @@
       ]
     },
     {
-      "id": "PATTERN_ratio_break_002",
+      "id": "PATTERN_flash_change_006",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.15,
+        "contracts": [
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "85311776980466124172592233613827772135755806679569714364894111367541150327553",
+            "severity": "critical",
+            "threshold": 0.15
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+      },
+      "monitored_functions": [
+        "deposit",
+        "deposit",
+        "deposit",
+        "deposit"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
       "name": "Ensure ratio stability between related values",
       "type": "ratio_stability",
       "severity": "high",
@@ -233,12 +233,12 @@
       "parameters": {
         "threshold": 0.18,
         "contracts": [
-          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2",
           "0x61A7b3dae70D943C6f2eA9ba4FfD2fEcc6AF15E4",
           "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2",
           "0x3AB5DD69950a948c55D1FBFb7500BF92B4Bd4C48",
-          "0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443"
+          "0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443",
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
         ],
         "slots": {
           "slot_0": {
@@ -267,71 +267,7 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_002",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.08,
-        "contracts": [
-          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "6446912116253275903440961200479437471609970167589025669540262955614778758903",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_1": {
-            "index": "85311776980466124172592233613827772135755806679569714364894111367541150327553",
-            "severity": "high",
-            "threshold": 0.08
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 0.08"
-      },
-      "monitored_functions": [
-        "deposit",
-        "deposit",
-        "deposit",
-        "deposit"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_003",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "769",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_1": {
-            "index": "768",
-            "severity": "high",
-            "threshold": 5.0
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "deposit",
-        "deposit",
-        "deposit",
-        "deposit"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_004",
+      "id": "PATTERN_monotonic_increase_001",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -363,7 +299,39 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_006",
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x0a5C5EAE1f471251089dF815a17A5C2378dD4Cf2"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "768",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "769",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "deposit",
+        "deposit",
+        "deposit",
+        "deposit"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_003",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -400,7 +368,7 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_008",
+      "id": "PATTERN_monotonic_increase_006",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -412,47 +380,47 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607794",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_1": {
-            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922270",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_10": {
-            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607793",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_11": {
-            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607792",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_2": {
-            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787691",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_3": {
-            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922272",
-            "severity": "high",
-            "threshold": 5.0
-          },
-          "slot_4": {
             "index": "77338518811735476697080666527048432370145113824356797988220997501596230420178",
             "severity": "high",
             "threshold": 5.0
           },
+          "slot_1": {
+            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922271",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_10": {
+            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787691",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_11": {
+            "index": "77338518811735476697080666527048432370145113824356797988220997501596230420179",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_2": {
+            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607794",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_3": {
+            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922270",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_4": {
+            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607792",
+            "severity": "high",
+            "threshold": 5.0
+          },
           "slot_5": {
-            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787689",
+            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922272",
             "severity": "high",
             "threshold": 5.0
           },
           "slot_6": {
-            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787690",
+            "index": "96153744229049025599687899865250995732418083112683553517613617296290575607793",
             "severity": "high",
             "threshold": 5.0
           },
@@ -462,17 +430,49 @@
             "threshold": 5.0
           },
           "slot_8": {
-            "index": "54243018957584215547201511988104760239908061712808557517536740732284529922271",
+            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787690",
             "severity": "high",
             "threshold": 5.0
           },
           "slot_9": {
-            "index": "77338518811735476697080666527048432370145113824356797988220997501596230420179",
+            "index": "37552372766756472550105687085251879930084054232843154136260191092706542787689",
             "severity": "high",
             "threshold": 5.0
           }
         },
         "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "deposit",
+        "deposit",
+        "deposit",
+        "deposit"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_007",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.08,
+        "contracts": [
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "85311776980466124172592233613827772135755806679569714364894111367541150327553",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_1": {
+            "index": "6446912116253275903440961200479437471609970167589025669540262955614778758903",
+            "severity": "high",
+            "threshold": 0.08
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.08"
       },
       "monitored_functions": [
         "deposit",

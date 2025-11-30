@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -301,6 +302,17 @@ func (i *CallInterceptor) processProtectedCall(
 	}
 
 	// 使用MutationEngine变异calldata
+	if decoded, err := i.mutationEngine.DecodeCalldata(method, input); err == nil {
+		for idx := range pooledParams {
+			if idx >= len(decoded) {
+				break
+			}
+			if method.Inputs[idx].Type.T == abi.AddressTy {
+				pooledParams[idx] = decoded[idx]
+			}
+		}
+	}
+
 	mutatedCalldata, err := i.mutationEngine.MutateCalldata(method, input, pooledParams)
 	if err != nil {
 		// 变异失败，返回原始calldata

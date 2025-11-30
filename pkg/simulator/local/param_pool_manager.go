@@ -3,6 +3,9 @@ package local
 
 import (
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,8 +17,30 @@ import (
 
 // SeedConfig 种子驱动模糊测试配置（简化版，避免循环导入）
 type SeedConfig struct {
-	Enabled     bool                     `json:"enabled"`
-	AttackSeeds map[int][]interface{}    `json:"attack_seeds"` // 参数索引 → 攻击参数值列表
+	Enabled             bool                                   `json:"enabled"`
+	AttackSeeds         map[int][]interface{}                  `json:"attack_seeds"`      // 参数索引 → 攻击参数值列表
+	ConstraintRanges    map[string]map[string]*ConstraintRange `json:"constraint_ranges"` // 函数名(小写) → 参数索引字符串 → 范围
+	RangeMutationConfig *RangeMutationConfig                   `json:"range_mutation_config"`
+}
+
+// ConstraintRange 约束范围（从链下配置提取）
+type ConstraintRange struct {
+	Type         string   `json:"type"`
+	AttackValues []string `json:"attack_values"`
+	Range        *struct {
+		Min string `json:"min"`
+		Max string `json:"max"`
+	} `json:"range"`
+	MutationStrategy string  `json:"mutation_strategy"`
+	Confidence       float64 `json:"confidence"`
+}
+
+// RangeMutationConfig 范围变异配置（简化版）
+type RangeMutationConfig struct {
+	FocusPercentiles       []int   `json:"focus_percentiles"`
+	BoundaryExploration    bool    `json:"boundary_exploration"`
+	StepCount              int     `json:"step_count"`
+	RandomWithinRangeRatio float64 `json:"random_within_range_ratio"`
 }
 
 // ParamPoolManager 参数池管理器接口
@@ -136,7 +161,15 @@ func (m *paramPoolManager) GeneratePool(
 		combo := make([]interface{}, len(method.Inputs))
 
 		for j, input := range method.Inputs {
-			// 优先使用种子配置
+			// 优先使用约束范围（按函数名匹配，采用攻击值/范围边界）
+			if seedConfig != nil && seedConfig.Enabled {
+				if vals := constraintValues(seedConfig, strings.ToLower(method.Name), j, input.Type, poolSize); len(vals) > 0 {
+					combo[j] = vals[i%len(vals)]
+					continue
+				}
+			}
+
+			// 退回：使用种子配置
 			if seedConfig != nil && seedConfig.Enabled {
 				if seeds, hasSeed := seedConfig.AttackSeeds[j]; hasSeed && len(seeds) > 0 {
 					// 从种子中轮询选择
@@ -268,4 +301,115 @@ func (m *paramPoolManager) generateDefaultValue(paramType abi.Type) interface{} 
 	default:
 		return nil
 	}
+}
+
+// constraintValues 根据配置的约束范围生成值列表
+func constraintValues(seed *SeedConfig, funcName string, paramIndex int, paramType abi.Type, poolSize int) []interface{} {
+	if seed == nil || seed.ConstraintRanges == nil {
+		return nil
+	}
+	funcRanges, ok := seed.ConstraintRanges[strings.ToLower(funcName)]
+	if !ok {
+		return nil
+	}
+	cr, ok := funcRanges[strconv.Itoa(paramIndex)]
+	if !ok || cr == nil {
+		return nil
+	}
+
+	// 1) 攻击值优先
+	var out []interface{}
+	for _, v := range cr.AttackValues {
+		if val := parseConstraintValue(v, paramType); val != nil {
+			out = append(out, val)
+		}
+	}
+
+	// 2) 范围边界/插值
+	if cr.Range != nil {
+		minVal := parseConstraintValue(cr.Range.Min, paramType)
+		maxVal := parseConstraintValue(cr.Range.Max, paramType)
+		if minVal != nil {
+			out = append(out, minVal)
+		}
+		if maxVal != nil && !sameValue(minVal, maxVal) {
+			out = append(out, maxVal)
+		}
+		// 简单插值：取中点
+		if minVal != nil && maxVal != nil {
+			if mid := midpointValue(minVal, maxVal, paramType); mid != nil {
+				out = append(out, mid)
+			}
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	// 限制数量，保持与 poolSize 一致的轮询体验
+	if len(out) > poolSize {
+		return out[:poolSize]
+	}
+	return out
+}
+
+func parseConstraintValue(v string, paramType abi.Type) interface{} {
+	switch paramType.T {
+	case abi.AddressTy:
+		return common.HexToAddress(v)
+	case abi.BoolTy:
+		return strings.TrimSpace(strings.ToLower(v)) == "true" || v == "1"
+	case abi.UintTy, abi.IntTy:
+		if strings.HasPrefix(v, "0x") {
+			if bi, ok := new(big.Int).SetString(strings.TrimPrefix(v, "0x"), 16); ok {
+				return bi
+			}
+		}
+		if bi, ok := new(big.Int).SetString(v, 10); ok {
+			return bi
+		}
+		return nil
+	case abi.BytesTy, abi.FixedBytesTy:
+		if strings.HasPrefix(v, "0x") {
+			return common.FromHex(v)
+		}
+		return []byte(v)
+	case abi.StringTy:
+		return v
+	default:
+		return nil
+	}
+}
+
+func sameValue(a, b interface{}) bool {
+	switch av := a.(type) {
+	case *big.Int:
+		if bv, ok := b.(*big.Int); ok {
+			return av.Cmp(bv) == 0
+		}
+	case common.Address:
+		if bv, ok := b.(common.Address); ok {
+			return av == bv
+		}
+	case []byte:
+		if bv, ok := b.([]byte); ok {
+			return len(av) == len(bv) && string(av) == string(bv)
+		}
+	}
+	return false
+}
+
+func midpointValue(a, b interface{}, paramType abi.Type) interface{} {
+	switch av := a.(type) {
+	case *big.Int:
+		if bv, ok := b.(*big.Int); ok {
+			sum := new(big.Int).Add(av, bv)
+			return sum.Div(sum, big.NewInt(2))
+		}
+	case common.Address:
+		// 地址不做插值，返回左值
+		return av
+	}
+	return nil
 }

@@ -94,6 +94,21 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		}
 	}
 
+	if len(overrides) > 0 {
+		accountWithCode := 0
+		totalSlots := 0
+		for _, ov := range overrides {
+			if ov == nil {
+				continue
+			}
+			if ov.Code != "" && ov.Code != "0x" {
+				accountWithCode++
+			}
+			totalSlots += len(ov.State)
+		}
+		log.Printf("[StateOverride] ✅ 构造完成 (accounts=%d, slots=%d, withCode=%d)", len(overrides), totalSlots, accountWithCode)
+	}
+
 	return overrides, nil
 }
 

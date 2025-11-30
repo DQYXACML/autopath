@@ -76,6 +76,22 @@ type ParamSummary struct {
 	OccurrenceCount *big.Int
 }
 
+// ExpressionTerm 链上表达式项
+type ExpressionTerm struct {
+	Kind       uint8
+	ParamIndex uint8
+	Slot       [32]byte
+	Coeff      *big.Int
+}
+
+// ExpressionRule 链上表达式规则
+type ExpressionRule struct {
+	RuleType  string
+	Terms     []ExpressionTerm
+	Threshold *big.Int
+	Scale     *big.Int
+}
+
 // NewOraclePusher 创建新的Oracle推送器
 func NewOraclePusher(config *PusherConfig) (*OraclePusher, error) {
 	// 连接到以太坊节点
@@ -178,6 +194,13 @@ func (p *OraclePusher) ProcessFuzzingReport(
 	p.mutex.Lock()
 	p.pendingReports = append(p.pendingReports, request)
 	p.mutex.Unlock()
+
+	// 先尝试推送表达式规则（链上存档）
+	if len(report.ExpressionRules) > 0 {
+		if err := p.pushExpressionRules(ctx, project, funcSig, report.ExpressionRules); err != nil {
+			log.Printf("[OraclePusher] Push expression rules failed: %v", err)
+		}
+	}
 
 	// 如果达到批量大小，执行推送
 	if len(p.pendingReports) >= p.config.BatchSize {
@@ -357,6 +380,75 @@ func (p *OraclePusher) stringToBytes32(val string) [32]byte {
 	return result
 }
 
+// pushExpressionRules 推送表达式规则（ratio/linear）
+func (p *OraclePusher) pushExpressionRules(
+	ctx context.Context,
+	project common.Address,
+	funcSig [4]byte,
+	exprs []fuzzer.ExpressionRule,
+) error {
+	chainRules := make([]ExpressionRule, 0, len(exprs))
+	for _, expr := range exprs {
+		cr := ExpressionRule{
+			RuleType:  expr.Type,
+			Threshold: parseBigIntHex(expr.Threshold),
+			Scale:     parseBigIntHex(expr.Scale),
+		}
+		for _, t := range expr.Terms {
+			term := ExpressionTerm{
+				Coeff: parseBigIntHex(t.Coeff),
+			}
+			if strings.EqualFold(t.Kind, "param") {
+				term.Kind = 0
+				if t.ParamIndex > 255 {
+					term.ParamIndex = 255
+				} else {
+					term.ParamIndex = uint8(t.ParamIndex)
+				}
+			} else {
+				term.Kind = 1
+				if len(t.Slot) > 2 {
+					copy(term.Slot[:], common.FromHex(t.Slot))
+				}
+			}
+			cr.Terms = append(cr.Terms, term)
+		}
+		chainRules = append(chainRules, cr)
+	}
+	if len(chainRules) == 0 {
+		return nil
+	}
+
+	tx, err := p.bound.Transact(p.auth, "updateExpressionRules", project, funcSig, chainRules)
+	if err != nil {
+		return fmt.Errorf("failed to push expression rules: %w", err)
+	}
+	log.Printf("[OraclePusher] Pushed expression rules tx=%s", tx.Hash().Hex())
+	return nil
+}
+
+func parseBigIntHex(hexStr string) *big.Int {
+	if hexStr == "" {
+		return big.NewInt(0)
+	}
+	hs := strings.ToLower(strings.TrimSpace(hexStr))
+	sign := int64(1)
+	if strings.HasPrefix(hs, "-0x") {
+		sign = -1
+		hs = strings.TrimPrefix(hs, "-0x")
+	} else if strings.HasPrefix(hs, "0x") {
+		hs = strings.TrimPrefix(hs, "0x")
+	}
+	bi := new(big.Int)
+	if _, ok := bi.SetString(hs, 16); ok {
+		if sign < 0 {
+			bi.Neg(bi)
+		}
+		return bi
+	}
+	return big.NewInt(0)
+}
+
 // sendTransaction 已弃用：改为使用绑定合约的 Transact 发送
 // 保留接口以兼容旧代码路径（不再被调用）
 func (p *OraclePusher) sendTransaction(ctx context.Context, data []byte) (common.Hash, error) {
@@ -426,6 +518,31 @@ const ParamCheckModuleABI = `[
 			}
 		],
 		"name": "updateFromAutopatch",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{"name": "project", "type": "address"},
+			{"name": "funcSig", "type": "bytes4"},
+			{
+				"components": [
+					{"name": "ruleType", "type": "string"},
+					{"components": [
+						{"name": "kind", "type": "uint8"},
+						{"name": "paramIndex", "type": "uint8"},
+						{"name": "slot", "type": "bytes32"},
+						{"name": "coeff", "type": "int256"}
+					], "name": "terms", "type": "tuple[]"},
+					{"name": "threshold", "type": "int256"},
+					{"name": "scale", "type": "uint256"}
+				],
+				"name": "rules",
+				"type": "tuple[]"
+			}
+		],
+		"name": "updateExpressionRules",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"

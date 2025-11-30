@@ -34,11 +34,16 @@
       "parameters": {
         "threshold": 0.25,
         "contracts": [
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         ],
         "slots": {
-          "reserve0_slot": {
-            "index": "8",
+          "slot_0": {
+            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
             "severity": "critical",
             "threshold": 0.25
           }
@@ -60,16 +65,11 @@
       "parameters": {
         "threshold": 0.25,
         "contracts": [
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
         ],
         "slots": {
-          "slot_0": {
-            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
-            "severity": "critical",
-            "threshold": 0.25
-          },
-          "slot_1": {
-            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
+          "reserve0_slot": {
+            "index": "8",
             "severity": "critical",
             "threshold": 0.25
           }
@@ -91,9 +91,9 @@
       "parameters": {
         "threshold": 0.3,
         "contracts": [
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397",
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F",
           "0x02f92800F57BCD74066F5709F1Daa1A4302Df875",
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
         ],
         "slots": {
           "reserve0_slot": {
@@ -119,11 +119,16 @@
       "parameters": {
         "threshold": 0.4,
         "contracts": [
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         ],
         "slots": {
-          "reserve0_slot": {
-            "index": "8",
+          "slot_0": {
+            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
+            "severity": "high",
+            "threshold": 0.4
+          },
+          "slot_1": {
+            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
             "severity": "high",
             "threshold": 0.4
           }
@@ -145,16 +150,11 @@
       "parameters": {
         "threshold": 0.4,
         "contracts": [
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
         ],
         "slots": {
-          "slot_0": {
-            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
-            "severity": "high",
-            "threshold": 0.4
-          },
-          "slot_1": {
-            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
+          "reserve0_slot": {
+            "index": "8",
             "severity": "high",
             "threshold": 0.4
           }

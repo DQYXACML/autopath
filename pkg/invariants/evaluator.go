@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,6 +37,8 @@ func (e *Evaluator) EvaluateProject(projectID string, state *ChainState) []Viola
 		// 真实交易: 打印详细日志
 		log.Printf("\n 开始评估项目 %s 的 %d 个不变量...", projectID, len(invariants))
 		log.Printf("   区块高度: %d, 交易: %s", state.BlockNumber, state.TxHash.Hex())
+		log.Printf("   当前状态合约数: %d (示例: %s)", len(state.States), sampleContractAddresses(state.States, 6))
+		log.Printf("   交易前状态合约数: %d (示例: %s)", len(state.PreviousStates), sampleContractAddresses(state.PreviousStates, 6))
 	}
 
 	var violations []ViolationResult
@@ -290,13 +293,16 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 			currentState, currentExists := state.States[contractAddr]
 			if !currentExists {
 				if !isSimulated {
-					log.Printf("   [DEBUG]   跳过：当前状态中没有该合约")
+					log.Printf("   [DEBUG]   跳过：当前状态中没有该合约 (当前State合约数=%d, 示例: %s)", len(state.States), sampleContractAddresses(state.States, 6))
+					if hasPreviousStates {
+						log.Printf("   [DEBUG]   交易前State合约数=%d, 示例: %s", len(state.PreviousStates), sampleContractAddresses(state.PreviousStates, 6))
+					}
 				}
 				continue // 状态中没有该合约，跳过
 			}
 
 			if !isSimulated {
-				log.Printf("   [DEBUG]   当前状态存储槽数量: %d", len(currentState.Storage))
+				log.Printf("   [DEBUG]   当前状态存储槽数量: %d (示例: %s)", len(currentState.Storage), sampleSlotHashes(currentState.Storage, 8))
 			}
 
 			// 检查该合约的所有配置的存储槽
@@ -319,7 +325,8 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 				afterValue, afterExists := currentState.Storage[slotHash]
 				if !afterExists {
 					if !isSimulated {
-						log.Printf("   [DEBUG]     跳过：当前状态中没有该存储槽")
+						log.Printf("   [DEBUG]     跳过：当前状态中没有该存储槽，hash=%s", slotHash.Hex())
+						log.Printf("   [DEBUG]     当前槽示例: %s", sampleSlotHashes(currentState.Storage, 8))
 					}
 					// 【Fallback】如果配置的slot不存在，尝试监控所有storage变化
 					if hasPreviousStates {
@@ -330,6 +337,8 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 							if !isSimulated {
 								log.Printf("   [DEBUG]   [Fallback] 找到交易前状态，槽数: %d，交易后槽数: %d",
 									len(prevState.Storage), len(currentState.Storage))
+								log.Printf("   [DEBUG]   [Fallback] 交易前槽示例: %s", sampleSlotHashes(prevState.Storage, 8))
+								log.Printf("   [DEBUG]   [Fallback] 交易后槽示例: %s", sampleSlotHashes(currentState.Storage, 8))
 							}
 
 							slotChecked := 0
@@ -423,7 +432,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 							}
 						} else {
 							if !isSimulated {
-								log.Printf("   [DEBUG]   [Fallback] 警告: 交易前状态中没有该合约!")
+								log.Printf("   [DEBUG]   [Fallback] 警告: 交易前状态中没有该合约! 交易前可用合约示例: %s", sampleContractAddresses(state.PreviousStates, 6))
 							}
 						}
 					} else {
@@ -453,12 +462,13 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 							}
 						} else {
 							if !isSimulated {
-								log.Printf("   [DEBUG]     交易前状态中没有该存储槽")
+								log.Printf("   [DEBUG]     交易前状态中没有该存储槽，hash=%s", slotHash.Hex())
+								log.Printf("   [DEBUG]     交易前槽示例: %s", sampleSlotHashes(prevState.Storage, 8))
 							}
 						}
 					} else {
 						if !isSimulated {
-							log.Printf("   [DEBUG]     交易前状态中没有该合约")
+							log.Printf("   [DEBUG]     交易前状态中没有该合约，交易前可用合约示例: %s", sampleContractAddresses(state.PreviousStates, 6))
 						}
 					}
 				}
@@ -592,4 +602,56 @@ func parseFlashChangeParams(params map[string]interface{}) (*FlashChangePreventi
 	}
 
 	return &result, nil
+}
+
+// sampleContractAddresses 提供合约地址样本，便于在日志中快速定位缺失原因
+func sampleContractAddresses(states map[common.Address]*ContractState, limit int) string {
+	if len(states) == 0 {
+		return "空"
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	entries := make([]string, 0, limit+1)
+	count := 0
+	for addr := range states {
+		entries = append(entries, addr.Hex())
+		count++
+		if count >= limit {
+			break
+		}
+	}
+	if len(states) > limit {
+		entries = append(entries, fmt.Sprintf("...+%d", len(states)-limit))
+	}
+	return strings.Join(entries, ", ")
+}
+
+// sampleSlotHashes 提供存储槽哈希样本，辅助排查slot缺失
+func sampleSlotHashes(storage map[common.Hash]common.Hash, limit int) string {
+	if len(storage) == 0 {
+		return "空"
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	entries := make([]string, 0, limit+1)
+	count := 0
+	for slot := range storage {
+		hash := slot.Hex()
+		if len(hash) > 12 {
+			hash = hash[:12] + "..."
+		}
+		entries = append(entries, hash)
+		count++
+		if count >= limit {
+			break
+		}
+	}
+	if len(storage) > limit {
+		entries = append(entries, fmt.Sprintf("...+%d", len(storage)-limit))
+	}
+	return strings.Join(entries, ", ")
 }

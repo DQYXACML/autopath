@@ -47,6 +47,171 @@ type TransactionTracer struct {
 var attackStatePathCache sync.Map // key: 项目/合约 -> 路径
 var attackStateCache sync.Map     // key: 路径 -> *attackStateFile
 
+// targetSelectorCache 缓存项目的目标函数选择器（contract -> selectors）
+var targetSelectorCache sync.Map // key: cacheKey, value: map[string]map[string]bool
+
+// projectTargetConfig 用于轻量级解析目标函数配置
+type projectTargetConfig struct {
+	ProjectID     string `json:"project_id"`
+	FuzzingConfig *struct {
+		TargetFunctions []struct {
+			Contract  string `json:"contract"`
+			Signature string `json:"signature"`
+			Function  string `json:"function"`
+		} `json:"target_functions"`
+	} `json:"fuzzing_config"`
+}
+
+// signatureToSelector 计算4字节selector
+func signatureToSelector(signature string) (string, error) {
+	if strings.TrimSpace(signature) == "" {
+		return "", fmt.Errorf("empty signature")
+	}
+	hash := crypto.Keccak256([]byte(signature))
+	if len(hash) < 4 {
+		return "", fmt.Errorf("keccak result too short")
+	}
+	return "0x" + hex.EncodeToString(hash[:4]), nil
+}
+
+// loadTargetSelectors 解析配置文件中的 target_functions；优先按 projectID 匹配，若无则按合约地址匹配
+func loadTargetSelectors(projectID string, contractAddr common.Address) map[string]map[string]bool {
+	cacheKey := projectID
+	if cacheKey == "" {
+		cacheKey = strings.ToLower(contractAddr.Hex())
+	}
+
+	log.Printf("[Fuzzer] 📄 加载target_functions (projectID=%s, contract=%s)", projectID, contractAddr.Hex())
+
+	if cached, ok := targetSelectorCache.Load(cacheKey); ok {
+		if m, ok2 := cached.(map[string]map[string]bool); ok2 {
+			// 如果缓存为空映射，尝试重新加载（避免早期空结果污染）
+			if len(m) == 0 {
+				log.Printf("[Fuzzer] ⚠️ 缓存命中但为空，尝试重新加载 target_functions (cacheKey=%s)", cacheKey)
+			} else {
+				return m
+			}
+		}
+	}
+
+	// 优先从当前目录向上查找 pkg/invariants/configs，再尝试 autopath/pkg/invariants/configs
+	wd, _ := os.Getwd()
+	candidateDirs := []string{}
+	for depth := 0; depth <= 3; depth++ {
+		prefix := strings.Repeat(".."+string(os.PathSeparator), depth)
+		candidateDirs = append(candidateDirs, filepath.Join(prefix, "pkg", "invariants", "configs"))
+		candidateDirs = append(candidateDirs, filepath.Join(prefix, "autopath", "pkg", "invariants", "configs"))
+	}
+
+	var matches []string
+	log.Printf("[Fuzzer] 🗂️ 当前工作目录: %s", wd)
+	for _, dir := range candidateDirs {
+		pattern := filepath.Join(dir, "*.json")
+		log.Printf("[Fuzzer] 🗂️ 尝试配置目录: %s", pattern)
+		found, globErr := filepath.Glob(pattern)
+		if globErr != nil {
+			log.Printf("[Fuzzer] ⚠️ Glob失败: %v", globErr)
+			continue
+		}
+		// 过滤掉不存在的路径，防止虚假匹配
+		valid := make([]string, 0, len(found))
+		for _, m := range found {
+			if _, err := os.Stat(m); err == nil {
+				valid = append(valid, m)
+			}
+		}
+		if len(valid) > 0 {
+			log.Printf("[Fuzzer] 🗂️ 在目录中找到配置文件 %d 个，示例: %s", len(valid), valid[0])
+			matches = append(matches, valid...)
+		}
+	}
+	if len(matches) == 0 {
+		log.Printf("[Fuzzer] ⚠️ 未找到任何配置文件，跳过target_functions加载")
+		return nil
+	}
+	log.Printf("[Fuzzer] 🗂️ 共发现配置文件: %d", len(matches))
+	sample := matches
+	if len(sample) > 5 {
+		sample = sample[:5]
+	}
+	log.Printf("[Fuzzer] 🗂️ 配置文件示例: %v", sample)
+
+	result := make(map[string]map[string]bool)
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var cfg projectTargetConfig
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			continue
+		}
+		if cfg.FuzzingConfig == nil || len(cfg.FuzzingConfig.TargetFunctions) == 0 {
+			continue
+		}
+
+		cfgProj := strings.TrimSpace(cfg.ProjectID)
+		targetProj := strings.TrimSpace(projectID)
+
+		if projectID != "" {
+			log.Printf("[Fuzzer] 📂 检查配置文件: %s (cfgProjectID=%s)", path, cfgProj)
+		}
+
+		// 过滤匹配：优先项目ID，相同则允许（去空格+不区分大小写）
+		if targetProj != "" && !strings.EqualFold(cfgProj, targetProj) {
+			continue
+		}
+
+		if targetProj != "" && strings.EqualFold(cfgProj, targetProj) {
+			log.Printf("[Fuzzer] 📦 命中项目配置文件: %s", path)
+		}
+
+		for _, tf := range cfg.FuzzingConfig.TargetFunctions {
+			if tf.Contract == "" || tf.Signature == "" {
+				continue
+			}
+			addrHex := common.HexToAddress(tf.Contract).Hex()
+			// 若未指定projectID，则按合约地址匹配
+			if projectID == "" && !strings.EqualFold(addrHex, contractAddr.Hex()) {
+				continue
+			}
+			sel, err := signatureToSelector(tf.Signature)
+			if err != nil {
+				continue
+			}
+			addr := strings.ToLower(addrHex)
+			if result[addr] == nil {
+				result[addr] = make(map[string]bool)
+			}
+			result[addr][strings.ToLower(sel)] = true
+		}
+
+		if len(result) == 0 && projectID != "" {
+			log.Printf("[Fuzzer] ⚠️ 命中文件但未解析到target_functions: %s", path)
+		}
+		if len(result) > 0 && projectID != "" {
+			log.Printf("[Fuzzer] ✅ 解析target_functions成功 (projectID=%s, selectors=%v)", projectID, result)
+		}
+
+		// 如果提供了项目ID，匹配到后即可结束；如果是按合约匹配，继续以防多文件同一合约
+		if projectID != "" && len(result) > 0 {
+			break
+		}
+	}
+
+	if len(result) > 0 {
+		targetSelectorCache.Store(cacheKey, result)
+		return result
+	}
+
+	// 若按 projectID 未找到，则回退按合约地址匹配一次（不缓存空结果）
+	if projectID != "" {
+		return loadTargetSelectors("", contractAddr)
+	}
+	log.Printf("[Fuzzer] ⚠️ 未在配置中找到target_functions (projectID=%s, contract=%s)", projectID, contractAddr.Hex())
+	return result
+}
+
 // NewTransactionTracer 创建交易追踪器
 func NewTransactionTracer(rpcClient *rpc.Client) *TransactionTracer {
 	return &TransactionTracer{
@@ -501,10 +666,15 @@ func containsPC(path []ContractJumpDest, pc uint64) bool {
 }
 
 // extractProtectedContractPath 提取受保护合约在原始路径中的子路径（用于循环体基准）
-func extractProtectedContractPath(path []ContractJumpDest, contract common.Address, startIndex int) []ContractJumpDest {
+func extractProtectedContractPath(path []ContractJumpDest, contract common.Address, startIndex int, label string) []ContractJumpDest {
 	target := strings.ToLower(contract.Hex())
 	if startIndex < 0 {
 		startIndex = 0
+	}
+
+	source := "未标记"
+	if strings.TrimSpace(label) != "" {
+		source = label
 	}
 
 	var res []ContractJumpDest
@@ -520,8 +690,8 @@ func extractProtectedContractPath(path []ContractJumpDest, contract common.Addre
 	}
 	if len(targetContractPCs) > 0 {
 		// 打印前20个和最后20个PC
-		log.Printf("[extractProtectedContractPath] 🔍 目标合约%s在原始路径中共有%d个JUMPDEST，前20个PC=%v",
-			target, len(targetContractPCs), func() []uint64 {
+		log.Printf("[extractProtectedContractPath][%s] 🔍 目标合约%s在路径中共有%d个JUMPDEST，前20个PC=%v",
+			source, target, len(targetContractPCs), func() []uint64 {
 				if len(targetContractPCs) > 20 {
 					return targetContractPCs[:20]
 				}
@@ -529,54 +699,34 @@ func extractProtectedContractPath(path []ContractJumpDest, contract common.Addre
 			}())
 		// 检查是否包含PC=100
 		if count, exists := pcCountMap[100]; exists {
-			log.Printf("[extractProtectedContractPath] ✅ 原始路径包含PC=100，出现%d次", count)
+			log.Printf("[extractProtectedContractPath][%s] ✅ 路径包含PC=100，出现%d次", source, count)
 		} else {
-			log.Printf("[extractProtectedContractPath] ❌ 原始路径不包含PC=100")
+			log.Printf("[extractProtectedContractPath][%s] ❌ 路径不包含PC=100", source)
 		}
 		// 检查是否包含PC=247
 		if count, exists := pcCountMap[247]; exists {
-			log.Printf("[extractProtectedContractPath] ✅ 原始路径包含PC=247，出现%d次", count)
+			log.Printf("[extractProtectedContractPath][%s] ✅ 路径包含PC=247，出现%d次", source, count)
 		}
 	}
 
-	// 从startIndex开始搜索受保护合约的路径片段
+	// 从startIndex开始定位目标合约首次命中位置
+	firstIdx := -1
 	for i := startIndex; i < len(path); i++ {
 		if strings.EqualFold(path[i].Contract, target) {
-			res = append(res, path[i])
+			firstIdx = i
+			break
 		}
 	}
-
-	// 关键修复：如果从startIndex没找到，扫描整个路径
-	if len(res) == 0 && startIndex > 0 {
-		log.Printf("[extractProtectedContractPath] 从startIndex=%d未找到合约%s，尝试全路径搜索", startIndex, target)
-		for i := 0; i < len(path); i++ {
-			if strings.EqualFold(path[i].Contract, target) {
-				res = append(res, path[i])
-			}
-		}
-	}
-
-	// 🔧 关键修复：即使startIndex=0，也需要扫描整个路径提取受保护合约的所有JUMPDEST
-	// 原问题：原始路径包含多个合约（攻击合约+wBARL），但只有wBARL是受保护的
-	// 需要过滤出属于受保护合约的路径片段
-	if len(res) == 0 && startIndex == 0 {
-		// startIndex=0但结果为空，说明路径第一个元素不是目标合约
-		// 需要扫描整个路径找到目标合约的所有JUMPDEST
-		for i := 0; i < len(path); i++ {
-			if strings.EqualFold(path[i].Contract, target) {
-				res = append(res, path[i])
-			}
-		}
-		if len(res) > 0 {
-			log.Printf("[extractProtectedContractPath] 全路径扫描成功提取 %d 个JUMPDEST (合约=%s)", len(res), target)
-		}
+	if firstIdx >= 0 {
+		// 从首次命中开始，记录后续所有调用（不再按合约过滤）
+		res = append(res, path[firstIdx:]...)
 	}
 
 	// 添加调试日志
 	if len(res) > 0 {
-		log.Printf("[extractProtectedContractPath] 成功提取 %d 个JUMPDEST (合约=%s, 原始路径长度=%d)", len(res), target, len(path))
+		log.Printf("[extractProtectedContractPath][%s] 成功提取 %d 个JUMPDEST (从索引=%d起, 路径总长=%d)", source, len(res), firstIdx, len(path))
 	} else {
-		log.Printf("[extractProtectedContractPath] ⚠️ 未能提取任何JUMPDEST (合约=%s, 路径长度=%d)", target, len(path))
+		log.Printf("[extractProtectedContractPath][%s] ⚠️ 未能提取任何JUMPDEST (未找到合约=%s, 路径长度=%d)", source, target, len(path))
 	}
 
 	return res
@@ -1288,286 +1438,57 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	}
 	log.Printf("[Fuzzer] Found %d calls to protected contract (hook扫描次数=%d)", len(protectedCalls), hookVisited)
 
-	// 直接使用执行过程中首次命中的受保护合约调用；若是标准只读函数，则回退到启发式选择
-	targetCall := protectedCalls[0]
-	targetCallIndex := 0
-	if hookTarget != nil {
-		targetCall = hookTarget
-		if idx := findCallIndex(protectedCalls, hookTarget); idx >= 0 {
-			targetCallIndex = idx
+	// 按项目配置的 target_functions 过滤调用
+	targetSelectors := loadTargetSelectors(f.projectID, contractAddr)
+	if len(targetSelectors) > 0 {
+		contractKey := strings.ToLower(contractAddr.Hex())
+		if allowed, ok := targetSelectors[contractKey]; ok && len(allowed) > 0 {
+			log.Printf("[Fuzzer] 🔎 发现配置的 target_functions (projectID=%s, contract=%s, selectors=%v)",
+				f.projectID, contractAddr.Hex(), mapKeys(allowed))
+			filtered := make([]*CallFrame, 0, len(protectedCalls))
+			for _, c := range protectedCalls {
+				if len(c.Input) < 10 {
+					continue
+				}
+				selector := strings.ToLower(c.Input[:10])
+				if allowed[selector] {
+					filtered = append(filtered, c)
+				}
+			}
+			if len(filtered) > 0 {
+				protectedCalls = filtered
+				log.Printf("[Fuzzer] 🎯 依据配置的 target_functions 过滤后，剩余 %d 个调用 (contract=%s)", len(protectedCalls), contractAddr.Hex())
+			} else {
+				log.Printf("[Fuzzer] ⚠️ 配置的 target_functions 未在调用树中命中，回退使用全部受保护调用 (contract=%s)", contractAddr.Hex())
+			}
 		}
 	}
-	standardSelectors := map[string]bool{
-		"0x70a08231": true, // balanceOf
-		"0xdd62ed3e": true, // allowance
-		"0x18160ddd": true, // totalSupply
-		"0x313ce567": true, // decimals
-	}
-	selector := targetCall.Input
-	if len(selector) > 10 {
-		selector = selector[:10]
-	}
-	if standardSelectors[selector] || len(targetCall.Input) <= 10 {
-		// 使用已有启发式挑选更有意义的调用（可能包含可变参数）
-		if alt := f.selectTargetCall(protectedCalls); alt != nil {
-			targetCall = alt
-			targetCallIndex = findCallIndex(protectedCalls, alt)
-			log.Printf("[Fuzzer] ⚙️  首个受保护调用为标准只读函数，回退到启发式选择 selector=%s idx=%d", selector, targetCallIndex)
-		}
-	}
-	originalTargetCall := targetCall // 保存原始受保护合约调用，用于入口模式回退
-	originalTargetIndex := targetCallIndex
-	log.Printf("[Fuzzer] Selected first protected call: from=%s, input=%s", targetCall.From, targetCall.Input[:10])
 
-	// 标记是否切换到Entry Call Fuzzing
-	isEntryCallFuzzing := false
+	// 直接使用首个命中的受保护合约调用作为Fuzz入口（不做只读/循环等启发式切换）
+	targetCall := protectedCalls[0]
+	if hookTarget != nil {
+		if idx := findCallIndex(protectedCalls, hookTarget); idx >= 0 {
+			targetCall = hookTarget
+		}
+	}
+	log.Printf("[Fuzzer] 📌 使用首个受保护调用作为Fuzz入口: from=%s, to=%s, selector=%s",
+		targetCall.From, targetCall.To, targetCall.Input[:10])
+
+	// 固定为函数级Fuzz，不做循环/入口模式切换
 	useLoopBaseline := false
 
-	// ========== 智能检测1：无参数函数自动回退到入口fuzzing ==========
-	// 检查选中的函数是否有参数
-	if !hasParameters(targetCall.Input) {
-		log.Printf("[Fuzzer] ⚠️  WARNING: Selected function has no parameters (selector=%s)", targetCall.Input[:10])
-		log.Printf("[Fuzzer] 🔄 Switching to ENTRY CALL fuzzing strategy...")
-		log.Printf("[Fuzzer] Reason: Parameter fuzzing requires functions with parameters")
-		log.Printf("[Fuzzer] New strategy: Fuzzing the attack transaction's entry point instead")
-
-		// 切换到攻击交易的入口调用
-		targetCall = f.selectEntryCall(trace)
-		isEntryCallFuzzing = true
-		log.Printf("[Fuzzer] 🎯 Entry call selected: from=%s, to=%s", targetCall.From, targetCall.To)
-	}
-
-	// ========== 智能检测2：循环函数检测（路径长度诊断）==========
-	// 执行一次快速模拟，检查单次调用的路径长度
-	testCallData, err := hexutil.Decode(targetCall.Input)
-	if err == nil && hasParameters(targetCall.Input) {
-		from := common.HexToAddress(targetCall.From)
-		to := common.HexToAddress(targetCall.To)
-		value := big.NewInt(0)
-		if targetCall.Value != "" && targetCall.Value != "0x0" {
-			if v, err := hexutil.DecodeBig(targetCall.Value); err == nil {
-				value = v
-			}
-		}
-
-		// 快速模拟单次调用，获取路径长度
-		testResult, err := f.simulator.SimulateWithCallData(ctx, from, to, testCallData, value, blockNumber, stateOverride)
-		if err == nil {
-			singleCallPathLen := len(testResult.ContractJumpDests)
-			originalPathLen := len(originalPath.ContractJumpDests)
-			ratio := float64(singleCallPathLen) / float64(originalPathLen)
-
-			log.Printf("[Fuzzer] 🔍 Path length diagnostic:")
-			log.Printf("[Fuzzer]    - Single call path length: %d JUMPDESTs", singleCallPathLen)
-			log.Printf("[Fuzzer]    - Original attack path length: %d JUMPDESTs", originalPathLen)
-			log.Printf("[Fuzzer]    - Ratio: %.2f%% (single/original)", ratio*100)
-
-			// 多重信号判定是否为循环函数
-			pathMismatchLoop := ratio < 0.5 && singleCallPathLen > 0           // 路径长度启发
-			repeatSelectorLoop := f.hasRepeatedSelector(trace, contractAddr)   // 调用树重复同一选择器
-			backEdgeLoop := hasBackEdgeForContract(originalPath, contractAddr) // CFG 回边检测
-
-			if repeatSelectorLoop {
-				log.Printf("[Fuzzer] 🔁 检测到同一选择器多次调用，疑似循环攻击")
-			}
-			if backEdgeLoop {
-				log.Printf("[Fuzzer] 🔁 检测到受保护合约存在回边/重复PC，疑似循环攻击")
-			}
-
-			if pathMismatchLoop || repeatSelectorLoop || backEdgeLoop {
-				useLoopBaseline = true
-				log.Printf("[Fuzzer] 🔁 检测到循环攻击，启用loopBaseline模式")
-
-				// 如果配置要求仅对受保护合约启用Entry模式，则避免切换到攻击合约
-				if f.entryCallProtectedOnly && !strings.EqualFold(trace.To, contractAddr.Hex()) {
-					log.Printf("[Fuzzer] ⚠️  检测为循环函数，但入口合约非受保护对象，保持函数级Fuzz")
-					log.Printf("[Fuzzer] 🔁 将使用loopBaseline子路径模式进行相似度比较，从原始路径中提取受保护合约的JUMPDEST子集")
-				} else {
-					log.Printf("[Fuzzer] ⚠️  WARNING: Likely LOOP FUNCTION detected (path/trace/CFG signals)")
-					log.Printf("[Fuzzer] 🔄 Auto-switching to ENTRY CALL fuzzing strategy...")
-					log.Printf("[Fuzzer] Reason: Cannot reproduce loop attacks by fuzzing single function call")
-					log.Printf("[Fuzzer] Solution: Fuzzing the complete attack transaction entry point")
-
-					// 切换到攻击交易的入口调用
-					targetCall = f.selectEntryCall(trace)
-					isEntryCallFuzzing = true
-					log.Printf("[Fuzzer] 🎯 Entry call selected: from=%s, to=%s", targetCall.From, targetCall.To)
-				}
-			} else if singleCallPathLen == 0 {
-				log.Printf("[Fuzzer] ⚠️  WARNING: Test simulation returned empty path (possible revert)")
-			} else {
-				log.Printf("[Fuzzer] ✅ Path length check passed, proceeding with function-level fuzzing")
-			}
-		} else {
-			log.Printf("[Fuzzer] ⚠️  Path length diagnostic failed: %v", err)
-		}
-	}
-	// ================================================================
-
-	// 步骤3: 解析受保护合约调用的calldata
+	// 步骤3: 解析目标调用的calldata
 	callDataBytes, err := hexutil.Decode(targetCall.Input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode target call input: %w", err)
 	}
-	log.Printf("[Fuzzer] Parsing protected contract calldata (%d bytes)", len(callDataBytes))
+	log.Printf("[Fuzzer] Parsing target calldata (%d bytes)", len(callDataBytes))
 
-	// ✅ 智能ABI解析：Entry Call可能失败，需要回退机制
 	parsedData, targetMethod, err := f.parseCallDataWithABI(contractAddr, callDataBytes)
 	if err != nil {
-		// 如果是Entry Call且ABI解析失败（攻击合约函数不在受保护合约ABI中）
-		if isEntryCallFuzzing {
-			log.Printf("[Fuzzer] ⚠️  Entry Call ABI parsing failed: %v", err)
-			log.Printf("[Fuzzer] ⚠️  Entry call function (likely attack contract) not in protected contract ABI")
-			log.Printf("[Fuzzer] 🔄 Fallback: Heuristic parsing of entry calldata (no ABI)")
-
-			// 仍然使用入口调用，启发式解析参数
-			if f.parser != nil {
-				if parsed, perr := f.parser.ParseCallData(callDataBytes); perr == nil {
-					parsedData = parsed
-					targetMethod = nil
-					err = nil
-				} else {
-					return nil, fmt.Errorf("failed to heuristically parse entry calldata: %w", perr)
-				}
-			} else {
-				return nil, fmt.Errorf("parser not initialized for entry call fallback")
-			}
-		} else {
-			return nil, fmt.Errorf("failed to parse protected contract calldata: %w", err)
-		}
+		return nil, fmt.Errorf("failed to parse target contract calldata: %w", err)
 	}
 
-	// Entry模式但无可变参数（仅选择器），先跑一次入口调用预热状态，然后回退到受保护合约函数级Fuzz
-	if isEntryCallFuzzing && len(parsedData.Parameters) == 0 {
-		log.Printf("[Fuzzer] ⚠️  Entry Call无参数可变，先重放入口调用以预热状态，再回退到受保护合约函数级Fuzz")
-
-		// 🔧 检查并补充攻击合约代码
-		attackContractAddr := strings.ToLower(targetCall.To)
-		if stateOverride == nil {
-			stateOverride = make(simulator.StateOverride)
-		}
-		if _, exists := stateOverride[attackContractAddr]; !exists {
-			stateOverride[attackContractAddr] = &simulator.AccountOverride{}
-		}
-		existingCode := stateOverride[attackContractAddr].Code
-		if existingCode == "" || existingCode == "0x" {
-			// 从本地 RPC 查询攻击合约代码
-			var localCode string
-			if err := f.rpcClient.CallContext(ctx, &localCode, "eth_getCode", targetCall.To, "latest"); err == nil {
-				if localCode != "" && localCode != "0x" && len(localCode) > 2 {
-					stateOverride[attackContractAddr].Code = strings.ToLower(localCode)
-					log.Printf("[Fuzzer] 🔧 从本地节点补充攻击合约代码: %s (size=%d bytes)",
-						attackContractAddr, (len(localCode)-2)/2)
-				} else {
-					log.Printf("[Fuzzer] ⚠️  攻击合约 %s 本地代码为空，Entry预热可能失败", attackContractAddr)
-				}
-			} else {
-				log.Printf("[Fuzzer] ⚠️  查询攻击合约代码失败: %v", err)
-			}
-		}
-
-		// 重放入口调用，获取状态变更
-		entryCallData, _ := hexutil.Decode(targetCall.Input)
-		entryValue := big.NewInt(0)
-		if targetCall.Value != "" && targetCall.Value != "0x0" {
-			if v, err := hexutil.DecodeBig(targetCall.Value); err == nil {
-				entryValue = v
-			}
-		}
-		log.Printf("[Fuzzer] 🔍 调试: 开始模拟入口调用 from=%s to=%s calldata=%x value=%s block=%d",
-			targetCall.From, targetCall.To, entryCallData, entryValue.String(), blockNumber)
-		res, simErr := f.simulator.SimulateWithCallData(ctx, common.HexToAddress(targetCall.From), common.HexToAddress(targetCall.To), entryCallData, entryValue, blockNumber, stateOverride)
-		if simErr != nil {
-			log.Printf("[Fuzzer] ⚠️  入口调用模拟失败: %v", simErr)
-			log.Printf("[Fuzzer] ⚠️  入口调用预热跳过（模拟错误），继续函数级Fuzz")
-		} else if res == nil {
-			log.Printf("[Fuzzer] ⚠️  入口调用模拟返回nil结果")
-			log.Printf("[Fuzzer] ⚠️  入口调用预热跳过（结果为空），继续函数级Fuzz")
-		} else if !res.Success {
-			// 🔧 关键修复：入口调用revert是预期行为（攻击合约通常需要回调机制）
-			// 不应阻塞后续fuzz，但也不应声称"预热成功"
-			log.Printf("[Fuzzer] ⚠️  入口调用模拟revert (gas=%d, jumpDests=%d)", res.GasUsed, len(res.JumpDests))
-			log.Printf("[Fuzzer] ⚠️  原因: 攻击合约入口函数可能依赖闪电贷回调等机制，单独调用必然revert")
-
-			// 🆕 尝试从原始交易trace中提取调用受保护合约时的状态快照
-			log.Printf("[Fuzzer] 🔍 尝试提取调用受保护合约时的状态快照...")
-			snapshotSelector := ""
-			callerSelector := ""
-			if originalTargetCall != nil {
-				callerSelector = originalTargetCall.From
-				if len(originalTargetCall.Input) >= 10 {
-					snapshotSelector = strings.ToLower(originalTargetCall.Input[:10])
-				}
-			}
-			if snapshotSelector == "" && len(targetCall.Input) >= 10 {
-				// 回退：若原始调用为空，使用入口selector尝试匹配
-				snapshotSelector = strings.ToLower(targetCall.Input[:10])
-			}
-			callerAddr := strings.ToLower(callerSelector)
-			snapshots, snapErr := f.simulator.ExtractAllCallSnapshots(ctx, txHash, contractAddr)
-			if snapErr == nil && len(snapshots) > 0 {
-				stateOverride = mergeSnapshotsIntoOverride(stateOverride, snapshots)
-				ensureCodeForSnapshots(ctx, f.rpcClient, snapshots, &stateOverride)
-				bestIdx := selectSnapshotWithPriority(snapshots, snapshotSelector, callerAddr, originalTargetIndex)
-				if bestIdx >= 0 && bestIdx < len(snapshots) && !strings.EqualFold(snapshots[bestIdx].Selector, snapshotSelector) && snapshotSelector != "" {
-					log.Printf("[Fuzzer] ⚠️  Selector未命中目标(%s)，使用优先级选择 idx=%d selector=%s", snapshotSelector, bestIdx, snapshots[bestIdx].Selector)
-				}
-				if bestIdx >= 0 && bestIdx < len(snapshots) {
-					chosen := snapshots[bestIdx]
-					stateOverride = simulator.BuildStateOverrideFromSnapshot(stateOverride, chosen)
-					// 确保调用方/被调方代码可用，避免回调缺失导致revert
-					ensureCodeInOverride(ctx, f.rpcClient, chosen.Caller, &stateOverride)
-					ensureCodeInOverride(ctx, f.rpcClient, chosen.Callee, &stateOverride)
-					log.Printf("[Fuzzer] ✅ 已根据selector选择并注入快照 (idx=%d selector=%s caller=%s)",
-						bestIdx, chosen.Selector, chosen.Caller.Hex())
-				} else {
-					log.Printf("[Fuzzer] ⚠️  无法根据selector定位快照，使用索引回退")
-				}
-			} else {
-				log.Printf("[Fuzzer] ⚠️  提取全部快照失败或为空，回退按索引提取: %v", snapErr)
-				snapshotIndex := originalTargetIndex
-				if snapshotIndex < 0 {
-					snapshotIndex = 0
-				}
-				snapshot, snapErr := f.simulator.ExtractSnapshotForProtectedCall(ctx, txHash, contractAddr, snapshotIndex)
-				if snapErr != nil {
-					log.Printf("[Fuzzer] ⚠️  无法提取状态快照: %v", snapErr)
-					log.Printf("[Fuzzer] ⚠️  入口调用预热跳过（revert），继续函数级Fuzz（使用prestate）")
-				} else {
-					// 使用快照注入正确的调用者状态
-					stateOverride = simulator.BuildStateOverrideFromSnapshot(stateOverride, snapshot)
-					ensureCodeInOverride(ctx, f.rpcClient, snapshot.Caller, &stateOverride)
-					ensureCodeInOverride(ctx, f.rpcClient, snapshot.Callee, &stateOverride)
-					log.Printf("[Fuzzer] ✅ 已提取调用时状态快照并注入 (caller=%s, balance=%s)",
-						snapshot.Caller.Hex(), snapshot.CallerBalance)
-				}
-			}
-		} else {
-			// 模拟成功且有状态变更
-			log.Printf("[Fuzzer] 🔍 调试: 模拟结果 success=%v, gasUsed=%d, jumpDests=%d, stateChanges=%d",
-				res.Success, res.GasUsed, len(res.JumpDests), len(res.StateChanges))
-			if len(res.StateChanges) > 0 {
-				stateOverride = applyStateChangesToOverride(stateOverride, res.StateChanges)
-				log.Printf("[Fuzzer] ✅ 入口调用预热完成，合并状态变更 %d 个合约", len(res.StateChanges))
-			} else {
-				log.Printf("[Fuzzer] ⚠️  入口调用成功但无状态变更 (可能为只读调用)")
-			}
-		}
-
-		// 回退到受保护合约函数
-		targetCall = originalTargetCall
-		isEntryCallFuzzing = false
-		callDataBytes, err = hexutil.Decode(targetCall.Input)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode protected call input after entry fallback: %w", err)
-		}
-		parsedData, targetMethod, err = f.parseCallDataWithABI(contractAddr, callDataBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse protected calldata after entry fallback: %w", err)
-		}
-	}
-
-	// Entry模式下允许无ABI，仅使用启发式解析，不再回退到受保护合约函数
 	log.Printf("[Fuzzer] Parsed: selector=0x%s, %d parameters", hex.EncodeToString(parsedData.Selector), len(parsedData.Parameters))
 
 	// ========== Layer 3: 符号执行约束提取 ==========
@@ -1710,30 +1631,37 @@ func (f *CallDataFuzzer) FuzzTransaction(
 			if strings.HasPrefix(p.Type, "address") {
 				idx := p.Index
 				f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				// address[] 类型也固定为原始数组
+				if strings.HasSuffix(p.Type, "[]") {
+					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				}
+				continue
 			}
 
-			// 数值参数：过滤掉大于原始值的种子，降低转账失败概率
-			if strings.HasPrefix(p.Type, "uint") {
-				orig := normalizeBigInt(p.Value)
-				if orig == nil {
-					continue
-				}
+			// bytes 类型（如签名等payload）固定原值
+			if strings.HasPrefix(p.Type, "bytes") {
 				idx := p.Index
-				if seeds, ok := f.seedConfig.AttackSeeds[idx]; ok {
-					filtered := make([]interface{}, 0, len(seeds))
-					for _, s := range seeds {
-						if val := normalizeBigInt(s); val != nil && val.Cmp(orig) <= 0 {
-							filtered = append(filtered, s)
-						}
-					}
-					if len(filtered) > 0 {
-						f.seedConfig.AttackSeeds[idx] = filtered
-					} else {
-						// 若过滤后为空，回退仅使用原始值
-						f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
-					}
+				f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				continue
+			}
+
+			// uint256 采用微扰策略：原值±1%、0.5x、2x
+			if strings.EqualFold(p.Type, "uint256") {
+				orig := normalizeBigInt(p.Value)
+				idx := p.Index
+				if seeds := buildSmartUintSeeds(orig); len(seeds) > 0 {
+					f.seedConfig.AttackSeeds[idx] = seeds
 				} else {
-					// 没有种子时也至少保留原始值
+					// fallback 保留原值
+					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				}
+				continue
+			}
+
+			// 其他uint类型，保留默认种子或原值
+			if strings.HasPrefix(p.Type, "uint") {
+				idx := p.Index
+				if _, ok := f.seedConfig.AttackSeeds[idx]; !ok {
 					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
 				}
 			}
@@ -2157,7 +2085,7 @@ func (f *CallDataFuzzer) buildFunctionBaseline(
 		return nil
 	}
 
-	baseline := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0)
+	baseline := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0, "函数级基准")
 	if len(baseline) > 0 {
 		head := make([]uint64, 0, 5)
 		for i := 0; i < len(baseline) && i < 5; i++ {
@@ -2241,7 +2169,17 @@ func formatParamValuesForLog(combo []interface{}) string {
 	}
 	parts := make([]string, 0, len(combo))
 	for i, v := range combo {
-		parts = append(parts, fmt.Sprintf("#%d=%s", i, ValueToString(v)))
+		switch arr := v.(type) {
+		case []interface{}:
+			arrLen := len(arr)
+			first := ""
+			if arrLen > 0 {
+				first = ValueToString(arr[0])
+			}
+			parts = append(parts, fmt.Sprintf("#%d=array(len=%d,first=%s)", i, arrLen, first))
+		default:
+			parts = append(parts, fmt.Sprintf("#%d=%s", i, ValueToString(v)))
+		}
 	}
 	return strings.Join(parts, ", ")
 }
@@ -2252,6 +2190,15 @@ func formatSelectorForLog(calldata []byte) string {
 		return hexutil.Encode(calldata[:4])
 	}
 	return hexutil.Encode(calldata)
+}
+
+// mapKeys 返回map的键列表，便于日志打印
+func mapKeys[T comparable](m map[T]bool) []T {
+	keys := make([]T, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // worker 工作协程
@@ -2478,42 +2425,104 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
-		startIndex := originalPath.ProtectedStartIndex
-		// 若 tracer 未能正确标记受保护起点，尝试根据目标合约地址回退定位
-		if startIndex < 0 || startIndex >= len(origContractJumpDests) {
+		baselineStart := originalPath.ProtectedStartIndex
+		if baselineStart < 0 || baselineStart >= len(origContractJumpDests) {
 			if idx := findProtectedStartIndex(origContractJumpDests, contractAddr); idx >= 0 {
-				startIndex = idx
-				log.Printf("[Worker %d] ⚙️  修正 ProtectedStartIndex 为 %d（基于目标合约 %s）", workerID, startIndex, contractAddr.Hex())
+				baselineStart = idx
+				log.Printf("[Worker %d] ⚙️  修正 ProtectedStartIndex 为 %d（基于目标合约 %s）", workerID, baselineStart, contractAddr.Hex())
 			} else {
-				startIndex = 0
+				baselineStart = 0
 				log.Printf("[Worker %d] ⚠️  未能定位受保护合约，使用起始索引 0", workerID)
 			}
 		}
 
-		// 循环场景：使用受保护合约子路径作为基准，避免外层路径稀释相似度
-		baseline := origContractJumpDests
-		baselineStart := startIndex
-
-		// 变异路径也裁剪到受保护合约片段，避免被外层调用稀释
-		var candidatePath []ContractJumpDest
-		if loopBaseline {
-			if seg := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0); len(seg) > 0 {
-				candidatePath = seg
-			} else {
-				candidatePath = simResult.ContractJumpDests
-				log.Printf("[Worker %d] ⚠️  变异路径未找到受保护片段，使用完整路径", workerID)
-			}
-		} else {
-			candidatePath = simResult.ContractJumpDests
+		// 统一使用全量基准：从索引0开始提取目标合约的所有JUMPDEST，避免受ProtectedStartIndex限制
+		baselineStart = 0
+		baseline := extractProtectedContractPath(origContractJumpDests, contractAddr, baselineStart, "基准全量")
+		candidatePath := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0, "候选")
+		if len(baseline) == 0 || len(candidatePath) == 0 {
+			log.Printf("[Worker %d] ⚠️ 基准或候选路径为空，跳过比较 (baseline=%d, candidate=%d)", workerID, len(baseline), len(candidatePath))
+			continue
 		}
+
+		// 入口对齐：用基准首个PC在候选中寻找对齐位置，找不到则从0开始
+		alignStart := 0
+		if len(baseline) > 0 {
+			entryPC := baseline[0].PC
+			entryContract := strings.ToLower(baseline[0].Contract)
+			for i, jd := range candidatePath {
+				if strings.EqualFold(jd.Contract, entryContract) && jd.PC == entryPC {
+					alignStart = i
+					break
+				}
+			}
+		}
+
+		// 多窗口尝试：1.0x/1.5x/2.0x 基准长度，取相似度最佳的窗口
+		windowFactors := []float64{1.0, 1.5, 2.0}
+		bestSim := -1.0
+		var bestWindow []ContractJumpDest
+		bestFactor := 0.0
+		for _, factor := range windowFactors {
+			targetLen := int(float64(len(baseline)) * factor)
+			if targetLen < len(baseline) {
+				targetLen = len(baseline)
+			}
+			if alignStart+targetLen > len(candidatePath) {
+				targetLen = len(candidatePath) - alignStart
+			}
+			if targetLen <= 0 {
+				continue
+			}
+			window := candidatePath[alignStart : alignStart+targetLen]
+			sim := f.comparator.CompareContractJumpDests(
+				baseline,
+				window,
+				baselineStart,
+			)
+			if sim > bestSim {
+				bestSim = sim
+				bestWindow = window
+				bestFactor = factor
+			}
+		}
+
+		if len(bestWindow) == 0 {
+			log.Printf("[Worker %d] ⚠️ 候选窗口为空，跳过比较 (candidateLen=%d, alignStart=%d)", workerID, len(candidatePath), alignStart)
+			continue
+		}
+
+		// 统计集合规模与交集，便于确认相似度来源
+		baseSet := make(map[string]struct{}, len(baseline))
+		for _, jd := range baseline {
+			key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
+			baseSet[key] = struct{}{}
+		}
+		candSet := make(map[string]struct{}, len(bestWindow))
+		for _, jd := range bestWindow {
+			key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
+			candSet[key] = struct{}{}
+		}
+		intersection := 0
+		for k := range baseSet {
+			if _, ok := candSet[k]; ok {
+				intersection++
+			}
+		}
+		if currentCount <= 5 || currentCount%500 == 0 {
+			log.Printf("[Worker %d] 路径集合统计: 基准唯一=%d, 候选唯一=%d, 交集=%d, 窗口len=%d/%d, factor=%.1f, alignStart=%d", workerID, len(baseSet), len(candSet), intersection, len(bestWindow), len(candidatePath), bestFactor, alignStart)
+		}
+
+		// 不再对基线/候选路径做循环体裁剪，保持完整路径对齐
+		loopBaseline = false
 
 		// 🔧 关键修复：循环场景下，按函数入口PC对齐基准路径
 		// 原因1：原始攻击可能先调用balanceOf/decimals等，导致基准路径从非目标函数开始
 		// 原因2：原始攻击包含20次循环，但fuzz只模拟单次调用
 		// 原因3：原始攻击流程为 debond→flash→bond×20，但fuzz只执行bond
-		// 解决方案：从fuzz路径的第一个PC（函数入口）在【完整原始路径】中找到对应位置，而非从startIndex截取的子路径
+		// 解决方案：从fuzz路径的第一个PC（函数入口）在【完整原始路径】中找到对应位置，而非从baselineStart截取的子路径
 		if loopBaseline {
-			loopSeg := extractProtectedContractPath(origContractJumpDests, contractAddr, startIndex)
+			loopSeg := extractProtectedContractPath(origContractJumpDests, contractAddr, baselineStart, "基准循环段")
 
 			// 如果基准不含当前入口PC，使用函数级基准（通常对应bond路径），避免落在debond起点
 			if len(functionBaseline) > 0 {
@@ -2523,7 +2532,7 @@ func (f *CallDataFuzzer) worker(
 				}
 				if len(loopSeg) == 0 || (fuzzEntryPC != 0 && !containsPC(loopSeg, fuzzEntryPC)) {
 					loopSeg = functionBaseline
-					startIndex = 0
+					baselineStart = 0
 					if currentCount <= 2 {
 						log.Printf("[Worker %d] 🔁 使用函数级基准路径对齐 (入口PC=%d, len=%d)", workerID, fuzzEntryPC, len(loopSeg))
 					}
@@ -2549,7 +2558,7 @@ func (f *CallDataFuzzer) worker(
 					if alignIndex >= 0 && alignIndex < len(origContractJumpDests) {
 						// 🔧 修复：从origContractJumpDests的对齐位置开始提取受保护合约的路径
 						// 而不是从loopSeg中提取（loopSeg可能不包含目标函数的路径）
-						alignedLoopSeg = extractProtectedContractPath(origContractJumpDests, contractAddr, alignIndex)
+						alignedLoopSeg = extractProtectedContractPath(origContractJumpDests, contractAddr, alignIndex, "对齐基准")
 						if currentCount <= 2 {
 							log.Printf("[Worker %d] 🎯 函数入口对齐成功: fuzz入口PC=%d, 在完整路径中的索引=%d, 提取后基准长度=%d",
 								workerID, fuzzEntryPC, alignIndex, len(alignedLoopSeg))
@@ -2627,11 +2636,7 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
-		similarity := f.comparator.CompareContractJumpDests(
-			baseline,
-			candidatePath,
-			baselineStart,
-		)
+		similarity := bestSim
 
 		// 记录批次最佳路径（每100个组合汇总一次）
 		if batchTracker != nil {
@@ -2665,6 +2670,16 @@ func (f *CallDataFuzzer) worker(
 
 		// 如果相似度超过阈值，进行后续检查
 		if similarity >= f.threshold {
+			log.Printf("[Worker %d] 🧮 相似度达标参数: sim=%.4f, selector=%s, params=%s, 窗口len=%d, factor=%.1f, alignStart=%d",
+				workerID,
+				similarity,
+				formatSelectorForLog(newCallData),
+				formatParamValuesForLog(combo),
+				len(bestWindow),
+				bestFactor,
+				alignStart,
+			)
+
 			// 记录模拟执行概况，便于诊断“高相似度但无违规”的原因
 			stateChangeCount := len(simResult.StateChanges)
 			if stateChangeCount == 0 {
@@ -2816,6 +2831,10 @@ func normalizeSingleParam(val interface{}, typeStr string) interface{} {
 		if addrs := normalizeAddressSlice(val); addrs != nil {
 			return addrs
 		}
+		// 标量地址包装为单元素数组
+		if addr := normalizeAddress(val); (addr != common.Address{}) {
+			return []common.Address{addr}
+		}
 	case typeStr == "uint8[]":
 		if arr := normalizeUint8Slice(val); arr != nil {
 			return arr
@@ -2827,6 +2846,10 @@ func normalizeSingleParam(val interface{}, typeStr string) interface{} {
 	case strings.HasPrefix(typeStr, "uint") && strings.HasSuffix(typeStr, "[]"):
 		if arr := normalizeUintSlice(val); arr != nil {
 			return arr
+		}
+		// 标量包装为单元素数组
+		if bi := normalizeBigInt(val); bi != nil {
+			return []*big.Int{bi}
 		}
 	case strings.HasPrefix(typeStr, "bytes"):
 		if b := normalizeBytes(val); b != nil {
@@ -3008,6 +3031,50 @@ func normalizeBytes(val interface{}) []byte {
 		return []byte(v)
 	}
 	return nil
+}
+
+// buildSmartUintSeeds 根据原始数值生成小幅震荡的种子组合（锁定拓扑，微扰数值）
+// 例如 orig=100 -> {100, 99, 101, 50, 200}
+func buildSmartUintSeeds(orig *big.Int) []interface{} {
+	if orig == nil || orig.Sign() < 0 {
+		return nil
+	}
+
+	// 特殊处理 orig=0
+	if orig.Sign() == 0 {
+		return []interface{}{big.NewInt(0), big.NewInt(1)}
+	}
+
+	type ratio struct {
+		num int64
+		den int64
+	}
+	ratios := []ratio{
+		{1, 1},     // 原值
+		{99, 100},  // -1%
+		{101, 100}, // +1%
+		{1, 2},     // 0.5x
+		{2, 1},     // 2x
+	}
+
+	seen := make(map[string]bool)
+	seeds := make([]interface{}, 0, len(ratios))
+	for _, r := range ratios {
+		if r.den == 0 {
+			continue
+		}
+		n := new(big.Int).Mul(orig, big.NewInt(r.num))
+		n.Div(n, big.NewInt(r.den))
+		if n.Sign() < 0 {
+			continue
+		}
+		key := n.String()
+		if !seen[key] {
+			seen[key] = true
+			seeds = append(seeds, n)
+		}
+	}
+	return seeds
 }
 
 // simulateExecution 执行单个模拟
@@ -3506,6 +3573,10 @@ func (f *CallDataFuzzer) InitializeArchitecture(poolSize int) error {
 		return fmt.Errorf("failed to create pool manager: %w", err)
 	}
 	log.Printf("[Fuzzer] ✅ 创建ParamPoolManager (maxPools=100)")
+	if f.generator != nil {
+		poolManager.SetParamGenerator(newPoolParamGeneratorAdapter(f.generator))
+		log.Printf("[Fuzzer] ✅ 参数池生成器已绑定（保留address原值，使用基础变异范围）")
+	}
 
 	// 3. 创建MutationEngine
 	engine := local.NewMutationEngine()
@@ -3517,10 +3588,7 @@ func (f *CallDataFuzzer) InitializeArchitecture(poolSize int) error {
 	var seedConfig *local.SeedConfig
 	if f.seedConfig != nil && f.seedConfig.Enabled {
 		// 转换fuzzer.SeedConfig为local.SeedConfig
-		seedConfig = &local.SeedConfig{
-			Enabled:     f.seedConfig.Enabled,
-			AttackSeeds: f.seedConfig.AttackSeeds,
-		}
+		seedConfig = convertSeedConfigToLocal(f.seedConfig)
 		log.Printf("[Fuzzer] 🌱 种子配置已启用，种子数: %d", len(f.seedConfig.AttackSeeds))
 	}
 	seedStrategy := strategies.NewSeedDrivenStrategy(seedConfig)
@@ -3559,6 +3627,104 @@ func (f *CallDataFuzzer) InitializeArchitecture(poolSize int) error {
 	log.Printf("[Fuzzer] 📊 已注册策略: %d个", len(engine.GetStrategies()))
 
 	return nil
+}
+
+// newPoolParamGeneratorAdapter 将基础参数生成器适配到本地参数池，保持address参数不被随机化
+type poolParamGeneratorAdapter struct {
+	base *ParamGenerator
+}
+
+func newPoolParamGeneratorAdapter(base *ParamGenerator) local.ParamGenerator {
+	return &poolParamGeneratorAdapter{base: base}
+}
+
+func (a *poolParamGeneratorAdapter) GenerateForType(paramType abi.Type, seed int) interface{} {
+	value := zeroValueForType(paramType)
+	if a == nil || a.base == nil {
+		return value
+	}
+
+	param := Parameter{Type: paramType.String(), Value: value}
+	variations := a.base.GenerateVariations(param)
+	if len(variations) == 0 {
+		return value
+	}
+
+	idx := seed % len(variations)
+	if idx < 0 {
+		idx = 0
+	}
+	return variations[idx]
+}
+
+func zeroValueForType(paramType abi.Type) interface{} {
+	switch paramType.T {
+	case abi.UintTy, abi.IntTy:
+		return big.NewInt(0)
+	case abi.BoolTy:
+		return false
+	case abi.AddressTy:
+		return common.Address{}
+	case abi.StringTy:
+		return ""
+	case abi.BytesTy, abi.FixedBytesTy:
+		return []byte{}
+	default:
+		return nil
+	}
+}
+
+// convertSeedConfigToLocal 将 fuzzer.SeedConfig 转换为 local.SeedConfig（包含约束范围）
+func convertSeedConfigToLocal(cfg *SeedConfig) *local.SeedConfig {
+	if cfg == nil {
+		return nil
+	}
+	out := &local.SeedConfig{
+		Enabled:     cfg.Enabled,
+		AttackSeeds: cfg.AttackSeeds,
+	}
+
+	// 转换 constraint_ranges（函数名小写）
+	if len(cfg.ConstraintRanges) > 0 {
+		out.ConstraintRanges = make(map[string]map[string]*local.ConstraintRange)
+		for fn, params := range cfg.ConstraintRanges {
+			fnLower := strings.ToLower(fn)
+			out.ConstraintRanges[fnLower] = make(map[string]*local.ConstraintRange)
+			for idx, cr := range params {
+				if cr == nil {
+					continue
+				}
+				lcr := &local.ConstraintRange{
+					Type:             cr.Type,
+					AttackValues:     cr.AttackValues,
+					MutationStrategy: cr.MutationStrategy,
+					Confidence:       cr.Confidence,
+				}
+				if cr.Range != nil {
+					lcr.Range = &struct {
+						Min string `json:"min"`
+						Max string `json:"max"`
+					}{
+						Min: cr.Range.Min,
+						Max: cr.Range.Max,
+					}
+				}
+				out.ConstraintRanges[fnLower][idx] = lcr
+			}
+		}
+	}
+
+	// 范围变异配置（可选）
+	if cfg.RangeMutationConfig != nil {
+		out.RangeMutationConfig = &local.RangeMutationConfig{
+			FocusPercentiles:       cfg.RangeMutationConfig.FocusPercentiles,
+			BoundaryExploration:    cfg.RangeMutationConfig.BoundaryExploration,
+			StepCount:              cfg.RangeMutationConfig.StepCount,
+			RandomWithinRangeRatio: cfg.RangeMutationConfig.RandomWithinRangeRatio,
+		}
+	}
+
+	return out
 }
 
 // RegisterProtectedContract 注册受保护合约到registry
@@ -3667,15 +3833,18 @@ func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, cont
 		return
 	}
 	rule := f.constraintCollector.GetRule(contractAddr, selector)
-	if rule == nil {
-		return
+	if rule != nil {
+		summaries := convertParamConstraintsToSummaries(rule.ParamConstraints)
+		if len(summaries) > 0 {
+			report.ValidParameters = summaries
+		}
+		report.ConstraintRule = rule
 	}
 
-	summaries := convertParamConstraintsToSummaries(rule.ParamConstraints)
-	if len(summaries) > 0 {
-		report.ValidParameters = summaries
+	// 附带表达式约束（ratio/linear）
+	if expr := f.constraintCollector.GetExpressionRule(contractAddr, selector); expr != nil {
+		report.ExpressionRules = append(report.ExpressionRules, *expr)
 	}
-	report.ConstraintRule = rule
 }
 
 // convertParamConstraintsToSummaries 将参数约束转成参数摘要
