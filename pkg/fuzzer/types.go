@@ -278,9 +278,10 @@ type Config struct {
 
 // InvariantCheckConfig 不变量检查配置
 type InvariantCheckConfig struct {
-	Enabled    bool   `yaml:"enabled"`     // 是否启用
-	ProjectID  string `yaml:"project_id"`  // 项目ID
-	ConfigPath string `yaml:"config_path"` // 不变量配置文件路径
+	Enabled              bool   `yaml:"enabled"`                 // 是否启用
+	ProjectID            string `yaml:"project_id"`              // 项目ID
+	ConfigPath           string `yaml:"config_path"`             // 不变量配置文件路径
+	SkipOnHighSimilarity *bool  `yaml:"skip_on_high_similarity"` // 高相似度样本是否跳过不变量评估（默认true）
 }
 
 // StrategyConfig 参数生成策略配置

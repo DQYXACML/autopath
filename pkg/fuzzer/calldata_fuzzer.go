@@ -262,8 +262,9 @@ type CallDataFuzzer struct {
 	stats *FuzzerStats
 
 	// 不变量评估器（新增）
-	invariantEvaluator   InvariantEvaluator // 通过接口避免循环依赖
-	enableInvariantCheck bool               // 是否启用不变量检查
+	invariantEvaluator      InvariantEvaluator // 通过接口避免循环依赖
+	enableInvariantCheck    bool               // 是否启用不变量检查
+	skipInvariantForHighSim bool               // 高相似度样本是否跳过不变量评估
 
 	// 种子驱动模糊测试（新增）
 	seedConfig *SeedConfig // 种子配置
@@ -324,30 +325,37 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		gen = NewParamGenerator(config.MaxVariations)
 	}
 
+	// 默认跳过高相似度样本的不变量检查，便于生成约束；可通过配置显式关闭
+	skipInv := true
+	if config.InvariantCheck.SkipOnHighSimilarity != nil {
+		skipInv = *config.InvariantCheck.SkipOnHighSimilarity
+	}
+
 	fuzzer := &CallDataFuzzer{
-		parser:                 NewABIParser(),
-		generator:              gen,
-		comparator:             NewPathComparator(),
-		merger:                 NewResultMerger(),
-		tracer:                 NewTransactionTracer(rpcClient),
-		threshold:              config.Threshold,
-		maxWorkers:             config.Workers,
-		timeout:                config.Timeout,
-		client:                 client,
-		rpcClient:              rpcClient,
-		stats:                  &FuzzerStats{StartTime: time.Now()},
-		invariantEvaluator:     &EmptyInvariantEvaluator{}, // 默认使用空实现
-		enableInvariantCheck:   config.InvariantCheck.Enabled,
-		seedConfig:             config.SeedConfig,        // 新增：种子配置
-		symbolicExtractor:      nil,                      // 延迟初始化
-		symbolicSolver:         nil,                      // 延迟初始化
-		targetSimilarity:       config.TargetSimilarity,  // 🆕 无限制模式配置
-		maxHighSimResults:      config.MaxHighSimResults, // 🆕 无限制模式配置
-		unlimitedMode:          config.UnlimitedMode,     // 🆕 无限制模式配置
-		entryCallProtectedOnly: config.EntryCallProtectedOnly,
-		projectID:              config.ProjectID,
-		localExecution:         config.LocalExecution, // 🆕 本地执行模式
-		constraintCollector:    NewConstraintCollector(10),
+		parser:                  NewABIParser(),
+		generator:               gen,
+		comparator:              NewPathComparator(),
+		merger:                  NewResultMerger(),
+		tracer:                  NewTransactionTracer(rpcClient),
+		threshold:               config.Threshold,
+		maxWorkers:              config.Workers,
+		timeout:                 config.Timeout,
+		client:                  client,
+		rpcClient:               rpcClient,
+		stats:                   &FuzzerStats{StartTime: time.Now()},
+		invariantEvaluator:      &EmptyInvariantEvaluator{}, // 默认使用空实现
+		enableInvariantCheck:    config.InvariantCheck.Enabled,
+		skipInvariantForHighSim: skipInv,
+		seedConfig:              config.SeedConfig,        // 新增：种子配置
+		symbolicExtractor:       nil,                      // 延迟初始化
+		symbolicSolver:          nil,                      // 延迟初始化
+		targetSimilarity:        config.TargetSimilarity,  // 🆕 无限制模式配置
+		maxHighSimResults:       config.MaxHighSimResults, // 🆕 无限制模式配置
+		unlimitedMode:           config.UnlimitedMode,     // 🆕 无限制模式配置
+		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
+		projectID:               config.ProjectID,
+		localExecution:          config.LocalExecution, // 🆕 本地执行模式
+		constraintCollector:     NewConstraintCollector(10),
 	}
 
 	// 🆕 根据配置选择模拟器类型
@@ -391,30 +399,37 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		config.LocalExecution = true
 	}
 
+	// 默认跳过高相似度样本的不变量检查，便于生成约束；可通过配置显式关闭
+	skipInv := true
+	if config.InvariantCheck.SkipOnHighSimilarity != nil {
+		skipInv = *config.InvariantCheck.SkipOnHighSimilarity
+	}
+
 	fuzzer := &CallDataFuzzer{
-		parser:                 NewABIParser(),
-		generator:              gen,
-		comparator:             NewPathComparator(),
-		merger:                 NewResultMerger(),
-		tracer:                 NewTransactionTracer(rpcClient),
-		threshold:              config.Threshold,
-		maxWorkers:             config.Workers,
-		timeout:                config.Timeout,
-		client:                 client,
-		rpcClient:              rpcClient,
-		stats:                  &FuzzerStats{StartTime: time.Now()},
-		invariantEvaluator:     &EmptyInvariantEvaluator{}, // 默认使用空实现
-		enableInvariantCheck:   config.InvariantCheck.Enabled,
-		seedConfig:             config.SeedConfig,        // 新增：种子配置
-		symbolicExtractor:      nil,                      // 延迟初始化
-		symbolicSolver:         nil,                      // 延迟初始化
-		targetSimilarity:       config.TargetSimilarity,  // 🆕 无限制模式配置
-		maxHighSimResults:      config.MaxHighSimResults, // 🆕 无限制模式配置
-		unlimitedMode:          config.UnlimitedMode,     // 🆕 无限制模式配置
-		entryCallProtectedOnly: config.EntryCallProtectedOnly,
-		projectID:              config.ProjectID,
-		localExecution:         config.LocalExecution, // 🆕 本地执行模式
-		constraintCollector:    NewConstraintCollector(10),
+		parser:                  NewABIParser(),
+		generator:               gen,
+		comparator:              NewPathComparator(),
+		merger:                  NewResultMerger(),
+		tracer:                  NewTransactionTracer(rpcClient),
+		threshold:               config.Threshold,
+		maxWorkers:              config.Workers,
+		timeout:                 config.Timeout,
+		client:                  client,
+		rpcClient:               rpcClient,
+		stats:                   &FuzzerStats{StartTime: time.Now()},
+		invariantEvaluator:      &EmptyInvariantEvaluator{}, // 默认使用空实现
+		enableInvariantCheck:    config.InvariantCheck.Enabled,
+		skipInvariantForHighSim: skipInv,
+		seedConfig:              config.SeedConfig,        // 新增：种子配置
+		symbolicExtractor:       nil,                      // 延迟初始化
+		symbolicSolver:          nil,                      // 延迟初始化
+		targetSimilarity:        config.TargetSimilarity,  // 🆕 无限制模式配置
+		maxHighSimResults:       config.MaxHighSimResults, // 🆕 无限制模式配置
+		unlimitedMode:           config.UnlimitedMode,     // 🆕 无限制模式配置
+		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
+		projectID:               config.ProjectID,
+		localExecution:          config.LocalExecution, // 🆕 本地执行模式
+		constraintCollector:     NewConstraintCollector(10),
 	}
 
 	// 🆕 根据配置选择模拟器类型
@@ -2707,9 +2722,9 @@ func (f *CallDataFuzzer) worker(
 					workerID, similarity, stateChangeCount, simResult.Success, simResult.GasUsed, changedAddrs)
 			}
 
-			// 如果启用了不变量检查,先进行不变量验证
+			// 如果启用了不变量检查,先进行不变量验证（可选跳过）
 			var violations []interface{}
-			if f.enableInvariantCheck && f.invariantEvaluator != nil {
+			if f.enableInvariantCheck && f.invariantEvaluator != nil && !(f.skipInvariantForHighSim && similarity >= f.threshold) {
 				// 转换状态为ChainState格式
 				chainState := ConvertToChainStateFromSimResult(
 					simResult,
@@ -2728,6 +2743,8 @@ func (f *CallDataFuzzer) worker(
 					// 路径相似但未打破不变量，不记录
 					continue
 				}
+			} else if f.skipInvariantForHighSim && similarity >= f.threshold {
+				log.Printf("[Worker %d] ⏭️ 高相似度样本跳过不变量评估 (sim=%.4f >= %.4f)", workerID, similarity, f.threshold)
 			}
 
 			// 没有状态变更且无违规，视为无效，不计数

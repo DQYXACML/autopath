@@ -3,6 +3,7 @@ package fuzzer
 import (
 	"encoding/hex"
 	"math/big"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,8 @@ type ConstraintCollector struct {
 	rules     map[string]*ConstraintRule
 	threshold int
 	exprs     map[string]*ExpressionRule
+	// lastGenSample 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
+	lastGenSample map[string]int
 }
 
 // NewConstraintCollector 创建约束收集器
@@ -32,10 +35,11 @@ func NewConstraintCollector(threshold int) *ConstraintCollector {
 		threshold = 10
 	}
 	return &ConstraintCollector{
-		samples:   make(map[string][]constraintSample),
-		rules:     make(map[string]*ConstraintRule),
-		exprs:     make(map[string]*ExpressionRule),
-		threshold: threshold,
+		samples:       make(map[string][]constraintSample),
+		rules:         make(map[string]*ConstraintRule),
+		exprs:         make(map[string]*ExpressionRule),
+		threshold:     threshold,
+		lastGenSample: make(map[string]int),
 	}
 }
 
@@ -65,17 +69,19 @@ func (cc *ConstraintCollector) RecordSample(
 		return nil
 	}
 
-	// 已生成过规则直接返回
-	if rule, ok := cc.rules[key]; ok {
-		return rule
-	}
-
+	// 生成或更新规则：达到阈值后每次都基于最新窗口重建，保证规则随样本滑动刷新
 	rule := cc.buildRule(contract, selector, cc.samples[key])
 	cc.rules[key] = rule
+	cc.lastGenSample[key] = len(cc.samples[key])
 
 	// 同步生成表达式规则（ratio/linear）
 	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key]); expr != nil {
 		cc.exprs[key] = expr
+	}
+
+	// 保留滑动窗口：只保留最近 threshold 条样本，避免缓存无限增长
+	if len(cc.samples[key]) > cc.threshold {
+		cc.samples[key] = cc.samples[key][len(cc.samples[key])-cc.threshold:]
 	}
 
 	return rule
@@ -151,6 +157,7 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 		paramIdx int
 		slot     string
 		rMin     *big.Rat
+		margin   *big.Int
 	}
 
 	var best candidate
@@ -166,10 +173,24 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 			if minRat == nil {
 				continue
 			}
-			// 留一点安全余量 90%
-			minRat.Mul(minRat, big.NewRat(9, 10))
-			if best.rMin == nil || minRat.Cmp(best.rMin) < 0 {
-				best = candidate{paramIdx: pIdx, slot: slot, rMin: minRat}
+			// 留一点安全余量 90%（5-10%安全边际）
+			minRat = new(big.Rat).Mul(minRat, big.NewRat(9, 10))
+
+			// k = rMin，转为 big.Int 精度 scale
+			kScaled := ratToInt(new(big.Rat).Mul(minRat, new(big.Rat).SetInt(scale)))
+			if kScaled == nil || kScaled.Sign() == 0 {
+				continue
+			}
+
+			paramCoeff := new(big.Int).Set(scale) // p * SCALE
+			stateCoeff := new(big.Int).Neg(kScaled)
+			minMargin := calcMinMarginRatio(vals, svals, paramCoeff, stateCoeff)
+			if minMargin == nil {
+				continue
+			}
+
+			if best.rMin == nil || minRat.Cmp(best.rMin) < 0 || (minRat.Cmp(best.rMin) == 0 && minMargin.Cmp(best.margin) > 0) {
+				best = candidate{paramIdx: pIdx, slot: slot, rMin: minRat, margin: minMargin}
 			}
 		}
 	}
@@ -178,10 +199,8 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 		return nil
 	}
 
-	// k = rMin，转为 big.Int 精度 scale
-	k := new(big.Rat).Mul(best.rMin, new(big.Rat).SetInt(scale))
-	kInt := new(big.Int).Div(k.Num(), k.Denom())
-	if kInt.Sign() == 0 {
+	kInt := ratToInt(new(big.Rat).Mul(best.rMin, new(big.Rat).SetInt(scale)))
+	if kInt == nil || kInt.Sign() == 0 {
 		return nil
 	}
 
@@ -199,7 +218,7 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 		},
 		Threshold:    "0x0",
 		Scale:        "0x" + scale.Text(16),
-		Confidence:   float64(len(samples)) / float64(len(samples)), // 全部样本
+		Confidence:   1.0, // 正样本全部覆盖
 		SampleCount:  len(samples),
 		MinMarginHex: "0x" + minMargin.Text(16),
 		Strategy:     "ratio_param_over_state",
@@ -212,92 +231,92 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 		return nil
 	}
 
-	paramVals := extractNumericParams(samples)
-	stateVals := extractNumericState(samples, contract)
-
-	// 构造权重：对每个特征取均值的倒数，避免全零
-	type feat struct {
-		kind       string
-		paramIndex int
-		slot       string
-		avg        *big.Int
-	}
-
-	var feats []feat
-	for idx, vals := range paramVals {
-		if avg := averageInt(vals); avg != nil && avg.Sign() != 0 {
-			feats = append(feats, feat{kind: "param", paramIndex: idx, avg: avg})
-		}
-	}
-	for slot, vals := range stateVals {
-		if avg := averageInt(vals); avg != nil && avg.Sign() != 0 {
-			feats = append(feats, feat{kind: "state", slot: slot, avg: avg})
-		}
-	}
-
-	if len(feats) == 0 {
+	featureOrder, maxAbs := collectFeatureOrder(samples, contract)
+	if len(featureOrder) == 0 {
 		return nil
 	}
 
-	// 稀疏：最多取前 6 个
-	if len(feats) > 6 {
-		feats = feats[:6]
+	// 构造特征向量（原始数值）
+	vectors := buildFeatureVectors(samples, featureOrder)
+
+	// 归一化并计算中心方向（近似 one-class 线性分隔）
+	centroid := make([]*big.Rat, len(featureOrder))
+	for i := range centroid {
+		centroid[i] = new(big.Rat)
+	}
+	for _, vec := range vectors {
+		for i, v := range vec {
+			norm := normalizeWithMax(v, maxAbs[i])
+			centroid[i].Add(centroid[i], norm)
+		}
+	}
+	countRat := new(big.Rat).SetInt64(int64(len(vectors)))
+	for i := range centroid {
+		centroid[i].Quo(centroid[i], countRat)
 	}
 
-	terms := make([]LinearTerm, 0, len(feats))
-	for _, f := range feats {
-		coeff := new(big.Int).Div(scale, f.avg) // 1/avg 乘 scale
-		if coeff.Sign() == 0 {
-			coeff = big.NewInt(1)
+	// 计算最小间隔（所有正样本均需满足）
+	minDot := (*big.Rat)(nil)
+	for _, vec := range vectors {
+		dot := new(big.Rat)
+		for i, v := range vec {
+			dot.Add(dot, new(big.Rat).Mul(centroid[i], normalizeWithMax(v, maxAbs[i])))
 		}
-		term := LinearTerm{Kind: f.kind, Coeff: "0x" + coeff.Text(16)}
-		if f.kind == "param" {
-			term.ParamIndex = f.paramIndex
+		if minDot == nil || dot.Cmp(minDot) < 0 {
+			minDot = dot
+		}
+	}
+	if minDot == nil || minDot.Sign() <= 0 {
+		return nil
+	}
+
+	// 设置阈值为最小间隔的90%（安全余量）
+	thresholdRat := new(big.Rat).Mul(minDot, big.NewRat(9, 10))
+	if thresholdRat.Sign() <= 0 {
+		return nil
+	}
+
+	terms := make([]LinearTerm, 0, len(featureOrder))
+	coeffInts := make([]*big.Int, len(featureOrder))
+	scaleRat := new(big.Rat).SetInt(scale)
+	for i, feat := range featureOrder {
+		// coeff = centroid_i / maxAbs_i * scale
+		coeffRat := new(big.Rat).Set(centroid[i])
+		coeffRat.Quo(coeffRat, new(big.Rat).SetInt(maxAbs[i]))
+		coeffRat.Mul(coeffRat, scaleRat)
+		coeffInt := ratToInt(coeffRat)
+		if coeffInt == nil {
+			coeffInt = big.NewInt(0)
+		}
+		coeffInts[i] = coeffInt
+
+		term := LinearTerm{Kind: feat.kind, Coeff: "0x" + coeffInt.Text(16)}
+		if feat.kind == "param" {
+			term.ParamIndex = feat.paramIndex
 		} else {
-			term.Slot = f.slot
+			term.Slot = feat.slot
 		}
 		terms = append(terms, term)
 	}
 
-	// 计算所有样本的最小 margin
-	minMargin := big.NewInt(0)
-	minMargin.SetInt64(1 << 62) // 大数
-	for _, s := range samples {
-		sum := big.NewInt(0)
-		sum.SetInt64(0)
-		for _, t := range terms {
-			coeff := hexToInt(t.Coeff)
-			var val *big.Int
-			if t.Kind == "param" {
-				val = pickParamValue(s.params, t.ParamIndex)
-			} else {
-				val = pickStateValue(s.state, t.Slot)
-			}
-			if val == nil {
-				val = big.NewInt(0)
-			}
-			sum.Add(sum, new(big.Int).Mul(coeff, val))
-		}
-		if sum.Cmp(minMargin) < 0 {
-			minMargin = sum
-		}
+	thresholdInt := ratToInt(new(big.Rat).Mul(thresholdRat, scaleRat))
+	if thresholdInt == nil || thresholdInt.Sign() <= 0 {
+		return nil
 	}
 
-	// 阈值取 90% 的最小值，保证样本通过
-	threshold := new(big.Int).Mul(minMargin, big.NewInt(9))
-	threshold = threshold.Div(threshold, big.NewInt(10))
+	minMargin := calcMinMarginLinear(vectors, coeffInts, thresholdInt)
 
 	return &ExpressionRule{
 		Type:         "linear",
 		Contract:     contract,
 		Selector:     selector,
 		Terms:        terms,
-		Threshold:    "0x" + threshold.Text(16),
+		Threshold:    "0x" + thresholdInt.Text(16),
 		Scale:        "0x" + scale.Text(16),
 		Confidence:   1.0,
 		SampleCount:  len(samples),
 		MinMarginHex: "0x" + minMargin.Text(16),
-		Strategy:     "sparse_hyperplane",
+		Strategy:     "sparse_hyperplane_origin_margin",
 	}
 }
 
@@ -583,4 +602,118 @@ func normalizeBigIntValue(val interface{}) *big.Int {
 		}
 	}
 	return nil
+}
+
+// featureDesc 描述用于线性不等式的特征（参数或状态槽）
+type featureDesc struct {
+	kind       string
+	paramIndex int
+	slot       string
+}
+
+// collectFeatureOrder 获取稳定的特征顺序及每个特征的最大绝对值（用于归一化）
+func collectFeatureOrder(samples []constraintSample, contract common.Address) ([]featureDesc, []*big.Int) {
+	paramVals := extractNumericParams(samples)
+	stateVals := extractNumericState(samples, contract)
+
+	var featureOrder []featureDesc
+	var maxAbs []*big.Int
+
+	paramIdx := make([]int, 0, len(paramVals))
+	for idx := range paramVals {
+		paramIdx = append(paramIdx, idx)
+	}
+	sort.Ints(paramIdx)
+	for _, idx := range paramIdx {
+		featureOrder = append(featureOrder, featureDesc{kind: "param", paramIndex: idx})
+		maxAbs = append(maxAbs, maxAbsValue(paramVals[idx]))
+	}
+
+	stateSlots := make([]string, 0, len(stateVals))
+	for slot := range stateVals {
+		stateSlots = append(stateSlots, slot)
+	}
+	sort.Strings(stateSlots)
+	for _, slot := range stateSlots {
+		featureOrder = append(featureOrder, featureDesc{kind: "state", slot: slot})
+		maxAbs = append(maxAbs, maxAbsValue(stateVals[slot]))
+	}
+
+	return featureOrder, maxAbs
+}
+
+// buildFeatureVectors 根据特征顺序生成样本向量
+func buildFeatureVectors(samples []constraintSample, order []featureDesc) [][]*big.Int {
+	vectors := make([][]*big.Int, 0, len(samples))
+	for _, s := range samples {
+		vec := make([]*big.Int, len(order))
+		for i, feat := range order {
+			if feat.kind == "param" {
+				vec[i] = pickParamValue(s.params, feat.paramIndex)
+			} else {
+				vec[i] = pickStateValue(s.state, feat.slot)
+			}
+			if vec[i] == nil {
+				vec[i] = big.NewInt(0)
+			}
+		}
+		vectors = append(vectors, vec)
+	}
+	return vectors
+}
+
+// maxAbsValue 计算一组数值的最大绝对值，最小为1以避免除零
+func maxAbsValue(vals []*big.Int) *big.Int {
+	maxV := big.NewInt(1)
+	for _, v := range vals {
+		if v == nil {
+			continue
+		}
+		if abs := new(big.Int).Abs(v); abs.Cmp(maxV) > 0 {
+			maxV = abs
+		}
+	}
+	return maxV
+}
+
+// normalizeWithMax 将值按最大绝对值归一化为[-1,1]区间，返回有理数
+func normalizeWithMax(val *big.Int, maxAbs *big.Int) *big.Rat {
+	if maxAbs == nil || maxAbs.Sign() == 0 {
+		return new(big.Rat)
+	}
+	return new(big.Rat).SetFrac(val, maxAbs)
+}
+
+// ratToInt 将有理数下取整为big.Int
+func ratToInt(r *big.Rat) *big.Int {
+	if r == nil {
+		return nil
+	}
+	return new(big.Int).Div(r.Num(), r.Denom())
+}
+
+// calcMinMarginLinear 计算线性不等式的最小裕度：sum(coeff_i * x_i) - threshold
+func calcMinMarginLinear(vectors [][]*big.Int, coeffs []*big.Int, threshold *big.Int) *big.Int {
+	if len(vectors) == 0 {
+		return big.NewInt(0)
+	}
+	minMargin := (*big.Int)(nil)
+	for _, vec := range vectors {
+		sum := big.NewInt(0)
+		for i, v := range vec {
+			coeff := big.NewInt(0)
+			if i < len(coeffs) && coeffs[i] != nil {
+				coeff = coeffs[i]
+			}
+			sum.Add(sum, new(big.Int).Mul(coeff, v))
+		}
+		margin := new(big.Int).Sub(sum, threshold)
+		if minMargin == nil || margin.Cmp(minMargin) < 0 {
+			minMargin = margin
+		}
+	}
+	if minMargin == nil {
+		return big.NewInt(0)
+	}
+	return minMargin
 }
