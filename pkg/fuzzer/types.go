@@ -67,6 +67,11 @@ type AttackParameterReport struct {
 	MaxSimilarity     float64 `json:"max_similarity"`
 	MinSimilarity     float64 `json:"min_similarity"`
 	ExecutionTimeMs   int64   `json:"execution_time_ms"`
+	// 时间轴统计：首个达标样本/最高相似度出现的时间（相对模糊开始，秒）
+	FirstHitSeconds float64 `json:"first_hit_seconds,omitempty"`
+	MaxSimSeconds   float64 `json:"max_sim_seconds,omitempty"`
+	// 链下表达式规则生成耗时（毫秒）
+	ExpressionGenMs int64 `json:"expression_generation_ms,omitempty"`
 
 	// 公开的高相似度结果样本（为便于序列化，参数值已转换为字符串）
 	HighSimilarityResults []PublicResult `json:"high_similarity_results,omitempty"`

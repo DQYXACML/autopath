@@ -37,9 +37,9 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "91341111320988850249033797726122639103019632627138462152359636574553610560903",
+            "index": "10",
             "severity": "critical",
-            "threshold": 0.1
+            "threshold": 0.25
           }
         },
         "formula": "abs(value_after - value_before) / value_before <= 0.1"
@@ -247,7 +247,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -312,6 +312,21 @@
             "confidence": 0.75,
             "value_expr": "1"
           },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
+          },
           "2": {
             "type": "uint256",
             "safe_threshold": "191987557076612907008",
@@ -330,7 +345,7 @@
             "value_expr": "redeemAmount"
           },
           "3": {
-            "type": "uint256",
+            "type": "uint8",
             "safe_threshold": "5951614269374999822336",
             "danger_threshold": "19838714231250000000001",
             "attack_values": [

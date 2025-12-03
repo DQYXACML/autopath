@@ -1036,7 +1036,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -1085,7 +1085,7 @@
       "constraint_ranges": {
         "getPositionLendingShares": {
           "0": {
-            "type": "uint256",
+            "type": "address => LendingPoolEntry",
             "safe_threshold": "374662543803889222744219534159420193573479383040",
             "danger_threshold": "1248875146012964071876423320777688075155124985543",
             "attack_values": [

@@ -59,6 +59,31 @@
             "index": "9",
             "severity": "critical",
             "threshold": 0.05
+          },
+          "slot_0": {
+            "index": "51065985614679764606399826168269166145705797969016210901621653506465243135623",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "22834982447418448314318860762008930967820423487313201730043782994883680975172",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_2": {
+            "index": "14450539945966347452523004163385766300867079168565500804923841528024826271182",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_3": {
+            "index": "22",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_4": {
+            "index": "104422793164674876267613781070978458539179937597144090259771007569482327811080",
+            "severity": "critical",
+            "threshold": 0.25
           }
         }
       },
@@ -444,7 +469,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,

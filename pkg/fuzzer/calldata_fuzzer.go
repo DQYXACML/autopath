@@ -6,6 +6,7 @@ import (
 	"autopath/pkg/simulator/local"
 	"autopath/pkg/simulator/local/strategies"
 	apptypes "autopath/pkg/types"
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -260,6 +262,17 @@ type CallDataFuzzer struct {
 
 	// 统计
 	stats *FuzzerStats
+	// 达标样本时间统计
+	firstHitAt int64  // 纳秒
+	maxSimAt   int64  // 纳秒
+	maxSimVal  uint64 // math.Float64bits(sim)
+
+	// 全量尝试统计（包含低相似度样本）
+	attemptMu sync.Mutex
+	attempts  int
+	simSum    float64
+	simMin    float64
+	simMax    float64
 
 	// 不变量评估器（新增）
 	invariantEvaluator      InvariantEvaluator // 通过接口避免循环依赖
@@ -357,6 +370,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		localExecution:          config.LocalExecution, // 🆕 本地执行模式
 		constraintCollector:     NewConstraintCollector(10),
 	}
+	fuzzer.simMin = math.Inf(1)
 
 	// 🆕 根据配置选择模拟器类型
 	if config.LocalExecution {
@@ -431,6 +445,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		localExecution:          config.LocalExecution, // 🆕 本地执行模式
 		constraintCollector:     NewConstraintCollector(10),
 	}
+	fuzzer.simMin = math.Inf(1)
 
 	// 🆕 根据配置选择模拟器类型
 	if config.LocalExecution {
@@ -1204,6 +1219,10 @@ func primeSeedsWithOriginalParams(seedCfg *SeedConfig, params []Parameter) bool 
 		if p.Value == nil {
 			continue
 		}
+		// 如果已有配置种子，跳过注入原始参数，优先使用配置
+		if len(seedCfg.AttackSeeds[p.Index]) > 0 {
+			continue
+		}
 		exist := false
 		for _, s := range seedCfg.AttackSeeds[p.Index] {
 			if reflect.DeepEqual(s, p.Value) {
@@ -1325,6 +1344,54 @@ func restrictComplexSeeds(seedCfg *SeedConfig, params []Parameter) {
 	}
 }
 
+// dedupInterfaces 对接口切片去重，保持顺序
+func dedupInterfaces(vals []interface{}) []interface{} {
+	seen := make(map[string]bool)
+	out := make([]interface{}, 0, len(vals))
+	for _, v := range vals {
+		key := fmt.Sprintf("%v", v)
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// convertToInterfaceArray 将任意数组转换为 []interface{}
+func convertToInterfaceArray(val interface{}) []interface{} {
+	switch v := val.(type) {
+	case []interface{}:
+		return v
+	case []common.Address:
+		out := make([]interface{}, len(v))
+		for i, a := range v {
+			out[i] = a
+		}
+		return out
+	case []string:
+		out := make([]interface{}, len(v))
+		for i, s := range v {
+			out[i] = s
+		}
+		return out
+	default:
+		return []interface{}{}
+	}
+}
+
+// repeatAddress 使用地址池循环生成指定长度的数组
+func repeatAddress(pool []interface{}, length int) []interface{} {
+	if len(pool) == 0 {
+		pool = []interface{}{common.HexToAddress("0x0000000000000000000000000000000000000000")}
+	}
+	out := make([]interface{}, length)
+	for i := 0; i < length; i++ {
+		out[i] = pool[i%len(pool)]
+	}
+	return out
+}
+
 // decodeRevertMessage 尝试从返回数据解码revert原因
 func decodeRevertMessage(data []byte) string {
 	if len(data) == 0 {
@@ -1357,8 +1424,22 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	blockNumber uint64,
 	tx *types.Transaction, // 新增：可选的交易对象
 ) (*AttackParameterReport, error) {
+	// 全局超时控制（整轮Fuzz）
+	if f.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, f.timeout)
+		defer cancel()
+		log.Printf("[Fuzzer] ⏱️ 整轮Fuzz时间预算: %v", f.timeout)
+	}
+
 	startTime := time.Now()
 	f.stats.StartTime = startTime
+	f.stats.TestedCombinations = 0
+	f.stats.ValidCombinations = 0
+	f.stats.FailedSimulations = 0
+	atomic.StoreInt64(&f.firstHitAt, 0)
+	atomic.StoreInt64(&f.maxSimAt, 0)
+	atomic.StoreUint64(&f.maxSimVal, 0)
 
 	// 步骤1: 获取原始交易信息和执行路径（传入受保护合约地址）
 	log.Printf("[Fuzzer] Fetching original transaction: %s", txHash.Hex())
@@ -1547,116 +1628,57 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	// ==================================================
 
 	// 步骤4: 生成参数组合并执行模糊测试
-	// 🔒 flash 函数：手工构造限幅组合，避免 SafeERC20 大量 revert
-	var results []FuzzingResult
-
-	if targetMethod != nil && strings.EqualFold(targetMethod.Name, "flash") {
-		if len(parsedData.Parameters) < 4 {
-			return nil, fmt.Errorf("flash parameter length mismatch: got %d", len(parsedData.Parameters))
-		}
-
-		// 尝试注入必要的授权与余额，避免 SafeERC20 revert
-		injectFlashSeedOverrides(stateOverride, contractAddr, targetCall, parsedData.Parameters)
-
-		param0 := parsedData.Parameters[0].Value
-		param1 := parsedData.Parameters[1].Value
-		origAmount := normalizeBigInt(parsedData.Parameters[2].Value)
-		param3Orig := parsedData.Parameters[3].Value
-		if origAmount == nil || origAmount.Sign() == 0 {
-			return nil, fmt.Errorf("invalid flash amount seed")
-		}
-
-		amounts := []*big.Int{new(big.Int).Set(origAmount)}
-		for _, denom := range []int64{2, 4} {
-			v := new(big.Int).Div(origAmount, big.NewInt(denom))
-			if v.Sign() > 0 {
-				amounts = append(amounts, v)
-			}
-		}
-
-		byteOpts := []interface{}{param3Orig}
-		switch param3Orig.(type) {
-		case []byte:
-			byteOpts = append(byteOpts, []byte{})
-		case string:
-			byteOpts = append(byteOpts, "")
-		default:
-			byteOpts = append(byteOpts, nil)
-		}
-
-		seen := make(map[string]bool)
-		dedup := make([]*big.Int, 0, len(amounts))
-		for _, a := range amounts {
-			key := a.String()
-			if !seen[key] {
-				seen[key] = true
-				dedup = append(dedup, a)
-			}
-		}
-		amounts = dedup
-
-		combCh := make(chan []interface{}, len(amounts)*len(byteOpts))
-		for _, amt := range amounts {
-			for _, b := range byteOpts {
-				combo := make([]interface{}, len(parsedData.Parameters))
-				combo[0] = param0
-				combo[1] = param1
-				combo[2] = amt
-				combo[3] = b
-				combCh <- combo
-			}
-		}
-		close(combCh)
-
-		log.Printf("[Fuzzer] 🎯 flash函数使用限幅组合: amount<=%s, combos=%d", origAmount.String(), len(combCh))
-		results = f.executeFuzzing(ctx, combCh, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, trace, useLoopBaseline)
-
-		// 生成报告并返回
-		log.Printf("[Fuzzer] Generating report...")
-		report := f.merger.MergeResults(results, contractAddr, parsedData.Selector, txHash, blockNumber, startTime)
-
-		// 应用约束规则（若已生成）
-		f.applyConstraintRule(report, contractAddr, parsedData.Selector)
-
-		if len(results) > 0 {
-			sorted := make([]FuzzingResult, len(results))
-			copy(sorted, results)
-			sort.Slice(sorted, func(i, j int) bool { return sorted[i].Similarity > sorted[j].Similarity })
-			if len(sorted) > 100 {
-				sorted = sorted[:100]
-			}
-			report.HighSimilarityResults = ToPublicResults(sorted)
-		}
-
-		f.stats.EndTime = time.Now()
-		f.stats.ValidCombinations = len(results)
-		log.Printf("[Fuzzer] Fuzzing completed in %v", f.stats.EndTime.Sub(f.stats.StartTime))
-		return report, nil
-	}
-
 	log.Printf("[Fuzzer] Generating parameter combinations...")
+
+	var results []FuzzingResult
 
 	// 对BarleyFinance关键函数收紧种子：地址仅使用原始值，数值不超过原始值，避免SafeERC20因余额/授权不足反复revert
 	if f.seedConfig != nil && f.seedConfig.Enabled && targetMethod != nil &&
 		(strings.EqualFold(targetMethod.Name, "flash") ||
 			strings.EqualFold(targetMethod.Name, "bond") ||
 			strings.EqualFold(targetMethod.Name, "debond")) {
+		if f.seedConfig.AttackSeeds == nil {
+			f.seedConfig.AttackSeeds = make(map[int][]interface{})
+		}
 		for _, p := range parsedData.Parameters {
-			// 地址参数：只保留原始地址
+			// 地址参数：保留原始地址，并加入极端/随机地址以增加离散度
 			if strings.HasPrefix(p.Type, "address") {
 				idx := p.Index
-				f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
-				// address[] 类型也固定为原始数组
+				seedPool := []interface{}{
+					p.Value,
+					common.HexToAddress("0x0000000000000000000000000000000000000000"),
+					common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff"),
+					common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+					common.BytesToAddress([]byte{0x01}),
+					common.BytesToAddress([]byte{0x09}),
+				}
+				f.seedConfig.AttackSeeds[idx] = dedupInterfaces(seedPool)
+
+				// address[]：加入不同长度的数组以拉低相似度
 				if strings.HasSuffix(p.Type, "[]") {
-					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+					base := convertToInterfaceArray(p.Value)
+					if len(base) == 0 {
+						base = []interface{}{p.Value}
+					}
+					f.seedConfig.AttackSeeds[idx] = []interface{}{
+						base,
+						[]interface{}{},
+						repeatAddress(seedPool, 1),
+						repeatAddress(seedPool, 3),
+						repeatAddress(seedPool, 10),
+					}
 				}
 				continue
 			}
 
-			// bytes 类型（如签名等payload）固定原值
+			// bytes 类型：原值+空值+全FF，避免全部落在同一区域
 			if strings.HasPrefix(p.Type, "bytes") {
 				idx := p.Index
-				f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				f.seedConfig.AttackSeeds[idx] = []interface{}{
+					p.Value,
+					[]byte{},
+					bytes.Repeat([]byte{0xFF}, 32),
+				}
 				continue
 			}
 
@@ -1686,11 +1708,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	// 若未提供显式种子，注入原始调用参数作为基础种子，避免组合数过少
 	if f.seedConfig != nil && f.seedConfig.Enabled {
 		injected := primeSeedsWithOriginalParams(f.seedConfig, parsedData.Parameters)
-		if injected || true {
-			// 过滤地址类种子，保留原始地址，避免随机地址导致回调缺失
-			sanitizeAddressSeeds(f.seedConfig, parsedData.Parameters)
-			restrictComplexSeeds(f.seedConfig, parsedData.Parameters)
-		}
+		_ = injected
 	}
 
 	// 判断是否启用自适应迭代模式
@@ -1747,9 +1765,35 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		blockNumber,
 		startTime,
 	)
+	// 补充时间轴统计
+	if fh := atomic.LoadInt64(&f.firstHitAt); fh > 0 {
+		report.FirstHitSeconds = float64(fh) / float64(time.Second)
+	}
+	if ms := atomic.LoadInt64(&f.maxSimAt); ms > 0 {
+		report.MaxSimSeconds = float64(ms) / float64(time.Second)
+	}
+	// 使用全量尝试统计（包含低相似度样本）
+	if attempts, sum, minSim, maxSim := f.getAttemptStats(); attempts > 0 {
+		report.TotalCombinations = attempts
+		report.AverageSimilarity = sum / float64(attempts)
+		report.MinSimilarity = minSim
+		report.MaxSimilarity = maxSim
+		log.Printf("[Fuzzer] 📑 报告统计（含低相似度）：total=%d avg=%.4f min=%.4f max=%.4f 阈值=%.4f 有效=%d",
+			attempts, report.AverageSimilarity, report.MinSimilarity, report.MaxSimilarity, f.threshold, len(results))
+	} else {
+		report.TotalCombinations = len(results)
+	}
 
 	// 应用约束规则（若已生成）
 	f.applyConstraintRule(report, contractAddr, parsedData.Selector)
+
+	// 输出时间轴统计
+	if report.FirstHitSeconds > 0 {
+		log.Printf("[Fuzzer] ⏱️ 首个达标样本出现在 %.2f 秒", report.FirstHitSeconds)
+	}
+	if report.MaxSimSeconds > 0 {
+		log.Printf("[Fuzzer] ⏱️ 最高相似度出现在 %.2f 秒", report.MaxSimSeconds)
+	}
 
 	// 附带高相似度结果样本（按相似度排序，最多100条）
 	if len(results) > 0 {
@@ -1967,9 +2011,15 @@ func (f *CallDataFuzzer) executeFuzzing(
 	callTree *CallFrame,
 	loopBaseline bool,
 ) []FuzzingResult {
-	// 🆕 创建可取消的context用于提前停止
-	ctx, cancel := context.WithCancel(ctx)
+	// 🆕 创建带超时的可取消context，限定整轮fuzz耗时；默认使用配置的 timeout_seconds
+	totalBudget := f.timeout
+	if totalBudget <= 0 {
+		totalBudget = 10 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, totalBudget)
 	defer cancel()
+
+	log.Printf("[Fuzzer] ⏱️ 单轮Fuzz时间预算: %v", totalBudget)
 
 	// 结果收集
 	results := []FuzzingResult{}
@@ -2049,9 +2099,13 @@ func (f *CallDataFuzzer) executeFuzzing(
 	// 等待完成
 	wg.Wait()
 
-	// 更新统计
-	f.stats.TestedCombinations = int(testedCount)
-	f.stats.ValidCombinations = int(validCount)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		log.Printf("[Fuzzer] ⏱️  已达单轮fuzz时限(%v)，提前停止后续组合", totalBudget)
+	}
+
+	// 更新统计（累加以支持自适应多轮汇总）
+	f.stats.TestedCombinations += int(testedCount)
+	f.stats.ValidCombinations += int(validCount)
 
 	log.Printf("[Fuzzer] Tested %d combinations, found %d valid (high-sim: %d)",
 		testedCount, validCount, highSimCount)
@@ -2197,6 +2251,16 @@ func formatParamValuesForLog(combo []interface{}) string {
 		}
 	}
 	return strings.Join(parts, ", ")
+}
+
+// extractNonZeroNumeric 提取非零数值参数，返回十进制字符串
+func extractNonZeroNumeric(val interface{}) (string, bool) {
+	if bi := normalizeBigInt(val); bi != nil {
+		if bi.Sign() != 0 {
+			return bi.String(), true
+		}
+	}
+	return "", false
 }
 
 // formatSelectorForLog 返回4字节selector的16进制展示
@@ -2397,6 +2461,23 @@ func (f *CallDataFuzzer) worker(
 				if decoded, err := hexutil.Decode(hookRes.ReturnData); err == nil {
 					simResult.ReturnData = decoded
 				}
+			}
+		}
+
+		// 记录非零 amount 的执行情况，便于确认是否被revert
+		nonZeroAmount := ""
+		if targetMethod != nil && strings.EqualFold(targetMethod.Name, "debond") && len(combo) > 0 {
+			if amtStr, ok := extractNonZeroNumeric(combo[0]); ok {
+				nonZeroAmount = amtStr
+				revertMsg := ""
+				if !simResult.Success {
+					revertMsg = decodeRevertMessage(simResult.ReturnData)
+					if revertMsg == "" && simResult.Error != nil {
+						revertMsg = simResult.Error.Error()
+					}
+				}
+				log.Printf("[Worker %d] 🔍 debond非零amount=%s, success=%v, gas=%d, stateChanges=%d, revert=%s",
+					workerID, nonZeroAmount, simResult.Success, simResult.GasUsed, len(simResult.StateChanges), revertMsg)
 			}
 		}
 
@@ -2653,6 +2734,9 @@ func (f *CallDataFuzzer) worker(
 
 		similarity := bestSim
 
+		// 记录全量尝试（包含低相似度样本）
+		f.recordAttempt(similarity)
+
 		// 记录批次最佳路径（每100个组合汇总一次）
 		if batchTracker != nil {
 			batchTracker.Update(currentCount, similarity, simResult.ContractJumpDests, workerID)
@@ -2755,8 +2839,25 @@ func (f *CallDataFuzzer) worker(
 			// 通过路径相似度检查(以及可选的不变量检查),记录结果
 			atomic.AddInt32(validCount, 1)
 
+			// 记录达标时间点与最高相似度时间
+			elapsed := time.Since(f.stats.StartTime)
+			if atomic.LoadInt64(&f.firstHitAt) == 0 {
+				atomic.CompareAndSwapInt64(&f.firstHitAt, 0, elapsed.Nanoseconds())
+			}
+			for {
+				oldBits := atomic.LoadUint64(&f.maxSimVal)
+				old := math.Float64frombits(oldBits)
+				if similarity <= old {
+					break
+				}
+				if atomic.CompareAndSwapUint64(&f.maxSimVal, oldBits, math.Float64bits(similarity)) {
+					atomic.StoreInt64(&f.maxSimAt, elapsed.Nanoseconds())
+					break
+				}
+			}
+
 			// 创建参数值列表
-			paramValues := f.extractParameterValues(combo, selector)
+			paramValues := f.extractParameterValues(combo, selector, targetMethod)
 
 			// 记录高相似样本用于约束生成
 			if f.constraintCollector != nil && similarity >= f.threshold {
@@ -3226,13 +3327,23 @@ func convertSimulatorStateChanges(in map[string]simulator.StateChange) map[strin
 }
 
 // extractParameterValues 提取参数值
-func (f *CallDataFuzzer) extractParameterValues(combo []interface{}, selector []byte) []ParameterValue {
+func (f *CallDataFuzzer) extractParameterValues(combo []interface{}, selector []byte, method *abi.Method) []ParameterValue {
 	values := make([]ParameterValue, len(combo))
 
 	for i, val := range combo {
+		paramType := f.detectType(val)
+		paramName := ""
+
+		// 优先使用ABI定义的类型/名称，避免数组被识别为unknown
+		if method != nil && i < len(method.Inputs) {
+			paramType = method.Inputs[i].Type.String()
+			paramName = method.Inputs[i].Name
+		}
+
 		values[i] = ParameterValue{
 			Index:   i,
-			Type:    f.detectType(val),
+			Type:    paramType,
+			Name:    paramName,
 			Value:   val,
 			IsRange: false,
 		}
@@ -3844,6 +3955,35 @@ func (f *CallDataFuzzer) InitializeParamPools(poolSize int) error {
 	return nil
 }
 
+// recordAttempt 记录一次组合尝试（包含低相似度样本）
+func (f *CallDataFuzzer) recordAttempt(similarity float64) {
+	f.attemptMu.Lock()
+	defer f.attemptMu.Unlock()
+
+	f.attempts++
+	f.simSum += similarity
+	if f.attempts == 1 || similarity < f.simMin {
+		f.simMin = similarity
+	}
+	if f.attempts == 1 || similarity > f.simMax {
+		f.simMax = similarity
+	}
+
+	// 调试日志：前几次和每100次打印一次
+	if f.attempts <= 5 || f.attempts%100 == 0 {
+		avg := f.simSum / float64(f.attempts)
+		log.Printf("[Fuzzer] 🧮 尝试#%d 相似度=%.4f (阈值=%.4f) 累计统计: avg=%.4f min=%.4f max=%.4f",
+			f.attempts, similarity, f.threshold, avg, f.simMin, f.simMax)
+	}
+}
+
+// getAttemptStats 返回全量尝试统计
+func (f *CallDataFuzzer) getAttemptStats() (attempts int, sum float64, minSim float64, maxSim float64) {
+	f.attemptMu.Lock()
+	defer f.attemptMu.Unlock()
+	return f.attempts, f.simSum, f.simMin, f.simMax
+}
+
 // 应用约束规则到报告（若收集到足够样本）
 func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, contractAddr common.Address, selector []byte) {
 	if report == nil || f.constraintCollector == nil {
@@ -3861,6 +4001,9 @@ func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, cont
 	// 附带表达式约束（ratio/linear）
 	if expr := f.constraintCollector.GetExpressionRule(contractAddr, selector); expr != nil {
 		report.ExpressionRules = append(report.ExpressionRules, *expr)
+		if cost := f.constraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
+			report.ExpressionGenMs = cost
+		}
 	}
 }
 

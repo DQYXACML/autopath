@@ -39,12 +39,12 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "27345345294061825628103022900114978450352795135033401968609844108243198926249",
+            "index": "2",
             "severity": "critical",
             "threshold": 0.25
           },
           "slot_1": {
-            "index": "2",
+            "index": "27345345294061825628103022900114978450352795135033401968609844108243198926249",
             "severity": "critical",
             "threshold": 0.25
           }
@@ -181,7 +181,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -242,7 +242,7 @@
             "value_expr": "address(this)"
           },
           "1": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "0x3e2324342bf5b8a1dca42915f0489497203d640e",
             "danger_threshold": "0x3e2324342bf5b8a1dca42915f0489497203d640e",
             "attack_values": [
@@ -285,7 +285,7 @@
         },
         "debond": {
           "0": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "3794716158774023815168",
             "danger_threshold": "9558478989355222963846",
             "attack_values": [
@@ -302,7 +302,7 @@
             "value_expr": "wBARL.balanceOf(address(this))"
           },
           "1": {
-            "type": "address[]",
+            "type": "uint256",
             "safe_threshold": "0x3e2324342bf5b8a1dca42915f0489497203d640e",
             "danger_threshold": "0x3e2324342bf5b8a1dca42915f0489497203d640e",
             "attack_values": [
@@ -348,20 +348,7 @@
       },
       "attack_seeds": {
         "0": [
-          "0x04c80bb477890f3021f03b068238836ee20aa0b8",
-          "1897358079387011907584",
-          "3415244542896621748224",
-          "3794716158774023815168",
-          "4174187774651426406400",
-          "4779239494677611481923",
-          "4779239494677611675648",
-          "5692074238161035722752",
-          "7589432317548047630336",
-          "8602631090419701645312",
-          "9558478989355222963846",
-          "10514326888290747154432",
-          "14337718484032833978368",
-          "19116957978710445927692"
+          "0x04c80bb477890f3021f03b068238836ee20aa0b8"
         ],
         "1": [
           "0x3e2324342bf5b8a1dca42915f0489497203d640e"

@@ -96,7 +96,8 @@ func NewSeedGenerator(config *SeedConfig, maxVariations int) *SeedGenerator {
 	}
 
 	if len(config.RangeConfig.AddressMutationTypes) == 0 {
-		config.RangeConfig.AddressMutationTypes = []string{"original"}
+		// 默认允许更多离谱的地址变异，避免全部落在同一相似度区间
+		config.RangeConfig.AddressMutationTypes = []string{"original", "bitflip_1", "bitflip_2", "nearby"}
 	}
 
 	// 初始化自适应配置默认值

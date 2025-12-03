@@ -25,6 +25,7 @@ type ConstraintCollector struct {
 	rules     map[string]*ConstraintRule
 	threshold int
 	exprs     map[string]*ExpressionRule
+	exprCost  map[string]int64 // 表达式生成耗时(ms)
 	// lastGenSample 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
 	lastGenSample map[string]int
 }
@@ -38,6 +39,7 @@ func NewConstraintCollector(threshold int) *ConstraintCollector {
 		samples:       make(map[string][]constraintSample),
 		rules:         make(map[string]*ConstraintRule),
 		exprs:         make(map[string]*ExpressionRule),
+		exprCost:      make(map[string]int64),
 		threshold:     threshold,
 		lastGenSample: make(map[string]int),
 	}
@@ -76,7 +78,9 @@ func (cc *ConstraintCollector) RecordSample(
 
 	// 同步生成表达式规则（ratio/linear）
 	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key]); expr != nil {
+		start := time.Now()
 		cc.exprs[key] = expr
+		cc.exprCost[key] = time.Since(start).Milliseconds()
 	}
 
 	// 保留滑动窗口：只保留最近 threshold 条样本，避免缓存无限增长
@@ -105,6 +109,16 @@ func (cc *ConstraintCollector) GetExpressionRule(contract common.Address, select
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 	return cc.exprs[cc.ruleKey(contract, selector)]
+}
+
+// GetExpressionGenCost 获取表达式生成耗时(ms)
+func (cc *ConstraintCollector) GetExpressionGenCost(contract common.Address, selector []byte) int64 {
+	if cc == nil {
+		return 0
+	}
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	return cc.exprCost[cc.ruleKey(contract, selector)]
 }
 
 func (cc *ConstraintCollector) ruleKey(contract common.Address, selector []byte) string {

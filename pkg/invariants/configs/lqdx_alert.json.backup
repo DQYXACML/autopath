@@ -263,7 +263,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -312,7 +312,7 @@
       "constraint_ranges": {
         "startPrank": {
           "0": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -327,7 +327,7 @@
         },
         "deposit": {
           "0": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -340,7 +340,7 @@
             "value_expr": "victim"
           },
           "1": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -353,7 +353,7 @@
             "value_expr": "address(WETH)"
           },
           "2": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -366,7 +366,7 @@
             "value_expr": "address(WETH)"
           },
           "3": {
-            "type": "uint256",
+            "type": "swapPath",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -379,7 +379,7 @@
             "value_expr": "ILiquidXv2Zap.swapPath({path: path})"
           },
           "4": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -392,7 +392,7 @@
             "value_expr": "address(WETH)"
           },
           "5": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -433,7 +433,7 @@
         },
         "swapPath": {
           "0": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -460,16 +460,7 @@
         "step_count": 20,
         "random_within_range_ratio": 0.3
       },
-      "attack_seeds": {
-        "0": [],
-        "1": [],
-        "2": [],
-        "3": [],
-        "4": [],
-        "5": [],
-        "6": [],
-        "7": []
-      }
+      "attack_seeds": {}
     }
   },
   "alert_config": {

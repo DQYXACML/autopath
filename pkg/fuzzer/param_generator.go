@@ -208,11 +208,17 @@ func (g *ParamGenerator) generateAddressVariations(param Parameter) []interface{
 		}
 	}
 
-	// 禁止地址随机化/变异：仅保留原始地址（若无法解析则为零地址）
-	if (original == common.Address{}) {
-		return []interface{}{common.HexToAddress("0x0000000000000000000000000000000000000000")}
+	pool := g.buildAddressPool(original)
+	variations := make([]interface{}, 0, len(pool))
+
+	for _, addr := range pool {
+		variations = append(variations, addr)
+		if len(variations) >= g.maxVariations {
+			break
+		}
 	}
-	return []interface{}{original}
+
+	return variations
 }
 
 // generateBoolVariations 生成布尔值变体
@@ -348,18 +354,30 @@ func (g *ParamGenerator) generateArrayVariations(param Parameter) []interface{} 
 
 	// 地址数组禁止随机化：仅保留原始数组
 	if elementType == "address" {
-		switch v := param.Value.(type) {
-		case []interface{}:
-			return []interface{}{v}
-		case []common.Address:
-			arr := make([]interface{}, len(v))
-			for i, item := range v {
-				arr[i] = item
-			}
-			return []interface{}{arr}
-		default:
-			return []interface{}{[]interface{}{}}
+		addrPool := g.buildAddressPool(common.Address{})
+		base := g.convertAddressArray(param.Value)
+		if len(base) == 0 {
+			base = g.pickAddressArray(addrPool, 1)
 		}
+
+		// 保留原值/基础数组
+		variations = append(variations, base)
+
+		// 空数组
+		variations = append(variations, []interface{}{})
+
+		// 多种长度的极端数组（包含零地址、广播地址、随机地址）
+		lengthOptions := []int{1, 3, 10}
+		if g.strategy.Arrays.MaxElements >= 50 {
+			lengthOptions = append(lengthOptions, 50)
+		}
+		for _, ln := range lengthOptions {
+			if ln <= g.strategy.Arrays.MaxElements {
+				variations = append(variations, g.pickAddressArray(addrPool, ln))
+			}
+		}
+
+		return variations
 	}
 
 	// 空数组
@@ -666,6 +684,82 @@ func (g *ParamGenerator) generateSequentialArray(length int) []interface{} {
 	arr := make([]interface{}, length)
 	for i := 0; i < length; i++ {
 		arr[i] = big.NewInt(int64(i))
+	}
+	return arr
+}
+
+// buildAddressPool 构造包含原值、极端值、随机值的地址池
+func (g *ParamGenerator) buildAddressPool(original common.Address) []common.Address {
+	pool := []common.Address{}
+	seen := make(map[string]bool)
+
+	add := func(addr common.Address) {
+		key := strings.ToLower(addr.Hex())
+		if !seen[key] {
+			seen[key] = true
+			pool = append(pool, addr)
+		}
+	}
+
+	// 原始值优先
+	if (original != common.Address{}) {
+		add(original)
+	}
+
+	// 零地址 & 广播地址
+	add(common.HexToAddress("0x0000000000000000000000000000000000000000"))
+	add(common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff"))
+
+	// 攻击/占位地址
+	add(common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"))
+
+	// 预编译合约（极低地址）
+	if g.strategy.Addresses.IncludePrecompiles {
+		for i := 1; i <= 9; i++ {
+			add(common.BytesToAddress([]byte{byte(i)}))
+		}
+	}
+
+	// 随机地址
+	if g.strategy.Addresses.IncludeRandom {
+		randomCount := g.strategy.Addresses.RandomCount
+		if randomCount <= 0 {
+			randomCount = 3
+		}
+		// 限制数量避免过多
+		randomCount = min(randomCount, 5)
+		for i := 0; i < randomCount; i++ {
+			add(g.generateRandomAddress())
+		}
+	}
+
+	return pool
+}
+
+// convertAddressArray 将各种地址数组转换为 []interface{}
+func (g *ParamGenerator) convertAddressArray(val interface{}) []interface{} {
+	switch v := val.(type) {
+	case []interface{}:
+		return v
+	case []common.Address:
+		arr := make([]interface{}, len(v))
+		for i, item := range v {
+			arr[i] = item
+		}
+		return arr
+	default:
+		return []interface{}{}
+	}
+}
+
+// pickAddressArray 使用地址池构造指定长度的数组（循环取值）
+func (g *ParamGenerator) pickAddressArray(pool []common.Address, length int) []interface{} {
+	if len(pool) == 0 {
+		pool = []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000000")}
+	}
+	arr := make([]interface{}, length)
+	for i := 0; i < length; i++ {
+		arr[i] = pool[i%len(pool)]
 	}
 	return arr
 }

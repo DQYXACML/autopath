@@ -210,7 +210,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -302,7 +302,7 @@
         },
         "debond": {
           "0": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "88163368427964784967680",
             "danger_threshold": "293877894759882629745878",
             "attack_values": [
@@ -319,7 +319,7 @@
             "value_expr": "ppPP.balanceOf(address(this))"
           },
           "1": {
-            "type": "address[]",
+            "type": "uint256",
             "safe_threshold": "0x0000000000000000000000000000000000000000",
             "danger_threshold": "0xffffffffffffffffffffffffffffffffffffffff",
             "attack_values": [
@@ -366,21 +366,7 @@
       },
       "attack_seeds": {
         "0": [
-          "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
-          "44081684213982392483840",
-          "79347031585168306470912",
-          "88163368427964784967680",
-          "88163368427964788923763",
-          "96979705270761263464448",
-          "132245052641947177451520",
-          "146938947379941313871872",
-          "146938947379941314872939",
-          "176326736855929569935360",
-          "264490105283894354903040",
-          "293877894759882629745878",
-          "323265684235870934138880",
-          "440816842139823958392832",
-          "587755789519765259491756"
+          "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31"
         ],
         "2": [
           "44081684213982392483840",

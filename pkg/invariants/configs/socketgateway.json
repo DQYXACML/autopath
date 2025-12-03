@@ -94,7 +94,7 @@
     "threshold": 0.1,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 10,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -142,38 +142,17 @@
       "enabled": true,
       "constraint_ranges": {
         "executeRoute": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "770994056912",
-            "danger_threshold": "2569980189709",
-            "attack_values": [
-              "2569980189709",
-              "770994056912",
-              "1284990094854"
-            ],
-            "range": {
-              "min": "770994056912",
-              "max": "2569980189709"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.5,
-            "value_expr": "routeId"
-          },
           "1": {
-            "type": "uint256",
-            "safe_threshold": "770994056912",
-            "danger_threshold": "2569980189709",
-            "attack_values": [
-              "2569980189709",
-              "770994056912",
-              "1284990094854"
-            ],
+            "type": "bytes",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [],
             "range": {
-              "min": "770994056912",
-              "max": "2569980189709"
+              "min": "0",
+              "max": "0"
             },
             "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.5,
+            "confidence": 0.3,
             "value_expr": "getRouteData(_usdc, targetUser)"
           }
         }
@@ -191,36 +170,7 @@
         "step_count": 20,
         "random_within_range_ratio": 0.3
       },
-      "attack_seeds": {
-        "0": [
-          "385497028456",
-          "693894651220",
-          "770994056912",
-          "848093462603",
-          "1156491085368",
-          "1284990094854",
-          "1541988113824",
-          "2312982170738",
-          "2569980189709",
-          "2826978208679",
-          "3854970284563",
-          "5139960379418"
-        ],
-        "1": [
-          "385497028456",
-          "693894651220",
-          "770994056912",
-          "848093462603",
-          "1156491085368",
-          "1284990094854",
-          "1541988113824",
-          "2312982170738",
-          "2569980189709",
-          "2826978208679",
-          "3854970284563",
-          "5139960379418"
-        ]
-      }
+      "attack_seeds": {}
     }
   },
   "alert_config": {
