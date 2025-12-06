@@ -387,12 +387,12 @@
       "attack_seeds": {
         "10": [
           "0x5443cf63033ab211f205076622b2426b994ce370",
-          "0x725fa18d06acb4f6f8a5b143bca088d76f77d953",
-          "0x739fe72bab59a2eead1e36fdf71441e0407332c5",
-          "0x6b6ddbaaafc5f0580b670ad9d0913ca4c60df275",
           "0x37da521031f0a65dd8466d4def41c44a69796f69",
-          "0x18303ee09818b0575ea4a5c2ed25b1e78523aa2b",
-          "0x0cc266abfa2ba924ffa7dab0cd8f7bb1a14891ec"
+          "0x0cc266abfa2ba924ffa7dab0cd8f7bb1a14891ec",
+          "0x739fe72bab59a2eead1e36fdf71441e0407332c5",
+          "0x725fa18d06acb4f6f8a5b143bca088d76f77d953",
+          "0x6b6ddbaaafc5f0580b670ad9d0913ca4c60df275",
+          "0x18303ee09818b0575ea4a5c2ed25b1e78523aa2b"
         ]
       }
     }

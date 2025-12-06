@@ -281,7 +281,7 @@ forge script test_compilable/MIC_exp/scripts/ExploitLocal.s.sol \
 Monitor 会输出详细的迭代过程:
 
 ```
-[Fuzzer] 🎯 Adaptive iteration mode enabled (max_iterations=5)
+[Fuzzer] Adaptive iteration mode enabled (max_iterations=5)
 
 ========== Iteration 0: Initial Exploration ==========
 [Adaptive] Using fixed seed-based ranges
@@ -311,12 +311,12 @@ Monitor 会输出详细的迭代过程:
 ========== Iteration 3: Adaptive Refinement ==========
 [Adaptive] Analyzing feedback from 65 results...
 [Adaptive] Convergence check: avgChange=0.0156, threshold=0.0200, converged=true
-[Adaptive] ✅ Converged at iteration 3
+[Adaptive] Converged at iteration 3
 
 ========== Adaptive Fuzzing Completed ==========
 [Adaptive] Total iterations: 4, Total valid results: 65
 
-💾 高相似度参数已保存到: ./fuzzing_results/mic_adaptive/high_sim_20250117_153042.json
+ 高相似度参数已保存到: ./fuzzing_results/mic_adaptive/high_sim_20250117_153042.json
 ```
 
 ### 日志解读
@@ -325,7 +325,7 @@ Monitor 会输出详细的迭代过程:
 
 ```
 [Adaptive] Convergence check: avgChange=0.0156, threshold=0.0200, converged=true
-[Adaptive] ✅ Converged at iteration 3
+[Adaptive] Converged at iteration 3
 ```
 - `avgChange=0.0156`: 本轮与上轮的平均相似度变化为 1.56%
 - `threshold=0.0200`: 配置的收敛阈值为 2%
@@ -561,7 +561,7 @@ cat ./fuzzing_results/mic_adaptive/high_sim_*.json | jq '{
 
 ```
 [Adaptive] Iteration 5 completed: 3 new results, total: 45
-[Adaptive] ⚠️ No new valid results in iteration 6, stopping
+[Adaptive] No new valid results in iteration 6, stopping
 ```
 
 **原因**:
@@ -583,7 +583,7 @@ cat ./fuzzing_results/mic_adaptive/high_sim_*.json | jq '{
 
 ```
 [Adaptive] Iteration 0 completed: 0 valid results, total: 0
-[Adaptive] ⚠️ No valid results in initial exploration, stopping adaptive fuzzing
+[Adaptive] No valid results in initial exploration, stopping adaptive fuzzing
 ```
 
 **原因**:
@@ -862,14 +862,14 @@ Layer 2 自适应范围缩放通过以下机制实现显著性能提升:
 4. **智能收敛**: 自动检测收敛避免无效迭代
 
 **适用场景**:
-- ✅ 已知攻击参数（种子值）
-- ✅ 需要深度分析参数空间
-- ✅ 可接受 2-3 倍时间换取 4-5 倍结果
+- 已知攻击参数（种子值）
+- 需要深度分析参数空间
+- 可接受 2-3 倍时间换取 4-5 倍结果
 
 **不适用场景**:
-- ❌ 完全未知的攻击（无种子值）→ 使用 Layer 1
-- ❌ 时间敏感的快速检测 → 使用 Layer 1
-- ❌ 参数超过 10 个的复杂攻击 → 等待 Layer 3-5
+- 完全未知的攻击（无种子值）→ 使用 Layer 1
+- 时间敏感的快速检测 → 使用 Layer 1
+- 参数超过 10 个的复杂攻击 → 等待 Layer 3-5
 
 **下一步**:
 - 在真实攻击场景中验证 Layer 2 效果

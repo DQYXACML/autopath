@@ -253,7 +253,15 @@ func performDryRun(config *fuzzer.Config) {
 
 // printStatistics 打印统计信息
 func printStatistics(report *fuzzer.AttackParameterReport, duration time.Duration) {
+	if report == nil {
+		fmt.Println("=== Fuzzing Results ===")
+		fmt.Println("无报告生成")
+		fmt.Println("=======================")
+		return
+	}
+
 	fmt.Println("\n=== Fuzzing Results ===")
+	fmt.Printf("Function (sig=%s)\n", report.FunctionSig)
 	fmt.Printf("Total Combinations Tested: %d\n", report.TotalCombinations)
 	fmt.Printf("Valid Combinations Found: %d\n", report.ValidCombinations)
 	fmt.Printf("Average Similarity: %.4f\n", report.AverageSimilarity)
@@ -339,6 +347,7 @@ func formatReportAsText(report *fuzzer.AttackParameterReport) string {
 
 	sb.WriteString("Attack Parameter Fuzzing Report\n")
 	sb.WriteString("================================\n\n")
+
 	sb.WriteString(fmt.Sprintf("Contract: %s\n", report.ContractAddress.Hex()))
 	sb.WriteString(fmt.Sprintf("Function: %s\n", report.FunctionSig))
 	sb.WriteString(fmt.Sprintf("Original TX: %s\n", report.OriginalTxHash.Hex()))

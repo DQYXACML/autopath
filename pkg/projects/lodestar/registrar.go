@@ -80,15 +80,15 @@ func resolveAddresses() contractAddresses {
 		if err := json.Unmarshal(data, &deployed); err == nil {
 			if deployed.GlpDepositor != "" {
 				addrs.Depositor = common.HexToAddress(deployed.GlpDepositor)
-				log.Printf("  📍 使用本地 GlpDepositor: %s", deployed.GlpDepositor)
+				log.Printf("   使用本地 GlpDepositor: %s", deployed.GlpDepositor)
 			}
 			if deployed.SGLP != "" {
 				addrs.SGLP = common.HexToAddress(deployed.SGLP)
-				log.Printf("  📍 使用本地 sGLP: %s", deployed.SGLP)
+				log.Printf("   使用本地 sGLP: %s", deployed.SGLP)
 			}
 			if deployed.PlvGLP != "" {
 				addrs.PlvGLP = common.HexToAddress(deployed.PlvGLP)
-				log.Printf("  📍 使用本地 plvGLP: %s", deployed.PlvGLP)
+				log.Printf("   使用本地 plvGLP: %s", deployed.PlvGLP)
 			}
 		}
 	}
@@ -273,7 +273,7 @@ func registerPLVGLPRatio(ctx context.Context, registry *invariants.Registry, add
 		log.Printf("[Invariant] plv-glp-ratio-check | sGLP_balance=%s, plvGLP_totalSupply=%s", sglpBalance.String(), plvglpSupply.String())
 
 		if plvglpSupply.Sign() == 0 {
-			log.Printf("      ⚪ plvGLP供应量为0，跳过检查")
+			log.Printf("       plvGLP供应量为0，跳过检查")
 			return true, nil
 		}
 
@@ -303,7 +303,7 @@ func registerOraclePriceDelta(ctx context.Context, registry *invariants.Registry
 	maxChange := lookup.float("oracle-price-delta", "max_change_percentage", 0.20)
 	oracleAddrStr := lookup.str("oracle-price-delta", "oracle_address", "")
 	if oracleAddrStr == "" {
-		log.Printf("      ⚠️ 未配置 oracle_address，跳过价格波动检测")
+		log.Printf("       未配置 oracle_address，跳过价格波动检测")
 		return
 	}
 	oracleAddr := common.HexToAddress(oracleAddrStr)
@@ -386,7 +386,7 @@ func registerUtilizationRate(ctx context.Context, registry *invariants.Registry,
 			}
 		}
 		if worst > warnUtil {
-			log.Printf("      ⚠️ 利用率接近警告阈值 (%.2f%%)", warnUtil*100)
+			log.Printf("       利用率接近警告阈值 (%.2f%%)", warnUtil*100)
 		}
 		return true, nil
 	})
@@ -406,7 +406,7 @@ func registerBorrowConcentration(registry *invariants.Registry, lookup paramLook
 		}
 		receipt, err := client.TransactionReceipt(context.Background(), state.TxHash)
 		if err != nil {
-			log.Printf("      ⚠️ 获取交易回执失败: %v", err)
+			log.Printf("       获取交易回执失败: %v", err)
 			return true, nil
 		}
 		mset := map[common.Address]bool{}
@@ -475,7 +475,7 @@ func registerRecursiveBorrow(ctx context.Context, registry *invariants.Registry,
 		mkt := strings.ToLower(plvglpMktStr)
 		frame, err := tracer.TraceTransaction(state.TxHash)
 		if err != nil {
-			log.Printf("      ⚠️ 交易追踪失败: %v", err)
+			log.Printf("       交易追踪失败: %v", err)
 			return true, nil
 		}
 		var borrowers []string

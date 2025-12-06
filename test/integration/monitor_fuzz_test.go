@@ -157,7 +157,7 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 
-	cached, _, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
+	cached, cachedReport, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
 	if err != nil {
 		t.Fatalf("process transaction (cached): %v", err)
 	}
@@ -166,6 +166,9 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 	}
 	if cached == nil || !cached.Success {
 		t.Fatalf("cached result mismatch: %+v", cached)
+	}
+	if cachedReport == nil {
+		t.Fatalf("cached reports mismatch: %+v", cachedReport)
 	}
 }
 

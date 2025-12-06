@@ -9,7 +9,7 @@
 
 ## 是否需要更新脚本?
 
-### ✅ 好消息: Monitor 启动命令无需修改
+### 好消息: Monitor 启动命令无需修改
 
 `test-mic-firewall.sh` 中的 Monitor 启动命令完全兼容新功能:
 
@@ -26,7 +26,7 @@
 
 **原因**: 所有新功能都通过配置文件(`mic.json`)启用,命令行参数保持不变。
 
-### 📝 需要更新: 配置文件
+### 需要更新: 配置文件
 
 需要更新 `autopath/pkg/invariants/configs/mic.json` 以启用新功能。
 
@@ -47,7 +47,7 @@ cp autopath/pkg/invariants/configs/mic_layer123.json \
 ```
 
 **新配置包含的改进:**
-1. ✅ Layer 1: 种子驱动配置
+1. Layer 1: 种子驱动配置
    ```json
    "seed_config": {
      "enabled": true,
@@ -56,7 +56,7 @@ cp autopath/pkg/invariants/configs/mic_layer123.json \
    }
    ```
 
-2. ✅ Layer 2: 自适应迭代配置
+2. Layer 2: 自适应迭代配置
    ```json
    "adaptive_config": {
      "enabled": true,
@@ -65,7 +65,7 @@ cp autopath/pkg/invariants/configs/mic_layer123.json \
    }
    ```
 
-3. ✅ Layer 3: 符号执行配置
+3. Layer 3: 符号执行配置
    ```json
    "symbolic_config": {
      "enabled": true,
@@ -183,12 +183,12 @@ Monitor检测攻击
 ### 启用 Layer 3 后的新日志
 
 ```
-[Fuzzer] 🔮 Symbolic execution enabled (mode=lightweight)
+[Fuzzer] Symbolic execution enabled (mode=lightweight)
 [Symbolic] Got trace with 2500 steps
 [Symbolic] Extracted 12 constraints, coverage=85.0%
 [Symbolic] Solved 3 parameter constraints
 [Symbolic] Generated 8 symbolic seeds
-[Fuzzer] 🔮 Applied 8 symbolic seeds to generator
+[Fuzzer] Applied 8 symbolic seeds to generator
 [SeedGen] Param #0: Using 5 symbolic seeds (priority=100)
 [Adaptive] ========== Iteration 0: Initial Exploration ==========
 [Adaptive] Iteration 0 completed: 15 valid results
@@ -206,9 +206,9 @@ Monitor检测攻击
 | Layer 1+2+3(完整) | ~50 | 最优 | ~8s |
 
 **Layer 3 带来的提升:**
-- ✅ 测试效率提升 50%+ (通过精准种子减少无效测试)
-- ✅ 规则覆盖率提升 30%+ (约束分析发现边界case)
-- ✅ 误报率降低 40%+ (基于执行路径的精确分析)
+- 测试效率提升 50%+ (通过精准种子减少无效测试)
+- 规则覆盖率提升 30%+ (约束分析发现边界case)
+- 误报率降低 40%+ (基于执行路径的精确分析)
 
 ## 验证更新
 
@@ -297,20 +297,20 @@ go build -tags z3 -o monitor ./cmd/monitor
 
 ## 总结
 
-### ✅ 脚本无需修改
+### 脚本无需修改
 - Monitor启动命令保持不变
 - 向后兼容性完全保证
 
-### 📝 推荐更新配置
+### 推荐更新配置
 - 使用 `mic_layer123.json` 替换 `mic.json`
 - 或手动添加 `seed_config` 配置块
 
-### 🚀 预期收益
+### 预期收益
 - 测试效率提升 50%+
 - 规则质量提升 30%+
 - 分析时间减少 60%+
 
-### 📊 可选配置级别
+### 可选配置级别
 1. **轻量级**(默认): `strategy: "local"`
 2. **增强级**(需编译): `strategy: "hybrid"`
 3. **完全级**(需编译): `strategy: "z3"`

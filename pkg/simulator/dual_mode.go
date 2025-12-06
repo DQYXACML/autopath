@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -195,7 +196,11 @@ func (s *DualModeSimulator) executeLocal(
 	}
 
 	// 转换结果格式
-	return convertToReplayResult(result), nil
+	protectedAddrs := make([]common.Address, 0, len(mutators))
+	for addr := range mutators {
+		protectedAddrs = append(protectedAddrs, addr)
+	}
+	return convertToReplayResult(result, protectedAddrs), nil
 }
 
 // convertToLocalOverride 转换StateOverride格式
@@ -220,7 +225,7 @@ func convertToLocalOverride(override StateOverride) local.StateOverride {
 }
 
 // convertToReplayResult 转换执行结果格式
-func convertToReplayResult(result *local.ExecutionResult) *ReplayResult {
+func convertToReplayResult(result *local.ExecutionResult, protectedAddrs []common.Address) *ReplayResult {
 	// 转换ContractJumpDests
 	contractJumpDests := make([]ContractJumpDest, len(result.ContractJumpDests))
 	for i, jd := range result.ContractJumpDests {
@@ -234,6 +239,18 @@ func convertToReplayResult(result *local.ExecutionResult) *ReplayResult {
 	jumpDests := make([]uint64, len(result.ContractJumpDests))
 	for i, jd := range result.ContractJumpDests {
 		jumpDests[i] = jd.PC
+	}
+
+	// 若提供受保护地址，则从首个命中位置开始记录路径
+	protectedStart := 0
+	protectedEnd := len(contractJumpDests)
+	if idx := findProtectedStartIndex(contractJumpDests, protectedAddrs); idx >= 0 && idx < len(contractJumpDests) {
+		if idx > 0 {
+			contractJumpDests = contractJumpDests[idx:]
+			jumpDests = jumpDests[idx:]
+		}
+		protectedStart = 0
+		protectedEnd = len(contractJumpDests)
 	}
 
 	// 转换StateChanges
@@ -271,12 +288,28 @@ func convertToReplayResult(result *local.ExecutionResult) *ReplayResult {
 		ReturnData:          common.Bytes2Hex(result.ReturnData),
 		JumpDests:           jumpDests,
 		ContractJumpDests:   contractJumpDests,
-		ProtectedStartIndex: 0,
-		ProtectedEndIndex:   len(contractJumpDests),
+		ProtectedStartIndex: protectedStart,
+		ProtectedEndIndex:   protectedEnd,
 		StateChanges:        stateChanges,
 		Logs:                logs,
 		Error:               result.Error,
 	}
+}
+
+// findProtectedStartIndex 返回首个匹配受保护地址的路径下标，未命中返回-1
+func findProtectedStartIndex(jumps []ContractJumpDest, protectedAddrs []common.Address) int {
+	if len(jumps) == 0 || len(protectedAddrs) == 0 {
+		return -1
+	}
+
+	for i, jd := range jumps {
+		for _, addr := range protectedAddrs {
+			if strings.EqualFold(jd.Contract, strings.ToLower(addr.Hex())) {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // AdaptCallMutator 适配旧版CallMutator到新版CallMutatorV2

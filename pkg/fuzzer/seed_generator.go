@@ -102,10 +102,10 @@ func NewSeedGenerator(config *SeedConfig, maxVariations int) *SeedGenerator {
 
 	// 初始化自适应配置默认值
 	if config.AdaptiveConfig != nil && config.AdaptiveConfig.Enabled {
-		// 🆕 无限制模式：设置极大的迭代次数
+		//  无限制模式：设置极大的迭代次数
 		if config.AdaptiveConfig.UnlimitedMode {
 			config.AdaptiveConfig.MaxIterations = 9999
-			log.Printf("[SeedGen] 🚀 Unlimited mode enabled, max_iterations set to 9999")
+			log.Printf("[SeedGen]  Unlimited mode enabled, max_iterations set to 9999")
 		} else if config.AdaptiveConfig.MaxIterations == 0 {
 			config.AdaptiveConfig.MaxIterations = 5 // 默认5轮迭代
 		}
@@ -228,7 +228,7 @@ func (sg *SeedGenerator) generateParameterVariations(paramIndex int, param Param
 	}
 
 	// 4. 数组类型：不需要特殊处理
-	// ✅ 策略：约束种子已经是正确类型，直接在seedDrivenMutation中处理
+	//  策略：约束种子已经是正确类型，直接在seedDrivenMutation中处理
 	// 不再调用generateArraySeedVariations()，避免创建[]interface{}类型
 
 	// 去重
@@ -251,7 +251,7 @@ func (sg *SeedGenerator) seedDrivenMutation(seeds []interface{}, param Parameter
 
 	for _, seed := range seeds {
 		// 数组类型：直接使用种子，不包装
-		// ✅ 策略：约束种子已经是正确类型（*big.Int, string），让normalizeXXXSlice()去处理
+		//  策略：约束种子已经是正确类型（*big.Int, string），让normalizeXXXSlice()去处理
 		if strings.HasSuffix(param.Type, "[]") {
 			// 直接添加种子值，不调用generateArraySeedVariations()
 			variations = append(variations, seed)
@@ -432,7 +432,7 @@ func (sg *SeedGenerator) generateAddressSeedVariations(seed interface{}, count i
 			// 尝试作为数字解析
 			if bi, ok := new(big.Int).SetString(v, 10); ok {
 				seedAddr = common.BigToAddress(bi)
-				log.Printf("[SeedGen] ⚠️  Converting numeric string to address: %s -> %s (config may have type mismatch)", v, seedAddr.Hex())
+				log.Printf("[SeedGen]   Converting numeric string to address: %s -> %s (config may have type mismatch)", v, seedAddr.Hex())
 			} else {
 				// 作为普通字符串处理
 				seedAddr = common.HexToAddress(v)
@@ -442,12 +442,12 @@ func (sg *SeedGenerator) generateAddressSeedVariations(seed interface{}, count i
 		}
 	case *big.Int:
 		seedAddr = common.BigToAddress(v)
-		log.Printf("[SeedGen] ⚠️  Converting *big.Int to address: %s (config may have type mismatch)", seedAddr.Hex())
+		log.Printf("[SeedGen]   Converting *big.Int to address: %s (config may have type mismatch)", seedAddr.Hex())
 	case []byte:
 		seedAddr = common.BytesToAddress(v)
-		log.Printf("[SeedGen] 📝 Converting bytes to address: %s", seedAddr.Hex())
+		log.Printf("[SeedGen]  Converting bytes to address: %s", seedAddr.Hex())
 	default:
-		log.Printf("[SeedGen] ❌ Unsupported seed type for address variation: %T", seed)
+		log.Printf("[SeedGen]  Unsupported seed type for address variation: %T", seed)
 		return variations
 	}
 
@@ -521,16 +521,16 @@ func (sg *SeedGenerator) generateBytesSeedVariations(seed interface{}, count int
 			seedBytes = []byte(v)
 		}
 	case *big.Int:
-		// ✅ 新增：支持*big.Int转bytes
+		//  新增：支持*big.Int转bytes
 		seedBytes = v.Bytes()
-		log.Printf("[SeedGen] 📝 Converting *big.Int to bytes: 0x%x (length=%d)", seedBytes, len(seedBytes))
+		log.Printf("[SeedGen]  Converting *big.Int to bytes: 0x%x (length=%d)", seedBytes, len(seedBytes))
 	case int, int64, uint64:
-		// ✅ 新增：支持整数转bytes
+		//  新增：支持整数转bytes
 		val64 := reflect.ValueOf(v).Int()
 		seedBytes = big.NewInt(val64).Bytes()
-		log.Printf("[SeedGen] 📝 Converting integer to bytes: 0x%x", seedBytes)
+		log.Printf("[SeedGen]  Converting integer to bytes: 0x%x", seedBytes)
 	default:
-		log.Printf("[SeedGen] ❌ Unsupported seed type for bytes variation: %T", seed)
+		log.Printf("[SeedGen]  Unsupported seed type for bytes variation: %T", seed)
 		return variations
 	}
 
@@ -1348,8 +1348,8 @@ func (sg *SeedGenerator) boundaryBreakthrough(dangerThreshold *big.Int) []interf
 
 // MergeConstraintSeeds 将约束范围中的攻击值合并到AttackSeeds
 // 这样可以利用现有的种子驱动逻辑
-// ✅ 修复：根据参数类型正确转换种子值
-// ✅ 修复：每次调用时清空AttackSeeds，避免不同函数的种子混淆
+//  修复：根据参数类型正确转换种子值
+//  修复：每次调用时清空AttackSeeds，避免不同函数的种子混淆
 func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 	funcRanges := sg.GetConstraintRangeForFunc(funcName)
 	if funcRanges == nil {
@@ -1365,7 +1365,7 @@ func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 
 		paramType := constraintRange.Type
 
-		// ✅ 根据参数类型转换种子
+		//  根据参数类型转换种子
 		switch {
 		case paramType == "address" || strings.HasPrefix(paramType, "address"):
 			// address类型：保持字符串格式，不转换
@@ -1379,7 +1379,7 @@ func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 
 		case paramType == "uint8[]" || paramType == "bytes" || strings.HasSuffix(paramType, "[]"):
 			// 数组/bytes类型：特殊处理
-			// ✅ 策略：保持原始格式（字符串或*big.Int），让normalizeXXXSlice()去处理
+			//  策略：保持原始格式（字符串或*big.Int），让normalizeXXXSlice()去处理
 			for _, attackVal := range constraintRange.AttackValues {
 				// 尝试解析为数字
 				if val, ok := new(big.Int).SetString(attackVal, 10); ok {
@@ -1426,5 +1426,5 @@ func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 		}
 	}
 
-	log.Printf("[ConstraintRange] ✅ Merged constraint seeds for function %s into AttackSeeds", funcName)
+	log.Printf("[ConstraintRange]  Merged constraint seeds for function %s into AttackSeeds", funcName)
 }

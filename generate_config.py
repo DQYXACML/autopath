@@ -97,7 +97,7 @@ def main():
     if deploy_path:
         deploy_path = os.path.normpath(deploy_path)
         if not os.path.exists(deploy_path):
-            print(f"⚠️  未找到部署文件 {deploy_path}，缺失字段将使用空字符串")
+            print(f"  未找到部署文件 {deploy_path}，缺失字段将使用空字符串")
         else:
             mapping.update(load_json_if_exists(deploy_path))
 
@@ -113,7 +113,7 @@ def main():
         json.dump(config, f, indent=2)
 
     contract_count = len(config.get("contracts", []))
-    print(f"✅ 已生成动态配置文件: {output_path}")
+    print(f" 已生成动态配置文件: {output_path}")
     print(f"   合约数量: {contract_count}")
     if contract_count and config.get("contracts"):
         preview = config["contracts"][:min(5, contract_count)]

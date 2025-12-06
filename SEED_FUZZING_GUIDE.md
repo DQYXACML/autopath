@@ -155,7 +155,7 @@ forge script test/MIC/scripts/ExploitLocal.s.sol \
 
 Monitor 日志会显示:
 ```
-[Fuzzer] 🌱 Using seed-driven generation with 2 attack seeds
+[Fuzzer] Using seed-driven generation with 2 attack seeds
 [SeedGen] Param #0: Generated 45 variations (type=uint256)
 [SeedGen] Param #1: Generated 28 variations (type=address)
 [SeedGen] Total combinations generated: 300
@@ -283,7 +283,7 @@ Monitor 日志会显示:
 ### 成功示例
 
 ```
-[Fuzzer] 🌱 Using seed-driven generation with 2 attack seeds
+[Fuzzer] Using seed-driven generation with 2 attack seeds
 [SeedGen] Param #0: Generated 45 variations (type=uint256)
 [SeedGen] Param #1: Generated 28 variations (type=address)
 [SeedGen] Total combinations generated: 300
@@ -291,7 +291,7 @@ Monitor 日志会显示:
 [Fuzzer] Found valid combination #1 with similarity 0.8234 (violations: 1)
 [Fuzzer] Found valid combination #2 with similarity 0.8156 (violations: 1)
 ...
-💾 高相似度参数已保存到: ./fuzzing_results/mic/high_sim_20250117_143052_0xa1b2c3d4.json
+高相似度参数已保存到: ./fuzzing_results/mic/high_sim_20250117_143052_0xa1b2c3d4.json
 ```
 
 ### 问题诊断

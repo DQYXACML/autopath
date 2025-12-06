@@ -362,7 +362,7 @@ var (
 func DetectPackedStorage(value *big.Int) (PackedStorageDetector, bool) {
 	for _, detector := range packedStorageDetectors {
 		if detector.Detect(value) {
-			log.Printf("   [DEBUG]   🔍 检测到 %s packed storage", detector.GetType())
+			log.Printf("   [DEBUG]    检测到 %s packed storage", detector.GetType())
 			return detector, true
 		}
 	}

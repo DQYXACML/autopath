@@ -163,7 +163,7 @@ kill_and_wait() {
     if kill -TERM "$pid" 2>/dev/null; then
         for _ in $(seq 1 $timeout); do
             if ! ps -p "$pid" >/dev/null 2>&1; then
-                echo -e "${GREEN}✓ 已终止 ${name} (PID: ${pid})${NC}"
+                echo -e "${GREEN} 已终止 ${name} (PID: ${pid})${NC}"
                 return 0
             fi
             sleep 1
@@ -249,7 +249,7 @@ if ! ps -p $MONITOR_PID > /dev/null; then
     exit 1
 fi
 
-echo -e "${GREEN}✅ 监控器已成功启动${NC}"
+echo -e "${GREEN} 监控器已成功启动${NC}"
 echo ""
 echo "========================================="
 echo "监控器配置："

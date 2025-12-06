@@ -43,7 +43,7 @@ func NewEVMSimulator(rpcURL string) (*EVMSimulator, error) {
 // NewEVMSimulatorWithClients 使用现有的RPC客户端创建EVM模拟器
 // 这个方法允许复用现有的连接，避免创建多个独立的RPC连接
 func NewEVMSimulatorWithClients(rpcClient *rpc.Client, client *ethclient.Client) *EVMSimulator {
-	fmt.Printf("[Simulator] ✅ 使用共享的RPC客户端创建模拟器（避免创建新连接）\n")
+	fmt.Printf("[Simulator]  使用共享的RPC客户端创建模拟器（避免创建新连接）\n")
 	return &EVMSimulator{
 		client:    client,
 		rpcClient: rpcClient,
@@ -418,7 +418,7 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 
 	var result json.RawMessage
 
-	// 🔍 诊断日志：记录RPC调用详情
+	//  诊断日志：记录RPC调用详情
 	fmt.Printf("[DEBUG Trace] 即将调用debug_traceTransaction:\n")
 	fmt.Printf("  - txHash: %s\n", txHash.Hex())
 	fmt.Printf("  - protectedContract: %s\n", protectedAddr)
@@ -491,7 +491,7 @@ func (s *EVMSimulator) ReplayTransactionWithOverride(
 			strings.Contains(errStr, "unexpected EOF") ||
 			strings.Contains(errStr, "invalid length") {
 			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 
 			paramsFallback := []interface{}{
 				msg,
@@ -517,7 +517,7 @@ func (s *EVMSimulator) ReplayTransactionWithOverride(
 				strings.Contains(errStr, "invalid length") ||
 				strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall")) {
 			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 
 			paramsFallback := []interface{}{
 				msg,
@@ -578,7 +578,7 @@ func (s *EVMSimulator) TraceCallTreeWithOverride(
 			strings.Contains(errStr, "unexpected EOF") ||
 			strings.Contains(errStr, "invalid length") {
 			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 
 			paramsFallback := []interface{}{
 				msg,
@@ -905,7 +905,7 @@ func (s *EVMSimulator) applyOverrideOnChain(ctx context.Context, override StateO
 				if callErr := s.rpcClient.CallContext(ctx, nil, "anvil_setStorageAt", lowerAddr, slotHex, valHex); callErr == nil {
 					setSlots++
 				} else {
-					log.Printf("[Simulator] ⚠️ 写入storage失败 addr=%s slot=%s err=%v", lowerAddr, slotHex, callErr)
+					log.Printf("[Simulator]  写入storage失败 addr=%s slot=%s err=%v", lowerAddr, slotHex, callErr)
 				}
 			}
 		}
@@ -1004,7 +1004,7 @@ func (s *EVMSimulator) SimulateWithCallData(
 				state.balanceAfter = this.formatHex(db.getBalance(log.contract.getAddress()));
 			}
 
-			// 🔧 新增：捕获 CALL 操作的 ETH 转账
+			//  新增：捕获 CALL 操作的 ETH 转账
 			var opName = log.op.toString();
 			if (opName === "CALL" || opName === "CALLCODE") {
 				var callValue = log.stack.peek(2);
@@ -1081,10 +1081,10 @@ func (s *EVMSimulator) SimulateWithCallData(
 				strings.Contains(errStr, "invalid length") ||
 				strings.Contains(errStr, "stateOverrides")) {
 			if override != nil {
-				log.Printf("[Simulator] ⚠️ debug_traceCall 不支持 stateOverride，回退为无覆盖调用 (override账户数=%d, err=%v)", len(override), err)
+				log.Printf("[Simulator]  debug_traceCall 不支持 stateOverride，回退为无覆盖调用 (override账户数=%d, err=%v)", len(override), err)
 				// 尝试直接将 stateOverride 写入本地节点，再以无覆盖方式重放
 				setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-				log.Printf("[Simulator] 🧊 已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+				log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 			}
 			paramsFallback := []interface{}{
 				msg,

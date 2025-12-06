@@ -83,7 +83,7 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 			callOpcodeCount: 0
 		},
 		formatHex: function(value) {
-			// 🔧 修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
+			//  修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
 			var hex;
 			if (typeof value === 'bigint') {
 				hex = "0x" + value.toString(16);
@@ -97,7 +97,7 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 			return "0x" + body.toLowerCase();
 		},
 		formatAddress: function(value) {
-			// 🔧 修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
+			//  修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
 			var hex;
 			if (typeof value === 'bigint') {
 				hex = "0x" + value.toString(16);
@@ -245,7 +245,7 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 				to: to
 			});
 
-			// 🔧 关键修复：在enter回调中捕获对受保护合约的调用
+			//  关键修复：在enter回调中捕获对受保护合约的调用
 			// enter回调会在每次子调用发生时被触发，包括嵌套的子调用
 			if (this.data.debugCalls.length < 50) {
 				this.data.debugCalls.push({
@@ -260,7 +260,7 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 			// 如果调用目标是受保护合约，记录快照
 			if (toLower === this.data.protectedContract) {
 				var value = "0x0";
-				// 🔧 修复: callFrame.getValue() 返回bigint, 需要特殊处理
+				//  修复: callFrame.getValue() 返回bigint, 需要特殊处理
 				try {
 					var rawValue = callFrame.getValue();
 					if (rawValue !== undefined && rawValue !== null) {
@@ -354,13 +354,13 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 		log.Printf("[Snapshot] 调试: stepCount=%d, callOpcodeCount=%d, debugCalls=%d",
 			debugResult.StepCount, debugResult.CallOpcodeCount, len(debugResult.DebugCalls))
 		if debugResult.StepCount == 0 {
-			log.Printf("[Snapshot] 调试: ⚠️  step函数未被调用！tracer可能有语法错误")
+			log.Printf("[Snapshot] 调试:   step函数未被调用！tracer可能有语法错误")
 		}
 		if debugResult.CallOpcodeCount == 0 && debugResult.StepCount > 0 {
-			log.Printf("[Snapshot] 调试: ⚠️  没有发现CALL/STATICCALL/DELEGATECALL指令")
+			log.Printf("[Snapshot] 调试:   没有发现CALL/STATICCALL/DELEGATECALL指令")
 		}
 		if len(debugResult.DebugCalls) == 0 && debugResult.CallOpcodeCount > 0 {
-			log.Printf("[Snapshot] 调试: ⚠️  发现了%d个CALL指令但没有记录debugCalls", debugResult.CallOpcodeCount)
+			log.Printf("[Snapshot] 调试:   发现了%d个CALL指令但没有记录debugCalls", debugResult.CallOpcodeCount)
 			// 打印原始JSON的前1500字符用于调试
 			rawStr := string(result)
 			if len(rawStr) > 1500 {
@@ -388,13 +388,13 @@ func (s *EVMSimulator) ExtractSnapshotForProtectedCall(
 
 	// 选择指定索引的调用
 	if callIndex >= len(traceResult.CallSnapshots) {
-		log.Printf("[Snapshot] ⚠️ callIndex=%d 超出范围，使用最后一次调用 (index=%d)",
+		log.Printf("[Snapshot]  callIndex=%d 超出范围，使用最后一次调用 (index=%d)",
 			callIndex, len(traceResult.CallSnapshots)-1)
 		callIndex = len(traceResult.CallSnapshots) - 1
 	}
 
 	snapshot := &traceResult.CallSnapshots[callIndex]
-	log.Printf("[Snapshot] ✅ 已提取调用时状态快照 (caller=%s, balance=%s, selector=%s, jumpDestIndex=%d)",
+	log.Printf("[Snapshot]  已提取调用时状态快照 (caller=%s, balance=%s, selector=%s, jumpDestIndex=%d)",
 		snapshot.Caller.Hex(), snapshot.CallerBalance, snapshot.Selector, snapshot.JumpDestIndex)
 
 	return snapshot, nil
@@ -426,7 +426,7 @@ func BuildStateOverrideFromSnapshot(
 	// 注入调用者余额
 	if !isZeroHex(snapshot.CallerBalance) {
 		callerOverride.Balance = snapshot.CallerBalance
-		log.Printf("[Snapshot] 📝 注入caller余额: %s = %s", callerAddr, snapshot.CallerBalance)
+		log.Printf("[Snapshot]  注入caller余额: %s = %s", callerAddr, snapshot.CallerBalance)
 	}
 
 	// 注入调用者storage状态
@@ -437,7 +437,7 @@ func BuildStateOverrideFromSnapshot(
 		for slot, value := range snapshot.CallerStorage {
 			callerOverride.State[slot] = value
 		}
-		log.Printf("[Snapshot] 📝 注入caller storage: %d slots", len(snapshot.CallerStorage))
+		log.Printf("[Snapshot]  注入caller storage: %d slots", len(snapshot.CallerStorage))
 	}
 
 	// 同步被调用合约的余额与存储，确保目标合约状态与调用时刻一致
@@ -451,7 +451,7 @@ func BuildStateOverrideFromSnapshot(
 
 		if !isZeroHex(snapshot.CalleeBalance) {
 			calleeOverride.Balance = snapshot.CalleeBalance
-			log.Printf("[Snapshot] 📝 注入callee余额: %s = %s", calleeAddr, snapshot.CalleeBalance)
+			log.Printf("[Snapshot]  注入callee余额: %s = %s", calleeAddr, snapshot.CalleeBalance)
 		}
 
 		if len(snapshot.CalleeStorage) > 0 {
@@ -461,7 +461,7 @@ func BuildStateOverrideFromSnapshot(
 			for slot, value := range snapshot.CalleeStorage {
 				calleeOverride.State[slot] = value
 			}
-			log.Printf("[Snapshot] 📝 注入callee storage: %d slots", len(snapshot.CalleeStorage))
+			log.Printf("[Snapshot]  注入callee storage: %d slots", len(snapshot.CalleeStorage))
 		}
 	}
 
@@ -487,7 +487,7 @@ func (s *EVMSimulator) ExtractAllCallSnapshots(
 			currentStorageCache: {}
 		},
 		formatHex: function(value) {
-			// 🔧 修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
+			//  修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
 			var hex;
 			if (typeof value === 'bigint') {
 				hex = "0x" + value.toString(16);
@@ -501,7 +501,7 @@ func (s *EVMSimulator) ExtractAllCallSnapshots(
 			return "0x" + body.toLowerCase();
 		},
 		formatAddress: function(value) {
-			// 🔧 修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
+			//  修复: 处理bigint类型 (Anvil的stack.peek返回bigint)
 			var hex;
 			if (typeof value === 'bigint') {
 				hex = "0x" + value.toString(16);
@@ -607,7 +607,7 @@ func (s *EVMSimulator) ExtractAllCallSnapshots(
 			// 如果调用目标是受保护合约，记录快照
 			if (toLower === this.data.protectedContract) {
 				var value = "0x0";
-				// 🔧 修复: callFrame.getValue() 返回bigint, 需要特殊处理
+				//  修复: callFrame.getValue() 返回bigint, 需要特殊处理
 				try {
 					var rawValue = callFrame.getValue();
 					if (rawValue !== undefined && rawValue !== null) {

@@ -160,7 +160,7 @@ func (i *CallInterceptor) ClearMutators() {
 func (i *CallInterceptor) HasMutators() bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	return len(i.mutators) > 0
+	return len(i.mutators) > 0 || i.registry != nil
 }
 
 // GetMutator 获取指定地址的mutator
@@ -234,6 +234,25 @@ func (i *CallInterceptor) ProcessCall(
 		// 基线模式下只记录不变异
 		if !i.mutationEnabled {
 			return input, false, nil
+		}
+
+		// 若显式注册了mutator，则优先使用（便于按selector注入预先准备好的变异值）
+		if mutator, ok := i.GetMutator(target); ok {
+			ctx := &CallInterceptContext{
+				OpType:  OpTypeString(opType),
+				Caller:  caller,
+				Target:  target,
+				Value:   value,
+				Input:   input,
+				Gas:     gas,
+				Depth:   depth,
+				StateDB: i.stateDB,
+			}
+			if newInput, modified, err := mutator(ctx); err != nil {
+				return input, false, err
+			} else if modified {
+				return newInput, true, nil
+			}
 		}
 
 		return i.processProtectedCall(opType, caller, target, value, input, gas, depth)

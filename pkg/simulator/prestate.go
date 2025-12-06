@@ -78,7 +78,7 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		}
 	}
 
-	// 🔧 补充本地已部署合约的代码
+	//  补充本地已部署合约的代码
 	// 处理场景：攻击合约通过 anvil_setCode 注入但 prestateTracer 未包含
 	for addr, override := range overrides {
 		if override.Code == "" || override.Code == "0x" {
@@ -87,7 +87,7 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 			if err := s.rpcClient.CallContext(ctx, &localCode, "eth_getCode", addr, "latest"); err == nil {
 				if localCode != "" && localCode != "0x" && len(localCode) > 2 {
 					override.Code = strings.ToLower(localCode)
-					log.Printf("[StateOverride] 🔧 从本地节点补充合约代码: %s (size=%d bytes)",
+					log.Printf("[StateOverride]  从本地节点补充合约代码: %s (size=%d bytes)",
 						addr, (len(localCode)-2)/2)
 				}
 			}
@@ -106,7 +106,7 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 			}
 			totalSlots += len(ov.State)
 		}
-		log.Printf("[StateOverride] ✅ 构造完成 (accounts=%d, slots=%d, withCode=%d)", len(overrides), totalSlots, accountWithCode)
+		log.Printf("[StateOverride]  构造完成 (accounts=%d, slots=%d, withCode=%d)", len(overrides), totalSlots, accountWithCode)
 	}
 
 	return overrides, nil

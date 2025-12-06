@@ -9,10 +9,10 @@
 ### 当前生成器生成的配置
 
 **默认配置** (由 `python3 scripts/tools/firewall_integration_cli.py batch` 生成):
-- ✅ 包含基础 `fuzzing_config`
-- ✅ 包含 `seed_config` 结构（但 `enabled: false`）
-- ❌ **不包含** `adaptive_config`（Layer 2）
-- 📝 `attack_seeds` 为空，需要手动填充
+- 包含基础 `fuzzing_config`
+- 包含 `seed_config` 结构（但 `enabled: false`）
+- **不包含** `adaptive_config`（Layer 2）
+- `attack_seeds` 为空，需要手动填充
 
 ### 手动配置文件
 
@@ -217,9 +217,9 @@ cast abi-decode "functionName(uint256,address)" <calldata>
 ### template_generator.py
 
 **修改内容**:
-- ✅ `_generate_fuzzing_config()`: 添加 `seed_config` 结构
-- ✅ 新增 `_generate_fuzzing_config_with_adaptive()`: Layer 2 配置生成
-- ✅ 更新默认阈值: `threshold: 0.7`, `max_variations: 300`
+- `_generate_fuzzing_config()`: 添加 `seed_config` 结构
+- 新增 `_generate_fuzzing_config_with_adaptive()`: Layer 2 配置生成
+- 更新默认阈值: `threshold: 0.7`, `max_variations: 300`
 
 **行数**: +55 行
 
@@ -298,10 +298,10 @@ Layer 2 配置 (<protocol>_adaptive.json)
 ## 总结
 
 **当前状态**:
-- ✅ 生成器已支持生成 Layer 1 配置结构
-- ✅ 提供了 `_generate_fuzzing_config_with_adaptive()` 用于未来集成
-- ⚠️ `attack_seeds` 仍需手动从攻击交易中提取
-- ⚠️ `adaptive_config` 需要手动添加（或复制示例）
+- 生成器已支持生成 Layer 1 配置结构
+- 提供了 `_generate_fuzzing_config_with_adaptive()` 用于未来集成
+- `attack_seeds` 仍需手动从攻击交易中提取
+- `adaptive_config` 需要手动添加（或复制示例）
 
 **建议使用方式**:
 1. 对于大多数场景：使用生成的基础配置 + 手动添加种子

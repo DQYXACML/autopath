@@ -155,7 +155,7 @@ def main() -> int:
         protocol_list = collect_protocols(args.filter)
 
     if not protocol_list:
-        print("⚠️  未找到任何协议，请检查过滤条件")
+        print("  未找到任何协议，请检查过滤条件")
         return 1
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
@@ -183,13 +183,13 @@ def main() -> int:
 
         if not template_path.exists():
             if not args.quiet:
-                print(f"❌ 跳过 {protocol}：未找到模板 {template_path}")
+                print(f" 跳过 {protocol}：未找到模板 {template_path}")
             failed += 1
             continue
 
         if output_path.exists() and not args.force:
             if not args.quiet:
-                print(f"⏭  已存在，跳过 {output_path}")
+                print(f"  已存在，跳过 {output_path}")
             skipped += 1
             continue
 
@@ -208,7 +208,7 @@ def main() -> int:
             continue
 
         if not args.quiet:
-            print("▶  生成配置:", " ".join(cmd))
+            print("  生成配置:", " ".join(cmd))
 
         result = subprocess.run(cmd, cwd=PROJECT_ROOT)
         if result.returncode == 0:

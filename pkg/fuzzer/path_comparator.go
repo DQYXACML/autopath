@@ -329,7 +329,7 @@ func (p *PathComparator) cosineSimilarity(seq1, seq2 []uint64) float64 {
 
 // CompareContractJumpDests 比较带合约地址的 JUMPDEST 序列
 // 从受保护合约开始的索引截取后比较
-// 🔧 修复：当LCS相似度较低时，自动切换到Jaccard相似度（适用于循环场景）
+//  修复：当LCS相似度较低时，自动切换到Jaccard相似度（适用于循环场景）
 func (p *PathComparator) CompareContractJumpDests(
 	original, variant []ContractJumpDest,
 	startIndex int,
@@ -361,7 +361,7 @@ func (p *PathComparator) CompareContractJumpDests(
 	// Dice 系数
 	diceSimilarity := (2.0 * float64(lcsLength)) / float64(len(origSlice)+len(varSlice))
 
-	// 🔧 循环场景优化：当Dice相似度较低时，尝试使用Jaccard相似度
+	//  循环场景优化：当Dice相似度较低时，尝试使用Jaccard相似度
 	// Jaccard忽略顺序，只关注是否访问了相同的JUMPDEST
 	// 这对于循环攻击很有用，因为单次调用的PC序列与多次循环的PC序列顺序不同
 	if diceSimilarity < 0.3 {

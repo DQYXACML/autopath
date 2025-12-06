@@ -23,7 +23,7 @@ func ConvertFuzzingConfig(jsonConfig *FuzzingConfigJSON, projectID string) *moni
 		}
 	}
 
-	// 🆕 转换SeedConfig
+	//  转换SeedConfig
 	var seedCfg *fuzzer.SeedConfig
 	if jsonConfig.SeedConfig != nil {
 		seedCfg = convertSeedConfig(jsonConfig.SeedConfig)
@@ -51,18 +51,18 @@ func ConvertFuzzingConfig(jsonConfig *FuzzingConfigJSON, projectID string) *moni
 		PrintRealtime:        jsonConfig.PrintRealtime,
 		InvariantCheck:       invariantCfg,
 
-		// 🆕 Unlimited fuzzing配置
+		//  Unlimited fuzzing配置
 		UnlimitedMode:     jsonConfig.UnlimitedMode,
 		TargetSimilarity:  jsonConfig.TargetSimilarity,
 		MaxHighSimResults: jsonConfig.MaxHighSimResults,
 
-		// 🆕 Seed配置
+		//  Seed配置
 		SeedConfig: seedCfg,
 
 		// Entry Call 限制
 		EntryCallProtectedOnly: jsonConfig.EntryCallProtectedOnly,
 
-		// 🆕 本地执行模式
+		//  本地执行模式
 		LocalExecution: jsonConfig.LocalExecution,
 
 		// 项目标识

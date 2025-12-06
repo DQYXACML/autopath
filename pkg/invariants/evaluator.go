@@ -48,7 +48,7 @@ func (e *Evaluator) EvaluateProject(projectID string, state *ChainState) []Viola
 		if !passed {
 			if !isSimulated {
 				// 真实交易: 打印详细违规信息
-				log.Printf("   ❌ 不变量触发: %s (%s)", inv.Name, inv.ID)
+				log.Printf("    不变量触发: %s (%s)", inv.Name, inv.ID)
 				if detail != nil {
 					log.Printf("      详情: %s", detail.Message)
 					if detail.ActualValue != nil {
@@ -71,9 +71,9 @@ func (e *Evaluator) EvaluateProject(projectID string, state *ChainState) []Viola
 	if !isSimulated {
 		// 真实交易: 打印评估结果
 		if len(violations) > 0 {
-			log.Printf("\n❌ 评估完成: 发现 %d 个违规", len(violations))
+			log.Printf("\n 评估完成: 发现 %d 个违规", len(violations))
 		} else {
-			log.Printf("\n✅ 评估完成: 所有不变量检查通过")
+			log.Printf("\n 评估完成: 所有不变量检查通过")
 		}
 	}
 
@@ -358,7 +358,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 								beforeBig := beforeVal.Big()
 								afterBig := afterVal.Big()
 
-								// ✅ 修复：对于零值，使用绝对值阈值检测
+								//  修复：对于零值，使用绝对值阈值检测
 								if beforeBig.Cmp(big.NewInt(0)) == 0 {
 									// 从0变化到非零：检查绝对值是否显著
 									// 使用一个合理的绝对值阈值（如 1e18，即1个ETH/Token单位）
@@ -367,7 +367,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 									if afterBig.Cmp(absThreshold) > 0 {
 										// 从0变化到显著的非零值，判定为违规
 										if !isSimulated {
-											log.Printf("   [DEBUG]   [Fallback] ❌ 检测到违规！slot %s从0变化到%s (>= 1e18阈值)",
+											log.Printf("   [DEBUG]   [Fallback]  检测到违规！slot %s从0变化到%s (>= 1e18阈值)",
 												slot.Hex(), afterBig.String())
 										}
 										return false, &ViolationDetail{
@@ -405,7 +405,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 								threshold := params.Threshold
 								if changeRate > threshold {
 									if !isSimulated {
-										log.Printf("   [DEBUG]   [Fallback] ❌ 检测到违规！slot %s 变化率 %.2f%% > 阈值 %.2f%%",
+										log.Printf("   [DEBUG]   [Fallback]  检测到违规！slot %s 变化率 %.2f%% > 阈值 %.2f%%",
 											slot.Hex(), changeRate*100, threshold*100)
 									}
 									return false, &ViolationDetail{
@@ -498,13 +498,13 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 
 						if !passed {
 							if !isSimulated {
-								log.Printf("   [DEBUG]     ❌ Packed storage检测到违规！")
+								log.Printf("   [DEBUG]      Packed storage检测到违规！")
 							}
 							return false, violation
 						}
 
 						if !isSimulated {
-							log.Printf("   [DEBUG]     ✅ Packed storage变化在阈值内")
+							log.Printf("   [DEBUG]      Packed storage变化在阈值内")
 						}
 						continue // 跳过下面的普通检测逻辑
 					}
@@ -528,7 +528,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 					// 检查是否超过阈值
 					if changeRate > threshold {
 						if !isSimulated {
-							log.Printf("   [DEBUG]     ❌ 检测到违规！变化率 %.2f%% > 阈值 %.2f%%", changeRate*100, threshold*100)
+							log.Printf("   [DEBUG]      检测到违规！变化率 %.2f%% > 阈值 %.2f%%", changeRate*100, threshold*100)
 						}
 						return false, &ViolationDetail{
 							Message: fmt.Sprintf("Storage slot %s of contract %s changed by %.2f%% (threshold: %.2f%%)",
@@ -548,7 +548,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 						}
 					} else {
 						if !isSimulated {
-							log.Printf("   [DEBUG]     ✅ 变化在阈值内")
+							log.Printf("   [DEBUG]      变化在阈值内")
 						}
 					}
 				} else {
@@ -559,7 +559,7 @@ func CreateFlashChangePreventionEvaluator(inv *Invariant) EvaluatorFunc {
 					if afterBig.Cmp(big.NewInt(0)) == 0 && beforeBig != nil && beforeBig.Cmp(big.NewInt(0)) > 0 {
 						// 值被清零可能表明资金被完全提取
 						if !isSimulated {
-							log.Printf("   [DEBUG]     ❌ 检测到违规！存储槽被清零")
+							log.Printf("   [DEBUG]      检测到违规！存储槽被清零")
 						}
 						return false, &ViolationDetail{
 							Message: fmt.Sprintf("Storage slot %s of contract %s was drained to zero",

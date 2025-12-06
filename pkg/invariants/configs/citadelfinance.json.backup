@@ -37,9 +37,9 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "10",
+            "index": "91341111320988850249033797726122639103019632627138462152359636574553610560903",
             "severity": "critical",
-            "threshold": 0.25
+            "threshold": 0.1
           }
         },
         "formula": "abs(value_after - value_before) / value_before <= 0.1"

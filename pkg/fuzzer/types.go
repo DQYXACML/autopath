@@ -266,7 +266,7 @@ type Config struct {
 	// 种子驱动模糊测试配置（新增）
 	SeedConfig *SeedConfig `yaml:"seed_config"`
 
-	// 🆕 无限制fuzzing模式配置
+	//  无限制fuzzing模式配置
 	TargetSimilarity  float64 `yaml:"target_similarity"`    // 目标相似度阈值（如0.95），达到后可停止
 	MaxHighSimResults int     `yaml:"max_high_sim_results"` // 找到N个高相似度结果后停止（0=不限制）
 	UnlimitedMode     bool    `yaml:"unlimited_mode"`       // 无限制模式：忽略迭代次数限制
@@ -274,10 +274,10 @@ type Config struct {
 	// Entry Call 限制
 	EntryCallProtectedOnly bool `yaml:"entry_call_protected_only"` // 仅对受保护合约启用Entry模式
 
-	// 🆕 本地执行模式配置
+	//  本地执行模式配置
 	LocalExecution bool `yaml:"local_execution"` // 使用本地EVM执行替代RPC调用
 
-	// 🆕 新架构开关（配合本地执行）
+	//  新架构开关（配合本地执行）
 	EnableNewArch bool `yaml:"enable_new_arch" json:"enable_new_arch"`
 }
 
@@ -393,7 +393,7 @@ type AdaptiveRangeConfig struct {
 	MaxIterations   int              `yaml:"max_iterations" json:"max_iterations"`     // 最大迭代轮数(建议3-5)
 	ConvergenceRate float64          `yaml:"convergence_rate" json:"convergence_rate"` // 收敛阈值(默认0.02)
 	RangeStrategies map[string][]int `yaml:"range_strategies" json:"range_strategies"` // 分层范围策略
-	UnlimitedMode   bool             `yaml:"unlimited_mode" json:"unlimited_mode"`     // 🆕 无限制模式：忽略迭代次数限制
+	UnlimitedMode   bool             `yaml:"unlimited_mode" json:"unlimited_mode"`     //  无限制模式：忽略迭代次数限制
 
 	// Layer 2: 高级配置（可选）
 	ZoneThreshold      float64 `yaml:"zone_threshold" json:"zone_threshold"`             // 高相似度区域识别阈值(默认0.75)

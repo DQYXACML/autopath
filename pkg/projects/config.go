@@ -28,18 +28,18 @@ type FuzzingConfigJSON struct {
 	ProjectID            string              `json:"project_id"`
 	InvariantCheck       *InvariantCheckJSON `json:"invariant_check"`
 
-	// 🆕 Unlimited fuzzing模式配置
+	//  Unlimited fuzzing模式配置
 	UnlimitedMode     bool    `json:"unlimited_mode"`       // 无限制fuzzing模式
 	TargetSimilarity  float64 `json:"target_similarity"`    // 目标相似度阈值
 	MaxHighSimResults int     `json:"max_high_sim_results"` // 最大高相似度结果数
 
-	// 🆕 Seed-driven fuzzing配置
+	//  Seed-driven fuzzing配置
 	SeedConfig *SeedConfigJSON `json:"seed_config"` // 种子配置
 
 	// Entry Call 限制
 	EntryCallProtectedOnly bool `json:"entry_call_protected_only"`
 
-	// 🆕 本地执行模式
+	//  本地执行模式
 	LocalExecution bool `json:"local_execution"` // 使用本地EVM执行替代RPC调用
 }
 

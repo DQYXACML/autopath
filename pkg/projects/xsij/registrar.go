@@ -26,11 +26,11 @@ func init() {
 // Register 将 XSIJ 专属不变量注册到 Registry
 func Register(ctx context.Context, deps projects.Dependencies) error {
 	if deps.Registry == nil || deps.Config == nil {
-		log.Printf("⚠️  XSIJ Register: Missing dependencies, skipping")
+		log.Printf("  XSIJ Register: Missing dependencies, skipping")
 		return nil
 	}
 
-	log.Printf("🔧 Registering XSIJ-specific invariant evaluators...")
+	log.Printf(" Registering XSIJ-specific invariant evaluators...")
 
 	// SINV_001: PancakePair XSIJ balance 操纵检测
 	deps.Registry.RegisterEvaluator("SINV_001", func(state *invariants.ChainState) (bool, *invariants.ViolationDetail) {
@@ -47,7 +47,7 @@ func Register(ctx context.Context, deps projects.Dependencies) error {
 		return checkLoopTransferAttack(state, deps)
 	})
 
-	log.Printf("✅ XSIJ invariant evaluators registered")
+	log.Printf(" XSIJ invariant evaluators registered")
 	return nil
 }
 
@@ -64,11 +64,11 @@ func checkPairBalanceManipulation(state *invariants.ChainState, deps projects.De
 
 	pairState, exists := state.States[PancakePairAddr]
 	if !exists {
-		log.Printf("[SINV_001] ⚠️  PancakePair状态不存在，跳过检查")
+		log.Printf("[SINV_001]   PancakePair状态不存在，跳过检查")
 		return true, nil
 	}
 
-	log.Printf("[SINV_001] ✓ 找到PancakePair状态，包含 %d 个storage slots", len(pairState.Storage))
+	log.Printf("[SINV_001]  找到PancakePair状态，包含 %d 个storage slots", len(pairState.Storage))
 
 	// 打印所有storage slots
 	if len(pairState.Storage) > 0 {
@@ -78,19 +78,19 @@ func checkPairBalanceManipulation(state *invariants.ChainState, deps projects.De
 			log.Printf("[SINV_001]   Slot %d: %s", slotNum, value.Hex())
 		}
 	} else {
-		log.Printf("[SINV_001] ⚠️  Storage为空！")
+		log.Printf("[SINV_001]   Storage为空！")
 	}
 
 	// 读取 reserves slot (slot 8 in Uniswap V2 Pair)
 	reservesSlot := common.BigToHash(big.NewInt(8))
 	reservesData, exists := pairState.Storage[reservesSlot]
 	if !exists {
-		log.Printf("[SINV_001] ⚠️  Slot 8 (reserves) 不存在，跳过检查")
+		log.Printf("[SINV_001]   Slot 8 (reserves) 不存在，跳过检查")
 		log.Printf("[SINV_001] 这可能是因为: 1) reserves为零值被过滤 2) storage读取失败")
 		return true, nil
 	}
 
-	log.Printf("[SINV_001] ✓ Slot 8 (reserves) 原始值: %s", reservesData.Hex())
+	log.Printf("[SINV_001]  Slot 8 (reserves) 原始值: %s", reservesData.Hex())
 
 	// Uniswap V2 Pair slot 8 存储：reserve0 (112 bits) | reserve1 (112 bits) | blockTimestampLast (32 bits)
 	// 解析 reserve0 和 reserve1
@@ -114,7 +114,7 @@ func checkPairBalanceManipulation(state *invariants.ChainState, deps projects.De
 	// 假设 token0 是 XSIJ (需要验证)
 	// 如果 reserve < threshold，认为被操纵
 	if reserve0.Cmp(threshold) < 0 || reserve1.Cmp(threshold) < 0 {
-		log.Printf("[SINV_001] 🚨 检测到违规！reserve异常低")
+		log.Printf("[SINV_001]  检测到违规！reserve异常低")
 		return false, &invariants.ViolationDetail{
 			Message:       "PancakePair XSIJ balance异常低，疑似被操纵攻击",
 			ActualValue:   reservesData.Hex(),
@@ -127,7 +127,7 @@ func checkPairBalanceManipulation(state *invariants.ChainState, deps projects.De
 		}
 	}
 
-	log.Printf("[SINV_001] ✓ 检查通过，reserves正常")
+	log.Printf("[SINV_001]  检查通过，reserves正常")
 	return true, nil
 }
 
@@ -137,7 +137,7 @@ func checkPairReservesAnomaly(state *invariants.ChainState, deps projects.Depend
 
 	pairState, exists := state.States[PancakePairAddr]
 	if !exists {
-		log.Printf("[SINV_002] ⚠️  PancakePair状态不存在，跳过检查")
+		log.Printf("[SINV_002]   PancakePair状态不存在，跳过检查")
 		return true, nil
 	}
 
@@ -145,7 +145,7 @@ func checkPairReservesAnomaly(state *invariants.ChainState, deps projects.Depend
 	reservesSlot := common.BigToHash(big.NewInt(8))
 	currentReserves, exists := pairState.Storage[reservesSlot]
 	if !exists {
-		log.Printf("[SINV_002] ⚠️  Slot 8 (reserves) 不存在，跳过检查")
+		log.Printf("[SINV_002]   Slot 8 (reserves) 不存在，跳过检查")
 		return true, nil
 	}
 
@@ -173,7 +173,7 @@ func checkPairReservesAnomaly(state *invariants.ChainState, deps projects.Depend
 
 		// 如果 ratio < 1 或 > 10000 (假设正常范围是 1:1000 到 1000:1)
 		if ratio.Cmp(big.NewInt(1)) < 0 || ratio.Cmp(big.NewInt(10000)) > 0 {
-			log.Printf("[SINV_002] 🚨 检测到违规！比率异常")
+			log.Printf("[SINV_002]  检测到违规！比率异常")
 			return false, &invariants.ViolationDetail{
 				Message:       "PancakePair reserves 比率异常，疑似价格操纵",
 				ActualValue:   ratio.String(),
@@ -186,10 +186,10 @@ func checkPairReservesAnomaly(state *invariants.ChainState, deps projects.Depend
 			}
 		}
 	} else {
-		log.Printf("[SINV_002] ⚠️  reserve0或reserve1为0，无法计算比率")
+		log.Printf("[SINV_002]   reserve0或reserve1为0，无法计算比率")
 	}
 
-	log.Printf("[SINV_002] ✓ 检查通过，比率正常")
+	log.Printf("[SINV_002]  检查通过，比率正常")
 	return true, nil
 }
 
@@ -205,7 +205,7 @@ func checkLoopTransferAttack(state *invariants.ChainState, deps projects.Depende
 
 	xsijState, exists := state.States[XSIJTokenAddr]
 	if !exists {
-		log.Printf("[SINV_003] ⚠️  XSIJ Token状态不存在，跳过检查")
+		log.Printf("[SINV_003]   XSIJ Token状态不存在，跳过检查")
 		return true, nil
 	}
 
@@ -214,7 +214,7 @@ func checkLoopTransferAttack(state *invariants.ChainState, deps projects.Depende
 	// TODO: 增强 Monitor 的 trace 分析能力
 	_ = xsijState
 
-	log.Printf("[SINV_003] ⚠️  循环转账检测需要trace数据，当前未实现")
-	log.Printf("[SINV_003] ✓ 跳过检查（SINV_001和SINV_002已覆盖检测）")
+	log.Printf("[SINV_003]   循环转账检测需要trace数据，当前未实现")
+	log.Printf("[SINV_003]  跳过检查（SINV_001和SINV_002已覆盖检测）")
 	return true, nil
 }
