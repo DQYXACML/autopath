@@ -1474,7 +1474,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, f.timeout)
 		defer cancel()
-	log.Printf("[Fuzzer] 计时 整轮Fuzz时间预算: %v", f.timeout)
+		log.Printf("[Fuzzer] 计时 整轮Fuzz时间预算: %v", f.timeout)
 	}
 
 	// 步骤1: 获取原始交易信息和执行路径（传入受保护合约地址）
@@ -2063,7 +2063,7 @@ func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common
 					interceptor.SetMutationEnabled(false)
 				}
 
-				localRes, localErr := localSim.ReplayTransactionLocal(ctx, tx, blockNumber, override)
+				localRes, localErr := localSim.ReplayTransactionLocal(ctx, tx, blockNumber, override, contractAddr)
 
 				if interceptor != nil {
 					interceptor.SetMutationEnabled(true)

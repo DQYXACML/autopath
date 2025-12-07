@@ -26,6 +26,9 @@ type LocalEVMExecutor struct {
 	// JumpTable Hook
 	jumpTableHook *HookedJumpTable
 
+	// 受保护合约（用于控制从何时开始记录路径）
+	protectedAddrs []common.Address
+
 	// 是否启用Hook
 	enableHook bool
 }
@@ -69,6 +72,11 @@ func (e *LocalEVMExecutor) SetMutationEnabled(enable bool) {
 	if e.interceptor != nil {
 		e.interceptor.SetMutationEnabled(enable)
 	}
+}
+
+// SetProtectedAddresses 配置受保护合约列表，用于控制何时开始记录执行路径
+func (e *LocalEVMExecutor) SetProtectedAddresses(addrs []common.Address) {
+	e.protectedAddrs = addrs
 }
 
 // ResetProtectedTracking 重置首个受保护调用记录
@@ -122,7 +130,7 @@ func (e *LocalEVMExecutor) Execute(
 	e.interceptor.Reset()
 
 	// 3. 重置收集器
-	e.collector.Reset()
+	e.collector.ResetWithProtected(e.protectedAddrs)
 
 	// 4. 创建EVM
 	blockCtx := e.buildBlockContext()

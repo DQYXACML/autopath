@@ -110,6 +110,7 @@ func (s *DualModeSimulator) ReplayTransactionLocal(
 	tx *types.Transaction,
 	blockNumber uint64,
 	override StateOverride,
+	protectedContract common.Address,
 ) (*ReplayResult, error) {
 	if s.localExecutor == nil {
 		return nil, fmt.Errorf("local executor not initialized")
@@ -146,7 +147,12 @@ func (s *DualModeSimulator) ReplayTransactionLocal(
 	// 强制使用本地模式
 	s.SetExecutionMode(ModeLocal)
 
-	return s.executeLocal(ctx, from, to, callData, value, override, nil)
+	protected := []common.Address{}
+	if protectedContract != (common.Address{}) {
+		protected = append(protected, protectedContract)
+	}
+
+	return s.executeLocal(ctx, from, to, callData, value, blockNumber, override, nil, protected)
 }
 
 // SimulateWithCallDataV2 支持双模式的模拟执行
@@ -162,7 +168,7 @@ func (s *DualModeSimulator) SimulateWithCallDataV2(
 ) (*ReplayResult, error) {
 	// 如果有mutators，使用本地执行
 	if len(mutators) > 0 || s.mode == ModeLocal {
-		return s.executeLocal(ctx, from, to, callData, value, override, mutators)
+		return s.executeLocal(ctx, from, to, callData, value, blockNumber, override, mutators, nil)
 	}
 
 	// 否则使用RPC执行
@@ -175,11 +181,30 @@ func (s *DualModeSimulator) executeLocal(
 	from, to common.Address,
 	callData []byte,
 	value *big.Int,
+	blockNumber uint64,
 	override StateOverride,
 	mutators map[common.Address]local.CallMutatorV2,
+	protectedAddrs []common.Address,
 ) (*ReplayResult, error) {
 	// 转换StateOverride格式
 	localOverride := convertToLocalOverride(override)
+
+	// 计算受保护合约集合（mutators + 显式指定）
+	effectiveProtected := mergeProtectedAddrs(mutators, protectedAddrs)
+
+	// 配置块高度，保证与原始攻击交易一致
+	if blockNumber > 0 {
+		cfg := s.localExecutor.GetConfig()
+		if cfg == nil {
+			cfg = local.DefaultExecutionConfig()
+		}
+		cfgCopy := *cfg
+		cfgCopy.BlockNumber = big.NewInt(int64(blockNumber))
+		s.localExecutor.SetConfig(&cfgCopy)
+	}
+
+	// 预先配置受保护合约，命中前不记录路径
+	s.localExecutor.SetProtectedAddresses(effectiveProtected)
 
 	// 执行
 	var result *local.ExecutionResult
@@ -196,11 +221,7 @@ func (s *DualModeSimulator) executeLocal(
 	}
 
 	// 转换结果格式
-	protectedAddrs := make([]common.Address, 0, len(mutators))
-	for addr := range mutators {
-		protectedAddrs = append(protectedAddrs, addr)
-	}
-	return convertToReplayResult(result, protectedAddrs), nil
+	return convertToReplayResult(result, effectiveProtected), nil
 }
 
 // convertToLocalOverride 转换StateOverride格式
@@ -222,6 +243,33 @@ func convertToLocalOverride(override StateOverride) local.StateOverride {
 		}
 	}
 	return localOverride
+}
+
+// mergeProtectedAddrs 合并显式指定的受保护地址和mutators中的目标地址
+func mergeProtectedAddrs(mutators map[common.Address]local.CallMutatorV2, extra []common.Address) []common.Address {
+	if len(mutators) == 0 && len(extra) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]common.Address)
+	for _, addr := range extra {
+		if addr == (common.Address{}) {
+			continue
+		}
+		seen[strings.ToLower(addr.Hex())] = addr
+	}
+	for addr := range mutators {
+		if addr == (common.Address{}) {
+			continue
+		}
+		seen[strings.ToLower(addr.Hex())] = addr
+	}
+
+	merged := make([]common.Address, 0, len(seen))
+	for _, addr := range seen {
+		merged = append(merged, addr)
+	}
+	return merged
 }
 
 // convertToReplayResult 转换执行结果格式
