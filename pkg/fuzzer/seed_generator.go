@@ -358,6 +358,18 @@ func (sg *SeedGenerator) generateNumericSeedVariations(seed interface{}, count i
 	// 转换种子为 *big.Int
 	var seedValue *big.Int
 	switch v := seed.(type) {
+	case []interface{}:
+		// 兼容数组写法（取首个可解析元素）
+		for _, item := range v {
+			if bi := normalizeBigInt(item); bi != nil {
+				seedValue = bi
+				break
+			}
+		}
+		if seedValue == nil {
+			log.Printf("[SeedGen] Unsupported seed type for numeric variation: %T", seed)
+			return variations
+		}
 	case *big.Int:
 		seedValue = new(big.Int).Set(v)
 	case int64:
@@ -1348,8 +1360,9 @@ func (sg *SeedGenerator) boundaryBreakthrough(dangerThreshold *big.Int) []interf
 
 // MergeConstraintSeeds 将约束范围中的攻击值合并到AttackSeeds
 // 这样可以利用现有的种子驱动逻辑
-//  修复：根据参数类型正确转换种子值
-//  修复：每次调用时清空AttackSeeds，避免不同函数的种子混淆
+//
+//	修复：根据参数类型正确转换种子值
+//	修复：每次调用时清空AttackSeeds，避免不同函数的种子混淆
 func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 	funcRanges := sg.GetConstraintRangeForFunc(funcName)
 	if funcRanges == nil {

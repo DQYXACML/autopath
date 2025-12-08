@@ -46,6 +46,7 @@ func DefaultStrategyConfig() *StrategyConfig {
 			IncludeZero:        true,
 			IncludeRandom:      true,
 			RandomCount:        10,
+			DisableMutation:    false,
 		},
 		Bytes: BytesStrategy{
 			IncludeEmpty:    true,
@@ -690,6 +691,14 @@ func (g *ParamGenerator) generateSequentialArray(length int) []interface{} {
 
 // buildAddressPool 构造包含原值、极端值、随机值的地址池
 func (g *ParamGenerator) buildAddressPool(original common.Address) []common.Address {
+	// 禁止变异：只返回原始地址（如原始为空则返回零地址）
+	if g.strategy.Addresses.DisableMutation {
+		if (original == common.Address{}) {
+			return []common.Address{common.Address{}}
+		}
+		return []common.Address{original}
+	}
+
 	pool := []common.Address{}
 	seen := make(map[string]bool)
 

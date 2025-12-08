@@ -140,7 +140,7 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 	tx := types.NewTransaction(0, contractAddr, big.NewInt(0), 21_000, big.NewInt(1), []byte{0x12, 0x34, 0x56, 0x78})
 
 	ctx := context.Background()
-	result, report, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
+	results, reports, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
 	if err != nil {
 		t.Fatalf("process transaction: %v", err)
 	}
@@ -149,26 +149,26 @@ func TestInvariantViolationTriggersFuzzing(t *testing.T) {
 		t.Fatalf("expected fuzz driver to be called once, got %d", fakeDriver.calls)
 	}
 
-	if result == nil || !result.Success || result.ValidCombinations != 1 {
-		t.Fatalf("unexpected fuzzing result: %+v", result)
+	if len(results) != 1 || results[0] == nil || !results[0].Success || results[0].ValidCombinations != 1 {
+		t.Fatalf("unexpected fuzzing result: %+v", results)
 	}
 
-	if report == nil || report.ValidCombinations != 1 || report.TotalCombinations != fakeDriver.stats.TestedCombinations {
-		t.Fatalf("unexpected report: %+v", report)
+	if len(reports) != 1 || reports[0] == nil || reports[0].ValidCombinations != 1 || reports[0].TotalCombinations != fakeDriver.stats.TestedCombinations {
+		t.Fatalf("unexpected report: %+v", reports)
 	}
 
-	cached, cachedReport, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
+	cached, cachedReports, err := integration.ProcessTransaction(ctx, tx, chainState.BlockNumber, contractAddr, tx.Hash())
 	if err != nil {
 		t.Fatalf("process transaction (cached): %v", err)
 	}
 	if fakeDriver.calls != 1 {
 		t.Fatalf("expected cached path to avoid driver, calls=%d", fakeDriver.calls)
 	}
-	if cached == nil || !cached.Success {
+	if len(cached) != 1 || cached[0] == nil || !cached[0].Success {
 		t.Fatalf("cached result mismatch: %+v", cached)
 	}
-	if cachedReport == nil {
-		t.Fatalf("cached reports mismatch: %+v", cachedReport)
+	if len(cachedReports) != 1 || cachedReports[0] == nil {
+		t.Fatalf("cached reports mismatch: %+v", cachedReports)
 	}
 }
 
@@ -178,9 +178,9 @@ type stubFuzzDriver struct {
 	calls  int
 }
 
-func (s *stubFuzzDriver) FuzzTransaction(ctx context.Context, txHash common.Hash, contractAddr common.Address, blockNumber uint64, tx *types.Transaction) (*fuzzer.AttackParameterReport, error) {
+func (s *stubFuzzDriver) FuzzTransaction(ctx context.Context, txHash common.Hash, contractAddr common.Address, blockNumber uint64, tx *types.Transaction) ([]*fuzzer.AttackParameterReport, error) {
 	s.calls++
-	return s.report, nil
+	return []*fuzzer.AttackParameterReport{s.report}, nil
 }
 
 func (s *stubFuzzDriver) GetStats() *fuzzer.FuzzerStats {

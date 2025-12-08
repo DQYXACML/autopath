@@ -114,7 +114,7 @@ func main() {
 
 	startTime := time.Now()
 
-	report, err := fuzzerInstance.FuzzTransaction(
+	reports, err := fuzzerInstance.FuzzTransaction(
 		ctx,
 		common.HexToHash(*txHash),
 		common.HexToAddress(*contractAddr),
@@ -125,11 +125,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Fuzzing failed: %v", err)
 	}
+	if len(reports) == 0 {
+		log.Fatalf("Fuzzing finished but no reports generated")
+	}
 
 	duration := time.Since(startTime)
 
 	// 打印统计信息
-	printStatistics(report, duration)
+	printStatistics(reports, duration)
 
 	// 保存报告
 	outputFile := *outputPath
@@ -137,7 +140,7 @@ func main() {
 		outputFile = generateOutputPath(*txHash)
 	}
 
-	if err := saveReport(report, outputFile, *format); err != nil {
+	if err := saveReport(reports, outputFile, *format); err != nil {
 		log.Fatalf("Failed to save report: %v", err)
 	}
 
@@ -252,37 +255,45 @@ func performDryRun(config *fuzzer.Config) {
 }
 
 // printStatistics 打印统计信息
-func printStatistics(report *fuzzer.AttackParameterReport, duration time.Duration) {
-	if report == nil {
-		fmt.Println("=== Fuzzing Results ===")
+func printStatistics(reports []*fuzzer.AttackParameterReport, duration time.Duration) {
+	fmt.Println("\n=== Fuzzing Results ===")
+	if len(reports) == 0 {
 		fmt.Println("无报告生成")
 		fmt.Println("=======================")
 		return
 	}
 
-	fmt.Println("\n=== Fuzzing Results ===")
-	fmt.Printf("Function (sig=%s)\n", report.FunctionSig)
-	fmt.Printf("Total Combinations Tested: %d\n", report.TotalCombinations)
-	fmt.Printf("Valid Combinations Found: %d\n", report.ValidCombinations)
-	fmt.Printf("Average Similarity: %.4f\n", report.AverageSimilarity)
-	fmt.Printf("Max Similarity: %.4f\n", report.MaxSimilarity)
-	fmt.Printf("Min Similarity: %.4f\n", report.MinSimilarity)
-	fmt.Printf("Execution Time: %v\n", duration)
+	for idx, report := range reports {
+		if report == nil {
+			continue
+		}
+		fmt.Printf("Report #%d - Function (sig=%s)\n", idx+1, report.FunctionSig)
+		fmt.Printf("Total Combinations Tested: %d\n", report.TotalCombinations)
+		fmt.Printf("Valid Combinations Found: %d\n", report.ValidCombinations)
+		fmt.Printf("Average Similarity: %.4f\n", report.AverageSimilarity)
+		fmt.Printf("Max Similarity: %.4f\n", report.MaxSimilarity)
+		fmt.Printf("Min Similarity: %.4f\n", report.MinSimilarity)
+		fmt.Printf("Execution Time: %v\n", duration)
 
-	if len(report.ValidParameters) > 0 {
-		fmt.Printf("\n=== Valid Parameters ===\n")
-		for _, param := range report.ValidParameters {
-			fmt.Printf("Parameter %d (%s):\n", param.ParamIndex, param.ParamType)
-			if param.IsRange {
-				fmt.Printf("  Range: [%s, %s]\n", param.RangeMin, param.RangeMax)
-			} else {
-				if len(param.SingleValues) <= 5 {
-					fmt.Printf("  Values: %v\n", param.SingleValues)
+		if len(report.ValidParameters) > 0 {
+			fmt.Printf("\n=== Valid Parameters ===\n")
+			for _, param := range report.ValidParameters {
+				fmt.Printf("Parameter %d (%s):\n", param.ParamIndex, param.ParamType)
+				if param.IsRange {
+					fmt.Printf("  Range: [%s, %s]\n", param.RangeMin, param.RangeMax)
 				} else {
-					fmt.Printf("  Values: %v... (%d total)\n", param.SingleValues[:5], len(param.SingleValues))
+					if len(param.SingleValues) <= 5 {
+						fmt.Printf("  Values: %v\n", param.SingleValues)
+					} else {
+						fmt.Printf("  Values: %v... (%d total)\n", param.SingleValues[:5], len(param.SingleValues))
+					}
 				}
+				fmt.Printf("  Occurrences: %d\n", param.OccurrenceCount)
 			}
-			fmt.Printf("  Occurrences: %d\n", param.OccurrenceCount)
+		}
+
+		if idx < len(reports)-1 {
+			fmt.Println("\n-----------------------")
 		}
 	}
 	fmt.Println("=======================")
@@ -306,22 +317,30 @@ func generateOutputPath(txHash string) string {
 }
 
 // saveReport 保存报告
-func saveReport(report *fuzzer.AttackParameterReport, path string, format string) error {
+func saveReport(reports []*fuzzer.AttackParameterReport, path string, format string) error {
+	if len(reports) == 0 {
+		return fmt.Errorf("no reports to save")
+	}
+
 	var data []byte
 	var err error
 
 	switch format {
 	case "json":
-		data, err = json.MarshalIndent(report, "", "  ")
+		if len(reports) == 1 {
+			data, err = json.MarshalIndent(reports[0], "", "  ")
+		} else {
+			data, err = json.MarshalIndent(reports, "", "  ")
+		}
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
 
 	case "text":
-		data = []byte(formatReportAsText(report))
+		data = []byte(formatReportsAsText(reports))
 
 	case "csv":
-		data = []byte(formatReportAsCSV(report))
+		data = []byte(formatReportsAsCSV(reports))
 
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
@@ -341,63 +360,79 @@ func saveReport(report *fuzzer.AttackParameterReport, path string, format string
 	return nil
 }
 
-// formatReportAsText 格式化报告为文本
-func formatReportAsText(report *fuzzer.AttackParameterReport) string {
+// formatReportsAsText 格式化报告为文本
+func formatReportsAsText(reports []*fuzzer.AttackParameterReport) string {
 	var sb strings.Builder
-
-	sb.WriteString("Attack Parameter Fuzzing Report\n")
-	sb.WriteString("================================\n\n")
-
-	sb.WriteString(fmt.Sprintf("Contract: %s\n", report.ContractAddress.Hex()))
-	sb.WriteString(fmt.Sprintf("Function: %s\n", report.FunctionSig))
-	sb.WriteString(fmt.Sprintf("Original TX: %s\n", report.OriginalTxHash.Hex()))
-	sb.WriteString(fmt.Sprintf("Block: %d\n", report.BlockNumber))
-	sb.WriteString(fmt.Sprintf("Timestamp: %s\n\n", report.Timestamp.Format(time.RFC3339)))
-
-	sb.WriteString("Statistics:\n")
-	sb.WriteString(fmt.Sprintf("  Total Tested: %d\n", report.TotalCombinations))
-	sb.WriteString(fmt.Sprintf("  Valid Found: %d\n", report.ValidCombinations))
-	sb.WriteString(fmt.Sprintf("  Avg Similarity: %.4f\n", report.AverageSimilarity))
-	sb.WriteString(fmt.Sprintf("  Max Similarity: %.4f\n", report.MaxSimilarity))
-	sb.WriteString(fmt.Sprintf("  Min Similarity: %.4f\n\n", report.MinSimilarity))
-
-	sb.WriteString("Valid Parameters:\n")
-	for _, param := range report.ValidParameters {
-		sb.WriteString(fmt.Sprintf("\nParameter %d (%s):\n", param.ParamIndex, param.ParamType))
-		if param.IsRange {
-			sb.WriteString(fmt.Sprintf("  Range: [%s, %s]\n", param.RangeMin, param.RangeMax))
-		} else {
-			sb.WriteString(fmt.Sprintf("  Values: %v\n", param.SingleValues))
+	for idx, report := range reports {
+		if report == nil {
+			continue
 		}
-		sb.WriteString(fmt.Sprintf("  Occurrences: %d\n", param.OccurrenceCount))
+
+		sb.WriteString("Attack Parameter Fuzzing Report\n")
+		sb.WriteString("================================\n\n")
+
+		sb.WriteString(fmt.Sprintf("Report #%d\n", idx+1))
+		sb.WriteString(fmt.Sprintf("Contract: %s\n", report.ContractAddress.Hex()))
+		sb.WriteString(fmt.Sprintf("Function: %s\n", report.FunctionSig))
+		sb.WriteString(fmt.Sprintf("Original TX: %s\n", report.OriginalTxHash.Hex()))
+		sb.WriteString(fmt.Sprintf("Block: %d\n", report.BlockNumber))
+		sb.WriteString(fmt.Sprintf("Timestamp: %s\n\n", report.Timestamp.Format(time.RFC3339)))
+
+		sb.WriteString("Statistics:\n")
+		sb.WriteString(fmt.Sprintf("  Total Tested: %d\n", report.TotalCombinations))
+		sb.WriteString(fmt.Sprintf("  Valid Found: %d\n", report.ValidCombinations))
+		sb.WriteString(fmt.Sprintf("  Avg Similarity: %.4f\n", report.AverageSimilarity))
+		sb.WriteString(fmt.Sprintf("  Max Similarity: %.4f\n", report.MaxSimilarity))
+		sb.WriteString(fmt.Sprintf("  Min Similarity: %.4f\n\n", report.MinSimilarity))
+
+		sb.WriteString("Valid Parameters:\n")
+		for _, param := range report.ValidParameters {
+			sb.WriteString(fmt.Sprintf("\nParameter %d (%s):\n", param.ParamIndex, param.ParamType))
+			if param.IsRange {
+				sb.WriteString(fmt.Sprintf("  Range: [%s, %s]\n", param.RangeMin, param.RangeMax))
+			} else {
+				sb.WriteString(fmt.Sprintf("  Values: %v\n", param.SingleValues))
+			}
+			sb.WriteString(fmt.Sprintf("  Occurrences: %d\n", param.OccurrenceCount))
+		}
+
+		if idx < len(reports)-1 {
+			sb.WriteString("\n\n")
+		}
 	}
 
 	return sb.String()
 }
 
-// formatReportAsCSV 格式化报告为CSV
-func formatReportAsCSV(report *fuzzer.AttackParameterReport) string {
+// formatReportsAsCSV 格式化报告为CSV
+func formatReportsAsCSV(reports []*fuzzer.AttackParameterReport) string {
 	var sb strings.Builder
 
-	// CSV头
-	sb.WriteString("ParamIndex,ParamType,IsRange,RangeMin,RangeMax,Values,OccurrenceCount\n")
+	// CSV头，增加函数selector便于区分
+	sb.WriteString("FunctionSig,ParamIndex,ParamType,IsRange,RangeMin,RangeMax,Values,OccurrenceCount\n")
 
 	// 数据行
-	for _, param := range report.ValidParameters {
-		values := ""
-		if !param.IsRange {
-			values = strings.Join(param.SingleValues, ";")
+	for _, report := range reports {
+		if report == nil {
+			continue
 		}
+		for _, param := range report.ValidParameters {
+			values := ""
+			if !param.IsRange {
+				values = strings.Join(param.SingleValues, ";")
+			}
 
-		sb.WriteString(fmt.Sprintf("%d,%s,%t,%s,%s,%s,%d\n",
-			param.ParamIndex,
-			param.ParamType,
-			param.IsRange,
-			param.RangeMin,
-			param.RangeMax,
-			values,
-			param.OccurrenceCount,
-		))
+			sb.WriteString(fmt.Sprintf("%s,%d,%s,%t,%s,%s,%s,%d\n",
+				report.FunctionSig,
+				param.ParamIndex,
+				param.ParamType,
+				param.IsRange,
+				param.RangeMin,
+				param.RangeMax,
+				values,
+				param.OccurrenceCount,
+			))
+		}
 	}
 
 	return sb.String()

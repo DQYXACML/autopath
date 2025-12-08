@@ -140,6 +140,11 @@ func (m *ResultMerger) extractParameterSummaries(groups map[int][]ParameterValue
 		paramType := values[0].Type
 		paramName := values[0].Name
 
+		// 地址类型不参与最终规则/表达式推送，避免硬编码地址
+		if isAddressType(paramType) {
+			continue
+		}
+
 		summary := ParameterSummary{
 			ParamIndex:      idx,
 			ParamType:       paramType,
@@ -192,6 +197,12 @@ func (m *ResultMerger) isNumericType(paramType string) bool {
 		strings.HasPrefix(paramType, "int") ||
 		paramType == "uint" ||
 		paramType == "int"
+}
+
+// isAddressType 判断是否为地址类型（含数组）
+func isAddressType(paramType string) bool {
+	lower := strings.ToLower(paramType)
+	return strings.HasPrefix(lower, "address")
 }
 
 // findRange 查找数值范围

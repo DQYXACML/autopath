@@ -82,6 +82,11 @@ type AttackParameterReport struct {
 
 	// 约束规则（由高相似样本生成）
 	ConstraintRule *ConstraintRule `json:"constraint_rule,omitempty"`
+
+	// 样本分类记录
+	PositiveSamples   []MutationSample         `json:"positive_samples,omitempty"`
+	NegativeSamples   []MutationSample         `json:"negative_samples,omitempty"`
+	PreparedMutations []PreparedMutationSample `json:"prepared_mutations,omitempty"`
 }
 
 // ParameterSummary 参数摘要
@@ -119,6 +124,24 @@ type PublicResult struct {
 	Parameters []PublicParamValue `json:"parameters"`
 	GasUsed    uint64             `json:"gas_used"`
 	Success    bool               `json:"success"`
+}
+
+// MutationSample 分类样本
+type MutationSample struct {
+	Selector     string             `json:"selector"`
+	FunctionName string             `json:"function_name,omitempty"`
+	Similarity   float64            `json:"similarity"`
+	Params       []PublicParamValue `json:"params"`
+	Mutated      bool               `json:"mutated"`     // true: 主动变异；false: 连锁调用
+	SampleType   string             `json:"sample_type"` // positive / negative
+}
+
+// PreparedMutationSample 预先准备的变异参数
+type PreparedMutationSample struct {
+	Selector       string             `json:"selector"`
+	FunctionName   string             `json:"function_name,omitempty"`
+	OriginalParams []PublicParamValue `json:"original_params,omitempty"`
+	PreparedParams []PublicParamValue `json:"prepared_params,omitempty"`
 }
 
 // ParamConstraint 参数约束
@@ -311,6 +334,7 @@ type AddressStrategy struct {
 	IncludeZero        bool `yaml:"include_zero"`
 	IncludeRandom      bool `yaml:"include_random"`
 	RandomCount        int  `yaml:"random_count"`
+	DisableMutation    bool `yaml:"disable_mutation"` // 为true时仅使用原始地址，不做任何变异
 }
 
 // BytesStrategy 字节生成策略

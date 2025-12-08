@@ -314,6 +314,9 @@ type CallDataFuzzer struct {
 
 	// 约束收集器（高相似样本生成规则）
 	constraintCollector *ConstraintCollector
+
+	// 样本记录器（正/负样本与连锁调用）
+	sampleRecorder *sampleRecorder
 }
 
 // NewCallDataFuzzer 创建模糊测试器
@@ -341,6 +344,10 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		gen = NewParamGeneratorWithStrategy(config.MaxVariations, &config.Strategies)
 	} else {
 		gen = NewParamGenerator(config.MaxVariations)
+	}
+	// 地址参数严格不变异：只使用原始值
+	if gen != nil && gen.strategy != nil {
+		gen.strategy.Addresses.DisableMutation = true
 	}
 
 	// 默认跳过高相似度样本的不变量检查，便于生成约束；可通过配置显式关闭
@@ -374,6 +381,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		projectID:               config.ProjectID,
 		localExecution:          config.LocalExecution, //  本地执行模式
 		constraintCollector:     NewConstraintCollector(10),
+		sampleRecorder:          newSampleRecorder(),
 	}
 	fuzzer.simMin = math.Inf(1)
 
@@ -417,6 +425,10 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 	} else {
 		gen = NewParamGenerator(config.MaxVariations)
 	}
+	// 地址参数严格不变异：只使用原始值
+	if gen != nil && gen.strategy != nil {
+		gen.strategy.Addresses.DisableMutation = true
+	}
 
 	// 如果启用了新架构但未显式开启本地执行，自动开启本地执行
 	if config.EnableNewArch && !config.LocalExecution {
@@ -455,6 +467,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		projectID:               config.ProjectID,
 		localExecution:          config.LocalExecution, //  本地执行模式
 		constraintCollector:     NewConstraintCollector(10),
+		sampleRecorder:          newSampleRecorder(),
 	}
 	fuzzer.simMin = math.Inf(1)
 
@@ -1468,7 +1481,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	contractAddr common.Address,
 	blockNumber uint64,
 	tx *types.Transaction, // 新增：可选的交易对象
-) (*AttackParameterReport, error) {
+) ([]*AttackParameterReport, error) {
 	// 全局超时控制（整轮Fuzz）
 	if f.timeout > 0 {
 		var cancel context.CancelFunc
@@ -1634,9 +1647,14 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		}
 	}
 
+	if len(targetCalls) > 1 {
+		log.Printf("[Fuzzer]  只对首个受保护函数执行主动变异，其余函数仅记录连锁调用参数")
+		targetCalls = targetCalls[:1]
+	}
+
 	log.Printf("[Fuzzer]  将依次Fuzz %d 个目标调用 (合约=%s)", len(targetCalls), contractAddr.Hex())
 
-	var bestReport *AttackParameterReport
+	var reports []*AttackParameterReport
 	var lastErr error
 
 	for idx, targetCall := range targetCalls {
@@ -1653,19 +1671,17 @@ func (f *CallDataFuzzer) FuzzTransaction(
 			continue
 		}
 
-		if bestReport == nil || report.MaxSimilarity > bestReport.MaxSimilarity {
-			bestReport = report
-		}
+		reports = append(reports, report)
 	}
 
-	if bestReport == nil {
+	if len(reports) == 0 {
 		if lastErr != nil {
 			return nil, lastErr
 		}
 		return nil, fmt.Errorf("所有目标调用均未产生报告")
 	}
 
-	return bestReport, nil
+	return reports, nil
 }
 
 // fuzzSingleTargetCall 针对单个受保护函数生成规则/表达式
@@ -1692,6 +1708,9 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	atomic.StoreInt64(&f.maxSimAt, 0)
 	atomic.StoreUint64(&f.maxSimVal, 0)
 	f.resetAttemptStats()
+	if f.sampleRecorder != nil {
+		f.sampleRecorder.Reset()
+	}
 
 	// 固定为函数级Fuzz，不做循环/入口模式切换
 	useLoopBaseline := false
@@ -1710,15 +1729,19 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 
 	log.Printf("[Fuzzer] Parsed: selector=0x%s, %d parameters", hex.EncodeToString(parsedData.Selector), len(parsedData.Parameters))
 
+	// 拷贝种子配置，避免跨函数交叉污染
+	baseSeedCfg := cloneSeedConfig(f.seedConfig)
+	targetSeedCfg := cloneSeedConfigForFunction(baseSeedCfg, targetMethod)
+
 	// ========== Layer 3: 符号执行约束提取 ==========
 	var symbolicSeeds []symbolic.SymbolicSeed
-	if f.seedConfig != nil && f.seedConfig.SymbolicConfig != nil && f.seedConfig.SymbolicConfig.Enabled {
-		log.Printf("[Fuzzer]  Symbolic execution enabled (mode=%s)", f.seedConfig.SymbolicConfig.Mode)
+	if baseSeedCfg != nil && baseSeedCfg.SymbolicConfig != nil && baseSeedCfg.SymbolicConfig.Enabled {
+		log.Printf("[Fuzzer]  Symbolic execution enabled (mode=%s)", baseSeedCfg.SymbolicConfig.Mode)
 
 		// 初始化符号执行组件(延迟初始化)
 		if f.symbolicExtractor == nil {
-			f.symbolicExtractor = symbolic.NewConstraintExtractor(f.seedConfig.SymbolicConfig, f.rpcClient)
-			f.symbolicSolver = symbolic.NewConstraintSolver(f.seedConfig.SymbolicConfig)
+			f.symbolicExtractor = symbolic.NewConstraintExtractor(baseSeedCfg.SymbolicConfig, f.rpcClient)
+			f.symbolicSolver = symbolic.NewConstraintSolver(baseSeedCfg.SymbolicConfig)
 		}
 
 		// 提取原始参数值
@@ -1750,18 +1773,22 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	}
 	// ==================================================
 
+	// 预先为本次交易的所有潜在selector准备变异参数，供Hook按selector快速取用
+	allowedSelectors := loadTargetSelectors(f.projectID, contractAddr)
+	preparedMutations := f.prepareSelectorMutations(contractAddr, trace, allowedSelectors, targetSeedCfg)
+
 	// 步骤4: 生成参数组合并执行模糊测试
 	log.Printf("[Fuzzer] Generating parameter combinations...")
 
 	var results []FuzzingResult
 
 	// 对BarleyFinance关键函数收紧种子：地址仅使用原始值，数值不超过原始值，避免SafeERC20因余额/授权不足反复revert
-	if f.seedConfig != nil && f.seedConfig.Enabled && targetMethod != nil &&
+	if targetSeedCfg != nil && targetSeedCfg.Enabled && targetMethod != nil &&
 		(strings.EqualFold(targetMethod.Name, "flash") ||
 			strings.EqualFold(targetMethod.Name, "bond") ||
 			strings.EqualFold(targetMethod.Name, "debond")) {
-		if f.seedConfig.AttackSeeds == nil {
-			f.seedConfig.AttackSeeds = make(map[int][]interface{})
+		if targetSeedCfg.AttackSeeds == nil {
+			targetSeedCfg.AttackSeeds = make(map[int][]interface{})
 		}
 		for _, p := range parsedData.Parameters {
 			// 地址参数：保留原始地址，并加入极端/随机地址以增加离散度
@@ -1775,7 +1802,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 					common.BytesToAddress([]byte{0x01}),
 					common.BytesToAddress([]byte{0x09}),
 				}
-				f.seedConfig.AttackSeeds[idx] = dedupInterfaces(seedPool)
+				targetSeedCfg.AttackSeeds[idx] = dedupInterfaces(seedPool)
 
 				// address[]：加入不同长度的数组以拉低相似度
 				if strings.HasSuffix(p.Type, "[]") {
@@ -1783,7 +1810,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 					if len(base) == 0 {
 						base = []interface{}{p.Value}
 					}
-					f.seedConfig.AttackSeeds[idx] = []interface{}{
+					targetSeedCfg.AttackSeeds[idx] = []interface{}{
 						base,
 						[]interface{}{},
 						repeatAddress(seedPool, 1),
@@ -1797,7 +1824,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 			// bytes 类型：原值+空值+全FF，避免全部落在同一区域
 			if strings.HasPrefix(p.Type, "bytes") {
 				idx := p.Index
-				f.seedConfig.AttackSeeds[idx] = []interface{}{
+				targetSeedCfg.AttackSeeds[idx] = []interface{}{
 					p.Value,
 					[]byte{},
 					bytes.Repeat([]byte{0xFF}, 32),
@@ -1810,10 +1837,10 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 				orig := normalizeBigInt(p.Value)
 				idx := p.Index
 				if seeds := buildSmartUintSeeds(orig); len(seeds) > 0 {
-					f.seedConfig.AttackSeeds[idx] = seeds
+					targetSeedCfg.AttackSeeds[idx] = seeds
 				} else {
 					// fallback 保留原值
-					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+					targetSeedCfg.AttackSeeds[idx] = []interface{}{p.Value}
 				}
 				continue
 			}
@@ -1821,29 +1848,33 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 			// 其他uint类型，保留默认种子或原值
 			if strings.HasPrefix(p.Type, "uint") {
 				idx := p.Index
-				if _, ok := f.seedConfig.AttackSeeds[idx]; !ok {
-					f.seedConfig.AttackSeeds[idx] = []interface{}{p.Value}
+				if _, ok := targetSeedCfg.AttackSeeds[idx]; !ok {
+					targetSeedCfg.AttackSeeds[idx] = []interface{}{p.Value}
 				}
 			}
 		}
 	}
 
 	// 若未提供显式种子，注入原始调用参数作为基础种子，避免组合数过少
-	if f.seedConfig != nil && f.seedConfig.Enabled {
-		injected := primeSeedsWithOriginalParams(f.seedConfig, parsedData.Parameters)
+	if targetSeedCfg != nil && targetSeedCfg.Enabled {
+		injected := primeSeedsWithOriginalParams(targetSeedCfg, parsedData.Parameters)
 		_ = injected
+
+		// 防御：地址、复杂类型只保留原始值，避免无代码地址/异常payload导致必然revert
+		sanitizeAddressSeeds(targetSeedCfg, parsedData.Parameters)
+		restrictComplexSeeds(targetSeedCfg, parsedData.Parameters)
 	}
 
 	// 判断是否启用自适应迭代模式
-	if f.seedConfig != nil && f.seedConfig.Enabled &&
-		f.seedConfig.AdaptiveConfig != nil && f.seedConfig.AdaptiveConfig.Enabled {
-		log.Printf("[Fuzzer]  Adaptive iteration mode enabled (max_iterations=%d)", f.seedConfig.AdaptiveConfig.MaxIterations)
-		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, symbolicSeeds, trace, useLoopBaseline)
+	if targetSeedCfg != nil && targetSeedCfg.Enabled &&
+		targetSeedCfg.AdaptiveConfig != nil && targetSeedCfg.AdaptiveConfig.Enabled {
+		log.Printf("[Fuzzer]  Adaptive iteration mode enabled (max_iterations=%d)", targetSeedCfg.AdaptiveConfig.MaxIterations)
+		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, symbolicSeeds, trace, targetSeedCfg, baseSeedCfg, useLoopBaseline, preparedMutations)
 	} else {
 		var combinations <-chan []interface{}
-		if f.seedConfig != nil && f.seedConfig.Enabled {
+		if targetSeedCfg != nil && targetSeedCfg.Enabled {
 			// 使用种子驱动生成器
-			seedGen := NewSeedGenerator(f.seedConfig, f.generator.maxVariations)
+			seedGen := NewSeedGenerator(targetSeedCfg, f.generator.maxVariations)
 
 			// 约束范围集成：如果有约束范围配置，合并约束种子
 			if seedGen.HasConstraintRanges() {
@@ -1851,7 +1882,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 					seedGen.MergeConstraintSeeds(targetMethod.Name)
 					log.Printf("[Fuzzer]  Merged constraint seeds for function: %s", targetMethod.Name)
 				} else {
-					for funcName := range f.seedConfig.ConstraintRanges {
+					for funcName := range targetSeedCfg.ConstraintRanges {
 						seedGen.MergeConstraintSeeds(funcName)
 						log.Printf("[Fuzzer]  Merged constraint seeds for function: %s", funcName)
 					}
@@ -1866,7 +1897,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 			}
 
 			combinations = seedGen.GenerateSeedBasedCombinations(parsedData.Parameters)
-			log.Printf("[Fuzzer]  Using seed-driven generation with %d attack seeds", len(f.seedConfig.AttackSeeds))
+			log.Printf("[Fuzzer]  Using seed-driven generation with %d attack seeds", len(targetSeedCfg.AttackSeeds))
 		} else {
 			// 使用默认随机生成器
 			combinations = f.generator.GenerateCombinations(parsedData.Parameters)
@@ -1874,7 +1905,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		}
 
 		log.Printf("[Fuzzer] Starting fuzzing with %d workers, threshold: %.2f", f.maxWorkers, f.threshold)
-		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, trace, useLoopBaseline)
+		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, trace, baseSeedCfg, useLoopBaseline, preparedMutations)
 		log.Printf("[Fuzzer] Found %d valid combinations", len(results))
 	}
 
@@ -1888,6 +1919,9 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		blockNumber,
 		startTime,
 	)
+
+	f.attachSampleRecords(report, contractAddr, parsedData.Selector, targetMethod)
+	f.attachPreparedMutations(report, preparedMutations)
 	// 补充时间轴统计
 	if fh := atomic.LoadInt64(&f.firstHitAt); fh > 0 {
 		report.FirstHitSeconds = float64(fh) / float64(time.Second)
@@ -1904,7 +1938,16 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		log.Printf("[Fuzzer]  报告统计（含低相似度）：total=%d avg=%.4f min=%.4f max=%.4f 阈值=%.4f 有效=%d",
 			attempts, report.AverageSimilarity, report.MinSimilarity, report.MaxSimilarity, f.threshold, len(results))
 	} else {
-		report.TotalCombinations = len(results)
+		// 即便全部revert也要记录尝试的组合数
+		if f.stats.TestedCombinations > 0 {
+			report.TotalCombinations = f.stats.TestedCombinations
+		} else {
+			report.TotalCombinations = len(results)
+		}
+	}
+	// 统一以实际执行过的组合数为准，避免报告出现默认值
+	if f.stats.TestedCombinations > 0 {
+		report.TotalCombinations = f.stats.TestedCombinations
 	}
 
 	// 应用约束规则（若已生成）
@@ -2131,7 +2174,9 @@ func (f *CallDataFuzzer) executeFuzzing(
 	blockNumber uint64,
 	stateOverride simulator.StateOverride,
 	callTree *CallFrame,
+	seedCfg *SeedConfig,
 	loopBaseline bool,
+	preparedMutations map[string]*PreparedMutation,
 ) []FuzzingResult {
 	//  创建带超时的可取消context，限定整轮fuzz耗时；默认使用配置的 timeout_seconds
 	totalBudget := f.timeout
@@ -2170,11 +2215,6 @@ func (f *CallDataFuzzer) executeFuzzing(
 	overrideAccounts, overrideSlots, overrideTargetSlots := summarizeOverride(stateOverride, contractAddr)
 	log.Printf("[Fuzzer]  StateOverride概要: 账户=%d, 槽位总数=%d, 受保护合约槽位=%d",
 		overrideAccounts, overrideSlots, overrideTargetSlots)
-
-	//  预先为该合约的所有目标selector准备一次性变异输入，用于单次重放中多selector替换
-	var preparedMutations map[string][]byte
-	allowedSelectors := loadTargetSelectors(f.projectID, contractAddr)
-	preparedMutations = f.prepareSelectorMutations(contractAddr, callTree, allowedSelectors)
 
 	// 创建worker池
 	var wg sync.WaitGroup
@@ -2408,8 +2448,134 @@ func mapKeys[T comparable](m map[T]bool) []T {
 	return keys
 }
 
+// cloneSeedConfig 深拷贝种子配置，避免跨函数相互污染
+func cloneSeedConfig(cfg *SeedConfig) *SeedConfig {
+	if cfg == nil {
+		return nil
+	}
+
+	cp := *cfg
+
+	// 深拷贝切片字段
+	if len(cfg.RangeConfig.NumericRangePercent) > 0 {
+		cp.RangeConfig.NumericRangePercent = append([]int(nil), cfg.RangeConfig.NumericRangePercent...)
+	}
+	if len(cfg.RangeConfig.AddressMutationTypes) > 0 {
+		cp.RangeConfig.AddressMutationTypes = append([]string(nil), cfg.RangeConfig.AddressMutationTypes...)
+	}
+
+	// 深拷贝AttackSeeds
+	if cfg.AttackSeeds != nil {
+		cp.AttackSeeds = make(map[int][]interface{}, len(cfg.AttackSeeds))
+		for idx, seeds := range cfg.AttackSeeds {
+			cp.AttackSeeds[idx] = append([]interface{}(nil), seeds...)
+		}
+	}
+
+	// 深拷贝约束范围
+	if cfg.ConstraintRanges != nil {
+		cp.ConstraintRanges = cloneConstraintRangeMap(cfg.ConstraintRanges)
+	}
+
+	// 深拷贝范围变异配置
+	if cfg.RangeMutationConfig != nil {
+		tmp := *cfg.RangeMutationConfig
+		cp.RangeMutationConfig = &tmp
+	}
+
+	// 深拷贝自适应配置
+	if cfg.AdaptiveConfig != nil {
+		cp.AdaptiveConfig = cloneAdaptiveConfig(cfg.AdaptiveConfig)
+	}
+
+	// 深拷贝符号执行配置
+	if cfg.SymbolicConfig != nil {
+		tmp := *cfg.SymbolicConfig
+		// FocusOpcodes为切片，单独拷贝
+		if len(cfg.SymbolicConfig.Extraction.FocusOpcodes) > 0 {
+			tmp.Extraction.FocusOpcodes = append([]string(nil), cfg.SymbolicConfig.Extraction.FocusOpcodes...)
+		}
+		cp.SymbolicConfig = &tmp
+	}
+
+	return &cp
+}
+
+func cloneConstraintRangeMap(src map[string]map[string]*ConstraintRange) map[string]map[string]*ConstraintRange {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]map[string]*ConstraintRange, len(src))
+	for fn, params := range src {
+		if len(params) == 0 {
+			continue
+		}
+		inner := make(map[string]*ConstraintRange, len(params))
+		for idx, cr := range params {
+			if cr == nil {
+				continue
+			}
+			cp := *cr
+			cp.AttackValues = append([]string(nil), cr.AttackValues...)
+			if cr.Range != nil {
+				r := *cr.Range
+				cp.Range = &r
+			}
+			inner[idx] = &cp
+		}
+		dst[fn] = inner
+	}
+	return dst
+}
+
+func cloneAdaptiveConfig(src *AdaptiveRangeConfig) *AdaptiveRangeConfig {
+	if src == nil {
+		return nil
+	}
+	cp := *src
+	if src.RangeStrategies != nil {
+		cp.RangeStrategies = make(map[string][]int, len(src.RangeStrategies))
+		for k, v := range src.RangeStrategies {
+			cp.RangeStrategies[k] = append([]int(nil), v...)
+		}
+	}
+	return &cp
+}
+
+// cloneSeedConfigForFunction 返回按函数名过滤后的种子配置副本
+func cloneSeedConfigForFunction(cfg *SeedConfig, method *abi.Method) *SeedConfig {
+	cloned := cloneSeedConfig(cfg)
+	if cloned == nil || method == nil || len(cloned.ConstraintRanges) == 0 {
+		return cloned
+	}
+
+	fnLower := strings.ToLower(method.Name)
+	if ranges, ok := cloned.ConstraintRanges[method.Name]; ok {
+		cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
+			method.Name: ranges,
+		}
+	} else if ranges, ok := cloned.ConstraintRanges[fnLower]; ok {
+		cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
+			fnLower: ranges,
+		}
+	} else {
+		cloned.ConstraintRanges = nil
+	}
+	return cloned
+}
+
+// PreparedMutation 预先构造的selector级别变异输入
+type PreparedMutation struct {
+	Selector        string
+	FunctionName    string
+	Method          *abi.Method
+	MutatedCalldata []byte
+	MutatedParams   []ParameterValue
+	OriginalParams  []ParameterValue
+}
+
 // prepareSelectorMutations 为单次重放预先构造多个selector的变异calldata
-func (f *CallDataFuzzer) prepareSelectorMutations(contractAddr common.Address, callTree *CallFrame, allowed map[string]map[string]bool) map[string][]byte {
+func (f *CallDataFuzzer) prepareSelectorMutations(contractAddr common.Address, callTree *CallFrame, allowed map[string]map[string]bool, seedCfg *SeedConfig) map[string]*PreparedMutation {
 	if callTree == nil {
 		return nil
 	}
@@ -2418,7 +2584,7 @@ func (f *CallDataFuzzer) prepareSelectorMutations(contractAddr common.Address, c
 	if len(contractCalls) == 0 {
 		return nil
 	}
-	prepared := make(map[string][]byte)
+	prepared := make(map[string]*PreparedMutation)
 	contractKey := strings.ToLower(contractAddr.Hex())
 	allowedFor := allowed[contractKey]
 	allowAll := len(allowed) == 0 || len(allowedFor) == 0
@@ -2434,35 +2600,85 @@ func (f *CallDataFuzzer) prepareSelectorMutations(contractAddr common.Address, c
 		if _, exists := prepared[selector]; exists {
 			continue
 		}
-		calldata, err := f.buildMutationForCall(contractAddr, c)
+		var origParams []ParameterValue
+		var method *abi.Method
+		if data, parseErr := hexutil.Decode(c.Input); parseErr == nil {
+			if parsed, m, err := f.parseCallDataWithABI(contractAddr, data); err == nil {
+				method = m
+				origParams = f.convertParsedParamsToValues(parsed, method)
+			}
+		}
+
+		mutatedCalldata, mutatedParams, err := f.buildMutationForCall(contractAddr, c, seedCfg)
 		if err != nil {
 			log.Printf("[Fuzzer]  预构造 selector=%s 变异失败: %v", selector, err)
 			continue
 		}
-		prepared[selector] = calldata
+		if method == nil {
+			if parsed, m, err := f.parseCallDataWithABI(contractAddr, mutatedCalldata); err == nil {
+				method = m
+				if origParams == nil {
+					origParams = f.convertParsedParamsToValues(parsed, method)
+				}
+			}
+		}
+
+		name := ""
+		if method != nil {
+			name = method.Name
+		}
+
+		prepared[selector] = &PreparedMutation{
+			Selector:        selector,
+			FunctionName:    name,
+			Method:          method,
+			MutatedCalldata: mutatedCalldata,
+			MutatedParams:   mutatedParams,
+			OriginalParams:  origParams,
+		}
+	}
+	if len(prepared) > 0 {
+		log.Printf("[Fuzzer]  已预构造受保护合约的变异输入: %d 个selector", len(prepared))
 	}
 	return prepared
 }
 
 // buildMutationForCall 基于调用本身的参数生成一个简单变异版calldata
-func (f *CallDataFuzzer) buildMutationForCall(contractAddr common.Address, call *CallFrame) ([]byte, error) {
+func (f *CallDataFuzzer) buildMutationForCall(contractAddr common.Address, call *CallFrame, seedCfg *SeedConfig) ([]byte, []ParameterValue, error) {
 	if call == nil || len(call.Input) < 10 {
-		return nil, fmt.Errorf("call frame invalid")
+		return nil, nil, fmt.Errorf("call frame invalid")
 	}
 	callDataBytes, err := hexutil.Decode(call.Input)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	parsed, method, err := f.parseCallDataWithABI(contractAddr, callDataBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	combo := f.buildSeedBasedCombo(parsed.Parameters, method)
+	// 若缺少ABI，无法安全构造变异，直接返回原始calldata避免报错
+	if method == nil {
+		return callDataBytes, f.convertParsedParamsToValues(parsed, method), nil
+	}
+
+	localSeedCfg := cloneSeedConfigForFunction(seedCfg, method)
+	if localSeedCfg != nil && localSeedCfg.Enabled {
+		primeSeedsWithOriginalParams(localSeedCfg, parsed.Parameters)
+		sanitizeAddressSeeds(localSeedCfg, parsed.Parameters)
+		restrictComplexSeeds(localSeedCfg, parsed.Parameters)
+	}
+
+	combo := f.buildSeedBasedCombo(parsed.Parameters, method, localSeedCfg)
 	if len(combo) == 0 {
 		combo = buildSimpleMutatedCombo(parsed.Parameters)
 	}
 	selector := callDataBytes[:4]
-	return f.reconstructCallData(selector, combo, method, -1)
+	calldata, encodeErr := f.reconstructCallData(selector, combo, method, -1)
+	if encodeErr != nil {
+		return nil, nil, encodeErr
+	}
+	params := f.extractParameterValues(combo, selector, method)
+	return calldata, params, nil
 }
 
 // buildSimpleMutatedCombo 为每个参数生成一个轻量变异值（若无法变异则回退原值）
@@ -2475,17 +2691,18 @@ func buildSimpleMutatedCombo(params []Parameter) []interface{} {
 }
 
 // buildSeedBasedCombo 基于函数的种子配置预先生成一次变异参数组合
-func (f *CallDataFuzzer) buildSeedBasedCombo(params []Parameter, method *abi.Method) []interface{} {
-	if f.seedConfig == nil || !f.seedConfig.Enabled {
+func (f *CallDataFuzzer) buildSeedBasedCombo(params []Parameter, method *abi.Method, seedCfg *SeedConfig) []interface{} {
+	if seedCfg == nil || !seedCfg.Enabled {
 		return nil
 	}
 
+	localCfg := cloneSeedConfigForFunction(seedCfg, method)
 	maxVariations := 1
 	if f.generator != nil && f.generator.maxVariations > 0 {
 		maxVariations = f.generator.maxVariations
 	}
 
-	seedGen := NewSeedGenerator(f.seedConfig, maxVariations)
+	seedGen := NewSeedGenerator(localCfg, maxVariations)
 	if method != nil && seedGen.HasConstraintRanges() {
 		seedGen.MergeConstraintSeeds(method.Name)
 	}
@@ -2530,6 +2747,13 @@ func simpleMutateValue(paramType string, original interface{}) interface{} {
 	return original
 }
 
+type observedCall struct {
+	selector     string
+	functionName string
+	params       []ParameterValue
+	mutated      bool
+}
+
 // worker 工作协程
 func (f *CallDataFuzzer) worker(
 	ctx context.Context,
@@ -2543,7 +2767,7 @@ func (f *CallDataFuzzer) worker(
 	blockNumber uint64,
 	stateOverride simulator.StateOverride,
 	callTree *CallFrame,
-	preparedMutations map[string][]byte,
+	preparedMutations map[string]*PreparedMutation,
 	results *[]FuzzingResult,
 	resultMutex *sync.Mutex,
 	testedCount *int32,
@@ -2557,6 +2781,10 @@ func (f *CallDataFuzzer) worker(
 	// 预先汇总一次StateOverride，供后续日志使用
 	overrideAccounts, overrideSlots, overrideTargetSlots := summarizeOverride(stateOverride, contractAddr)
 	targetSelectorHex := strings.ToLower(hexutil.Encode(selector))
+	targetFunctionName := ""
+	if targetMethod != nil {
+		targetFunctionName = targetMethod.Name
+	}
 
 	for combo := range combinations {
 		select {
@@ -2568,6 +2796,27 @@ func (f *CallDataFuzzer) worker(
 		// 增加测试计数
 		currentCount := atomic.AddInt32(testedCount, 1)
 
+		observedCalls := []observedCall{}
+		recordObserved := func(selector string, params []ParameterValue, fnName string, mutated bool) {
+			if selector == "" {
+				return
+			}
+			if len(params) == 0 {
+				return
+			}
+			if fnName == "" {
+				if pm, ok := preparedMutations[selector]; ok && pm != nil && pm.FunctionName != "" {
+					fnName = pm.FunctionName
+				}
+			}
+			observedCalls = append(observedCalls, observedCall{
+				selector:     selector,
+				functionName: fnName,
+				params:       params,
+				mutated:      mutated,
+			})
+		}
+
 		// 重构calldata（使用受保护合约调用的selector和变异参数），提前准备供Hook直接替换
 		newCallData, err := f.reconstructCallData(selector, combo, targetMethod, workerID)
 		if err != nil {
@@ -2575,11 +2824,8 @@ func (f *CallDataFuzzer) worker(
 			continue
 		}
 		mutatedInputs := map[string][]byte{targetSelectorHex: newCallData}
-		for sel, data := range preparedMutations {
-			if _, exists := mutatedInputs[sel]; !exists {
-				mutatedInputs[sel] = data
-			}
-		}
+		targetParamValues := f.extractParameterValues(combo, selector, targetMethod)
+		mutationApplied := false
 
 		// 创建模拟请求：直接模拟调用受保护合约
 		from := common.HexToAddress(targetCall.From) // 使用原始调用者地址
@@ -2635,10 +2881,24 @@ func (f *CallDataFuzzer) worker(
 					return original, false, nil
 				}
 				selectorHex := strings.ToLower(frame.Input[:10])
-				if mutated, ok := mutatedInputs[selectorHex]; ok {
-					return mutated, true, nil
+				mutated := false
+				newInput := original
+
+				if !mutationApplied && selectorHex == targetSelectorHex {
+					if mutatedData, ok := mutatedInputs[selectorHex]; ok {
+						newInput = mutatedData
+						mutated = true
+						mutationApplied = true
+						recordObserved(selectorHex, targetParamValues, targetFunctionName, true)
+						return newInput, true, nil
+					}
 				}
-				return original, false, nil
+
+				params, fnName := f.decodeParamsForSample(contractAddr, newInput, preparedMutations, selectorHex)
+				if len(params) > 0 {
+					recordObserved(selectorHex, params, fnName, mutated)
+				}
+				return newInput, mutated, nil
 			}
 			mutators := map[common.Address]local.CallMutatorV2{
 				contractAddr: simulator.AdaptCallMutator(hookMutator),
@@ -2686,10 +2946,24 @@ func (f *CallDataFuzzer) worker(
 					return original, false, nil
 				}
 				selectorHex := strings.ToLower(frame.Input[:10])
-				if mutated, ok := mutatedInputs[selectorHex]; ok && strings.EqualFold(strings.ToLower(frame.Input[:10]), selectorHex) {
-					return mutated, true, nil
+				mutated := false
+				newInput := original
+
+				if !mutationApplied && selectorHex == targetSelectorHex {
+					if mutatedData, ok := mutatedInputs[selectorHex]; ok {
+						newInput = mutatedData
+						mutated = true
+						mutationApplied = true
+						recordObserved(selectorHex, targetParamValues, targetFunctionName, true)
+						return newInput, true, nil
+					}
 				}
-				return original, false, nil
+
+				params, fnName := f.decodeParamsForSample(contractAddr, newInput, preparedMutations, selectorHex)
+				if len(params) > 0 {
+					recordObserved(selectorHex, params, fnName, mutated)
+				}
+				return newInput, mutated, nil
 			}
 
 			hookRes, simErr := f.simulator.ExecuteWithHooks(
@@ -2744,8 +3018,9 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
+		revertMsg := ""
 		if !simResult.Success {
-			revertMsg := decodeRevertMessage(simResult.ReturnData)
+			revertMsg = decodeRevertMessage(simResult.ReturnData)
 			if revertMsg == "" && simResult.Error != nil {
 				revertMsg = simResult.Error.Error()
 			}
@@ -2769,9 +3044,8 @@ func (f *CallDataFuzzer) worker(
 				selectorHex = hexutil.Encode(newCallData[:4])
 			}
 
-			log.Printf("[Worker %d]   模拟交易revert，跳过相似度计算 (gas=%d, msg=%s, traceErr=%s, lastPath=%s, return=%s, selector=%s, len=%d, from=%s, to=%s, value=%s)",
+			log.Printf("[Worker %d]   模拟交易revert，仍计算路径相似度 (gas=%d, msg=%s, traceErr=%s, lastPath=%s, return=%s, selector=%s, len=%d, from=%s, to=%s, value=%s)",
 				workerID, simResult.GasUsed, revertMsg, traceErr, lastPath, formatReturnDataForLog(simResult.ReturnData), selectorHex, len(newCallData), from.Hex(), to.Hex(), value.String())
-			continue
 		}
 
 		// 比较路径相似度 - 使用带合约地址的 JUMPDEST 序列
@@ -2801,6 +3075,8 @@ func (f *CallDataFuzzer) worker(
 		candidatePath := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0, "候选")
 		if len(baseline) == 0 || len(candidatePath) == 0 {
 			log.Printf("[Worker %d]  基准或候选路径为空，跳过比较 (baseline=%d, candidate=%d)", workerID, len(baseline), len(candidatePath))
+			f.recordAttempt(0)
+			f.recordSamples(contractAddr, 0, observedCalls)
 			continue
 		}
 
@@ -2848,6 +3124,8 @@ func (f *CallDataFuzzer) worker(
 
 		if len(bestWindow) == 0 {
 			log.Printf("[Worker %d]  候选窗口为空，跳过比较 (candidateLen=%d, alignStart=%d)", workerID, len(candidatePath), alignStart)
+			f.recordAttempt(0)
+			f.recordSamples(contractAddr, 0, observedCalls)
 			continue
 		}
 
@@ -2999,6 +3277,7 @@ func (f *CallDataFuzzer) worker(
 
 		// 记录全量尝试（包含低相似度样本）
 		f.recordAttempt(similarity)
+		f.recordSamples(contractAddr, similarity, observedCalls)
 
 		// 记录批次最佳路径（每100个组合汇总一次）
 		if batchTracker != nil {
@@ -3196,6 +3475,28 @@ func normalizeParamsForABI(params []interface{}, method *abi.Method) []interface
 }
 
 func normalizeSingleParam(val interface{}, typeStr string) interface{} {
+	// 如果目标不是数组类型，且传入了切片/数组，优先取首元素以避免ABI因类型不匹配报错
+	if !strings.HasSuffix(typeStr, "[]") {
+		switch v := val.(type) {
+		case []interface{}:
+			if len(v) > 0 {
+				val = v[0]
+			}
+		case []common.Address:
+			if len(v) > 0 {
+				val = v[0]
+			}
+		case []string:
+			if len(v) > 0 {
+				val = v[0]
+			}
+		case [][]byte:
+			if len(v) > 0 {
+				val = v[0]
+			}
+		}
+	}
+
 	switch {
 	case typeStr == "address":
 		return normalizeAddress(val)
@@ -3245,6 +3546,11 @@ func normalizeAddress(val interface{}) common.Address {
 	switch v := val.(type) {
 	case common.Address:
 		return v
+	case []interface{}:
+		if len(v) > 0 {
+			return normalizeAddress(v[0])
+		}
+		return common.Address{}
 	case string:
 		// 检查是否是数字字符串（配置错误）
 		if !strings.HasPrefix(v, "0x") {
@@ -3377,6 +3683,11 @@ func normalizeBigInt(val interface{}) *big.Int {
 	switch v := val.(type) {
 	case *big.Int:
 		return v
+	case []interface{}:
+		if len(v) > 0 {
+			return normalizeBigInt(v[0])
+		}
+		return nil
 	case int:
 		return big.NewInt(int64(v))
 	case int64:
@@ -3403,6 +3714,11 @@ func normalizeBytes(val interface{}) []byte {
 	switch v := val.(type) {
 	case []byte:
 		return v
+	case []interface{}:
+		if len(v) > 0 {
+			return normalizeBytes(v[0])
+		}
+		return nil
 	case string:
 		if strings.HasPrefix(v, "0x") {
 			if b, err := hexutil.Decode(v); err == nil {
@@ -3591,6 +3907,57 @@ func convertSimulatorStateChanges(in map[string]simulator.StateChange) map[strin
 	return out
 }
 
+// convertParsedParamsToValues 将解析后的参数转为通用记录格式
+func (f *CallDataFuzzer) convertParsedParamsToValues(parsed *ParsedCallData, method *abi.Method) []ParameterValue {
+	if parsed == nil {
+		return nil
+	}
+	values := make([]ParameterValue, len(parsed.Parameters))
+	for i, p := range parsed.Parameters {
+		pType := p.Type
+		name := p.Name
+		if method != nil && i < len(method.Inputs) {
+			pType = method.Inputs[i].Type.String()
+			if method.Inputs[i].Name != "" {
+				name = method.Inputs[i].Name
+			}
+		}
+		values[i] = ParameterValue{
+			Index:   i,
+			Type:    pType,
+			Name:    name,
+			Value:   p.Value,
+			IsRange: false,
+		}
+	}
+	return values
+}
+
+// decodeParamsForSample 解析实际执行的calldata为样本参数，解析失败时回退已准备的参数
+func (f *CallDataFuzzer) decodeParamsForSample(contractAddr common.Address, input []byte, prepared map[string]*PreparedMutation, selector string) ([]ParameterValue, string) {
+	fnName := ""
+	if parsed, method, err := f.parseCallDataWithABI(contractAddr, input); err == nil && parsed != nil {
+		if method != nil {
+			fnName = method.Name
+		}
+		return f.convertParsedParamsToValues(parsed, method), fnName
+	}
+
+	if pm, ok := prepared[selector]; ok && pm != nil {
+		if pm.FunctionName != "" {
+			fnName = pm.FunctionName
+		}
+		if len(pm.OriginalParams) > 0 {
+			return pm.OriginalParams, fnName
+		}
+		if len(pm.MutatedParams) > 0 {
+			return pm.MutatedParams, fnName
+		}
+	}
+
+	return nil, fnName
+}
+
 // extractParameterValues 提取参数值
 func (f *CallDataFuzzer) extractParameterValues(combo []interface{}, selector []byte, method *abi.Method) []ParameterValue {
 	values := make([]ParameterValue, len(combo))
@@ -3740,9 +4107,20 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	stateOverride simulator.StateOverride,
 	symbolicSeeds []symbolic.SymbolicSeed,
 	callTree *CallFrame,
+	seedCfg *SeedConfig,
+	mutationSeedCfg *SeedConfig,
 	loopBaseline bool,
+	preparedMutations map[string]*PreparedMutation,
 ) []FuzzingResult {
-	seedGen := NewSeedGenerator(f.seedConfig, f.generator.maxVariations)
+	if seedCfg == nil {
+		log.Printf("[Adaptive]  Seed config missing, skip adaptive fuzzing")
+		return nil
+	}
+	if seedCfg.AdaptiveConfig == nil {
+		log.Printf("[Adaptive]  Adaptive config missing, skip adaptive fuzzing")
+		return nil
+	}
+	seedGen := NewSeedGenerator(seedCfg, f.generator.maxVariations)
 	allResults := []FuzzingResult{}
 
 	// 约束范围集成：如果有约束范围配置，合并约束种子
@@ -3751,7 +4129,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 			seedGen.MergeConstraintSeeds(targetMethod.Name)
 			log.Printf("[Adaptive]  Merged constraint seeds for function: %s", targetMethod.Name)
 		} else {
-			for funcName := range f.seedConfig.ConstraintRanges {
+			for funcName := range seedCfg.ConstraintRanges {
 				seedGen.MergeConstraintSeeds(funcName)
 				log.Printf("[Adaptive]  Merged constraint seeds for function: %s", funcName)
 			}
@@ -3770,7 +4148,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	log.Printf("[Adaptive] Using fixed seed-based ranges")
 
 	initialCombos := seedGen.GenerateSeedBasedCombinations(parsedData.Parameters)
-	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, callTree, loopBaseline)
+	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
 	allResults = append(allResults, initialResults...)
 
 	log.Printf("[Adaptive] Iteration 0 completed: %d valid results, total: %d",
@@ -3783,7 +4161,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	}
 
 	// 迭代优化
-	for iter := 1; iter <= f.seedConfig.AdaptiveConfig.MaxIterations; iter++ {
+	for iter := 1; iter <= seedCfg.AdaptiveConfig.MaxIterations; iter++ {
 		log.Printf("[Adaptive] ========== Iteration %d: Adaptive Refinement ==========", iter)
 
 		seedGen.currentIteration = iter
@@ -3805,7 +4183,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 
 		// 4. 执行新一轮模糊测试
 		log.Printf("[Adaptive] Executing fuzzing with adaptive ranges...")
-		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, callTree, loopBaseline)
+		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, blockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
 
 		// 5. 累积结果
 		allResults = append(allResults, iterResults...)
@@ -4260,6 +4638,81 @@ func (f *CallDataFuzzer) recordAttempt(similarity float64) {
 	}
 }
 
+// recordSamples 将本次重放产生的样本按正/负分类记录
+func (f *CallDataFuzzer) recordSamples(contractAddr common.Address, similarity float64, observed []observedCall) {
+	if f.sampleRecorder == nil || len(observed) == 0 {
+		return
+	}
+	positive := similarity >= f.threshold
+	for _, oc := range observed {
+		f.sampleRecorder.Record(contractAddr, oc.selector, oc.functionName, oc.params, similarity, oc.mutated, positive)
+	}
+}
+
+// attachSampleRecords 将样本分类信息写入报告
+func (f *CallDataFuzzer) attachSampleRecords(report *AttackParameterReport, contractAddr common.Address, selector []byte, targetMethod *abi.Method) {
+	if report == nil || f.sampleRecorder == nil {
+		return
+	}
+	selectorHex := strings.ToLower(hexutil.Encode(selector))
+	snapshots := f.sampleRecorder.Snapshot(contractAddr)
+	if len(snapshots) == 0 {
+		return
+	}
+
+	for sel, bucket := range snapshots {
+		if bucket == nil {
+			continue
+		}
+		if sel == selectorHex {
+			if len(bucket.positive) > 0 {
+				report.PositiveSamples = append(report.PositiveSamples, bucket.positive...)
+			}
+			if len(bucket.negative) > 0 {
+				report.NegativeSamples = append(report.NegativeSamples, bucket.negative...)
+			}
+			if report.FunctionName == "" {
+				if bucket.functionName != "" {
+					report.FunctionName = bucket.functionName
+				} else if targetMethod != nil {
+					report.FunctionName = targetMethod.Name
+				}
+			}
+			continue
+		}
+
+		if len(bucket.positive) > 0 {
+			report.PositiveSamples = append(report.PositiveSamples, bucket.positive...)
+		}
+		if len(bucket.negative) > 0 {
+			report.NegativeSamples = append(report.NegativeSamples, bucket.negative...)
+		}
+	}
+}
+
+// attachPreparedMutations 记录预设的变异参数，便于审计“先准备再重放”的流程
+func (f *CallDataFuzzer) attachPreparedMutations(report *AttackParameterReport, prepared map[string]*PreparedMutation) {
+	if report == nil || len(prepared) == 0 {
+		return
+	}
+	summaries := make([]PreparedMutationSample, 0, len(prepared))
+	for sel, pm := range prepared {
+		if pm == nil {
+			continue
+		}
+		summaries = append(summaries, PreparedMutationSample{
+			Selector:       sel,
+			FunctionName:   pm.FunctionName,
+			OriginalParams: toPublicParamValues(pm.OriginalParams),
+			PreparedParams: toPublicParamValues(pm.MutatedParams),
+		})
+	}
+	if len(summaries) > 1 {
+		sort.Slice(summaries, func(i, j int) bool { return summaries[i].Selector < summaries[j].Selector })
+	}
+	report.PreparedMutations = summaries
+}
+
 // getAttemptStats 返回全量尝试统计
 func (f *CallDataFuzzer) getAttemptStats() (attempts int, sum float64, minSim float64, maxSim float64) {
 	f.attemptMu.Lock()
@@ -4304,6 +4757,10 @@ func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, cont
 func convertParamConstraintsToSummaries(constraints []ParamConstraint) []ParameterSummary {
 	var out []ParameterSummary
 	for _, c := range constraints {
+		// 地址类型不输出规则
+		if isAddressType(c.Type) {
+			continue
+		}
 		ps := ParameterSummary{
 			ParamIndex:      c.Index,
 			ParamType:       c.Type,

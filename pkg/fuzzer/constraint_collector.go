@@ -339,6 +339,10 @@ func extractNumericParams(samples []constraintSample) map[int][]*big.Int {
 	out := make(map[int][]*big.Int)
 	for _, s := range samples {
 		for _, p := range s.params {
+			// 地址类型不参与表达式/数值规则
+			if isAddressType(p.Type) {
+				continue
+			}
 			if val := normalizeToBigInt(p.Value); val != nil {
 				out[p.Index] = append(out[p.Index], val)
 			}
@@ -470,6 +474,10 @@ func hexToInt(hexStr string) *big.Int {
 func pickParamValue(params []ParameterValue, idx int) *big.Int {
 	for _, p := range params {
 		if p.Index == idx {
+			// 地址类型不参与数值特征
+			if isAddressType(p.Type) {
+				return nil
+			}
 			return normalizeToBigInt(p.Value)
 		}
 	}
@@ -515,6 +523,10 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 
 	for i := 0; i < paramCount; i++ {
 		pc := &constraints[i]
+		// 地址类型不生成规则，直接跳过
+		if isAddressType(pc.Type) {
+			continue
+		}
 		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
 
 		var minVal, maxVal *big.Int
