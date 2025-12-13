@@ -80,6 +80,7 @@ type ParamSummary struct {
 type ExpressionTerm struct {
 	Kind       uint8
 	ParamIndex uint8
+	ParamType  uint8
 	Slot       [32]byte
 	Coeff      *big.Int
 }
@@ -150,6 +151,15 @@ func (p *OraclePusher) ProcessFuzzingReport(
 	funcSig [4]byte,
 	report *fuzzer.AttackParameterReport,
 ) error {
+	hasExpr := len(report.ExpressionRules) > 0
+	hasParams := len(report.ValidParameters) > 0
+
+	// 没有表达式也没有范围/离散值时跳过
+	if !hasExpr && !hasParams {
+		log.Printf("[OraclePusher] Skip push: no expression or param rules for %s-%x", project.Hex(), funcSig)
+		return nil
+	}
+
 	// 新增: 检查是否经过不变量验证
 	if report.HasInvariantCheck {
 		// 如果启用了不变量检查,则只推送有违规的报告
@@ -181,31 +191,31 @@ func (p *OraclePusher) ProcessFuzzingReport(
 		return nil
 	}
 
-	// 创建推送请求
-	request := &PushRequest{
-		Project:     project,
-		FunctionSig: funcSig,
-		Report:      report,
-		Threshold:   p.config.PushThreshold,
-		Timestamp:   time.Now(),
-	}
-
-	// 添加到待推送队列
-	p.mutex.Lock()
-	p.pendingReports = append(p.pendingReports, request)
-	p.mutex.Unlock()
-
-	// 先尝试推送表达式规则（链上存档）
-	if len(report.ExpressionRules) > 0 {
+	if hasExpr {
+		// 有表达式规则时仅推送表达式，避免范围规则覆盖
 		if err := p.pushExpressionRules(ctx, project, funcSig, report.ExpressionRules); err != nil {
-			log.Printf("[OraclePusher] Push expression rules failed: %v", err)
+			return err
 		}
+		log.Printf("[OraclePusher] Expression rules pushed for %s-%x", project.Hex(), funcSig)
+	} else {
+		// 无表达式时回退推送范围/离散值规则
+		paramSummaries, err := p.convertToChainFormat(report.ValidParameters)
+		if err != nil {
+			return err
+		}
+		if len(paramSummaries) == 0 {
+			log.Printf("[OraclePusher] Skip push: empty param summaries for %s-%x", project.Hex(), funcSig)
+			return nil
+		}
+		if err := p.pushParamRules(ctx, project, funcSig, paramSummaries, report.MaxSimilarity); err != nil {
+			return err
+		}
+		log.Printf("[OraclePusher] Param rules pushed for %s-%x", project.Hex(), funcSig)
 	}
 
-	// 如果达到批量大小，执行推送
-	if len(p.pendingReports) >= p.config.BatchSize {
-		return p.FlushPending(ctx)
-	}
+	p.mutex.Lock()
+	p.lastPushTime[key] = time.Now()
+	p.mutex.Unlock()
 
 	return nil
 }
@@ -266,32 +276,46 @@ func (p *OraclePusher) pushGroup(ctx context.Context, key string, requests []*Pu
 	// 使用最新的报告
 	latest := requests[len(requests)-1]
 
-	// 转换参数摘要为链上格式
-	summaries, err := p.convertToChainFormat(latest.Report.ValidParameters)
-	if err != nil {
-		return fmt.Errorf("failed to convert parameters: %w", err)
+	// 选择最近一次包含表达式规则的报告
+	var exprRules []fuzzer.ExpressionRule
+	for i := len(requests) - 1; i >= 0; i-- {
+		if len(requests[i].Report.ExpressionRules) > 0 {
+			exprRules = requests[i].Report.ExpressionRules
+			break
+		}
 	}
 
-	// 限制规则数量
-	if len(summaries) > p.config.MaxRulesPerFunc {
-		summaries = summaries[:p.config.MaxRulesPerFunc]
+	hasExpr := len(exprRules) > 0
+	hasParams := len(latest.Report.ValidParameters) > 0
+
+	// 相似度过滤
+	if latest.Report.MaxSimilarity < p.config.PushThreshold {
+		log.Printf("[OraclePusher] Group %s similarity %.2f below threshold %.2f, skipping", key, latest.Report.MaxSimilarity, p.config.PushThreshold)
+		return nil
 	}
 
-	// 发送交易（直接通过绑定合约调用）
-	// 说明：GasPrice/GasLimit 若未指定，将由 bind 库自动建议与估算
-	tx, err := p.bound.Transact(
-		p.auth,
-		"updateFromAutopatch",
-		latest.Project,
-		latest.FunctionSig,
-		summaries,
-		big.NewInt(int64(latest.Threshold*1000000)),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to send transaction: %w", err)
+	if hasExpr {
+		if err := p.pushExpressionRules(ctx, latest.Project, latest.FunctionSig, exprRules); err != nil {
+			return err
+		}
+		log.Printf("[OraclePusher] Expression rules pushed for grouped key %s", key)
+	} else if hasParams {
+		paramSummaries, err := p.convertToChainFormat(latest.Report.ValidParameters)
+		if err != nil {
+			return err
+		}
+		if len(paramSummaries) == 0 {
+			log.Printf("[OraclePusher] Skip group %s: empty param summaries", key)
+			return nil
+		}
+		if err := p.pushParamRules(ctx, latest.Project, latest.FunctionSig, paramSummaries, latest.Report.MaxSimilarity); err != nil {
+			return err
+		}
+		log.Printf("[OraclePusher] Param rules pushed for grouped key %s", key)
+	} else {
+		log.Printf("[OraclePusher] Skip group %s: no expression or param rules", key)
+		return nil
 	}
-
-	log.Printf("[OraclePusher] Pushed update for %s, tx: %s", key, tx.Hash().Hex())
 
 	// 更新最后推送时间
 	p.mutex.Lock()
@@ -306,6 +330,11 @@ func (p *OraclePusher) convertToChainFormat(params []fuzzer.ParameterSummary) ([
 	summaries := make([]ParamSummary, 0, len(params))
 
 	for _, param := range params {
+		// 跳过空参数（既无范围也无离散值），避免推送无效 0/0 规则
+		if param.IsRange && strings.TrimSpace(param.RangeMin) == "" && strings.TrimSpace(param.RangeMax) == "" && len(param.SingleValues) == 0 {
+			log.Printf("[OraclePusher] Skip empty param summary: idx=%d funcParamType=%s", param.ParamIndex, param.ParamType)
+			continue
+		}
 		summary := ParamSummary{
 			ParamIndex:      uint8(param.ParamIndex),
 			ParamType:       p.convertParamType(param.ParamType),
@@ -405,6 +434,7 @@ func (p *OraclePusher) pushExpressionRules(
 				} else {
 					term.ParamIndex = uint8(t.ParamIndex)
 				}
+				term.ParamType = p.convertParamType(t.ParamType)
 			} else {
 				term.Kind = 1
 				if len(t.Slot) > 2 {
@@ -425,6 +455,39 @@ func (p *OraclePusher) pushExpressionRules(
 	}
 	log.Printf("[OraclePusher] Pushed expression rules tx=%s", tx.Hash().Hex())
 	return nil
+}
+
+// pushParamRules 推送范围/离散值规则（用于无表达式时的回退）
+func (p *OraclePusher) pushParamRules(
+	ctx context.Context,
+	project common.Address,
+	funcSig [4]byte,
+	params []ParamSummary,
+	similarity float64,
+) error {
+	if len(params) == 0 {
+		return fmt.Errorf("no param summaries to push")
+	}
+
+	threshold := convertSimilarityToUint(similarity)
+	tx, err := p.bound.Transact(p.auth, "updateFromAutopatch", project, funcSig, params, threshold)
+	if err != nil {
+		return fmt.Errorf("failed to push param rules: %w", err)
+	}
+	log.Printf("[OraclePusher] Pushed param rules tx=%s (sim=%.4f)", tx.Hash().Hex(), similarity)
+	return nil
+}
+
+// convertSimilarityToUint 将相似度(0-1)转换为1e18精度的uint表示，方便链上记录
+func convertSimilarityToUint(sim float64) *big.Int {
+	if sim <= 0 {
+		return big.NewInt(0)
+	}
+	f := big.NewFloat(sim)
+	scale := big.NewFloat(0).SetInt(big.NewInt(1_000_000_000_000_000_000)) // 1e18
+	f.Mul(f, scale)
+	out, _ := f.Int(nil)
+	return out
 }
 
 func parseBigIntHex(hexStr string) *big.Int {
@@ -491,11 +554,11 @@ func (p *OraclePusher) GetStats() map[string]interface{} {
 const ParamCheckModuleABI = `[
 	{
 		"inputs": [
-			{
-				"name": "project",
-				"type": "address"
-			},
-			{
+		{
+			"name": "project",
+			"type": "address"
+		},
+		{
 				"name": "funcSig",
 				"type": "bytes4"
 			},
@@ -532,6 +595,7 @@ const ParamCheckModuleABI = `[
 					{"components": [
 						{"name": "kind", "type": "uint8"},
 						{"name": "paramIndex", "type": "uint8"},
+						{"name": "paramType", "type": "uint8"},
 						{"name": "slot", "type": "bytes32"},
 						{"name": "coeff", "type": "int256"}
 					], "name": "terms", "type": "tuple[]"},

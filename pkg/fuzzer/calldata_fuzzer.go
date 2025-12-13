@@ -1647,38 +1647,38 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		}
 	}
 
+	var chainedCalls []*CallFrame
 	if len(targetCalls) > 1 {
-		log.Printf("[Fuzzer]  只对首个受保护函数执行主动变异，其余函数仅记录连锁调用参数")
+		log.Printf("[Fuzzer]  只对首个受保护函数主动变异，其余函数复用连锁调用样本生成规则")
+		chainedCalls = targetCalls[1:]
 		targetCalls = targetCalls[:1]
 	}
 
 	log.Printf("[Fuzzer]  将依次Fuzz %d 个目标调用 (合约=%s)", len(targetCalls), contractAddr.Hex())
 
 	var reports []*AttackParameterReport
-	var lastErr error
 
-	for idx, targetCall := range targetCalls {
-		if len(targetCall.Input) < 10 {
-			log.Printf("[Fuzzer]  目标调用输入过短，跳过 (idx=%d)", idx)
-			continue
-		}
-		log.Printf("[Fuzzer] 进度 [%d/%d] selector=%s from=%s to=%s", idx+1, len(targetCalls), targetCall.Input[:10], targetCall.From, targetCall.To)
-
-		report, err := f.fuzzSingleTargetCall(ctx, txHash, contractAddr, blockNumber, targetCall, originalPath, stateOverride, trace)
-		if err != nil {
-			lastErr = err
-			log.Printf("[Fuzzer]  当前目标fuzz失败: %v", err)
-			continue
-		}
-
-		reports = append(reports, report)
+	if len(targetCalls) == 0 {
+		return nil, fmt.Errorf("未找到可Fuzz的受保护调用")
 	}
 
-	if len(reports) == 0 {
-		if lastErr != nil {
-			return nil, lastErr
+	targetCall := targetCalls[0]
+	if len(targetCall.Input) < 10 {
+		return nil, fmt.Errorf("目标调用输入过短")
+	}
+	log.Printf("[Fuzzer] 进度 [1/1] selector=%s from=%s to=%s", targetCall.Input[:10], targetCall.From, targetCall.To)
+
+	report, err := f.fuzzSingleTargetCall(ctx, txHash, contractAddr, blockNumber, targetCall, originalPath, stateOverride, trace)
+	if err != nil {
+		return nil, fmt.Errorf("当前目标fuzz失败: %w", err)
+	}
+	reports = append(reports, report)
+
+	// 基于连锁调用样本为其他 target_functions 生成规则报告（不再额外模糊测试）
+	if len(chainedCalls) > 0 {
+		if extra := f.buildChainedReportsFromSamples(report, chainedCalls, contractAddr, txHash, blockNumber); len(extra) > 0 {
+			reports = append(reports, extra...)
 		}
-		return nil, fmt.Errorf("所有目标调用均未产生报告")
 	}
 
 	return reports, nil
@@ -4776,4 +4776,317 @@ func convertParamConstraintsToSummaries(constraints []ParamConstraint) []Paramet
 		out = append(out, ps)
 	}
 	return out
+}
+
+// sampleGroup 聚合单个 selector 的样本
+type sampleGroup struct {
+	functionName string
+	pos          []MutationSample
+	neg          []MutationSample
+}
+
+// buildChainedReportsFromSamples 利用连锁调用样本为其他 target_functions 生成规则报告（不额外fuzz）
+func (f *CallDataFuzzer) buildChainedReportsFromSamples(
+	baseReport *AttackParameterReport,
+	chainedCalls []*CallFrame,
+	contractAddr common.Address,
+	txHash common.Hash,
+	blockNumber uint64,
+) []*AttackParameterReport {
+	if baseReport == nil || len(chainedCalls) == 0 {
+		return nil
+	}
+
+	// 按 selector 聚合样本
+	groups := make(map[string]*sampleGroup)
+	for _, s := range baseReport.PositiveSamples {
+		key := strings.ToLower(s.Selector)
+		if _, ok := groups[key]; !ok {
+			groups[key] = &sampleGroup{}
+		}
+		groups[key].pos = append(groups[key].pos, s)
+		if groups[key].functionName == "" && s.FunctionName != "" {
+			groups[key].functionName = s.FunctionName
+		}
+	}
+	for _, s := range baseReport.NegativeSamples {
+		key := strings.ToLower(s.Selector)
+		if _, ok := groups[key]; !ok {
+			groups[key] = &sampleGroup{}
+		}
+		groups[key].neg = append(groups[key].neg, s)
+		if groups[key].functionName == "" && s.FunctionName != "" {
+			groups[key].functionName = s.FunctionName
+		}
+	}
+
+	primarySelector := strings.ToLower(baseReport.FunctionSig)
+	seen := make(map[string]bool)
+	var out []*AttackParameterReport
+
+	for _, c := range chainedCalls {
+		if c == nil || len(c.Input) < 10 {
+			continue
+		}
+		selector := strings.ToLower(c.Input[:10])
+		if selector == "" {
+			continue
+		}
+		if strings.EqualFold(selector, primarySelector) {
+			continue
+		}
+		if seen[selector] {
+			continue
+		}
+		seen[selector] = true
+
+		group := groups[selector]
+		params := f.deriveParamSummariesFromSamples(group, contractAddr, c)
+		if len(params) == 0 {
+			continue
+		}
+
+		funcName := ""
+		if group != nil && group.functionName != "" {
+			funcName = group.functionName
+		}
+		if funcName == "" {
+			if _, method, err := f.decodeCallForSamples(contractAddr, c); err == nil && method != nil {
+				funcName = method.Name
+			}
+		}
+
+		totalSamples := 1
+		if group != nil {
+			totalSamples = len(group.pos) + len(group.neg)
+			if totalSamples == 0 {
+				totalSamples = 1
+			}
+		}
+
+		maxSim := baseReport.MaxSimilarity
+		if maxSim <= 0 {
+			maxSim = 1.0
+		}
+		avgSim := baseReport.AverageSimilarity
+		if avgSim <= 0 {
+			avgSim = maxSim
+		}
+
+		report := &AttackParameterReport{
+			ContractAddress:   contractAddr,
+			FunctionSig:       ensureSelectorHex(selector),
+			FunctionName:      funcName,
+			Timestamp:         time.Now(),
+			OriginalTxHash:    txHash,
+			BlockNumber:       blockNumber,
+			ValidParameters:   params,
+			TotalCombinations: totalSamples,
+			ValidCombinations: totalSamples,
+			AverageSimilarity: avgSim,
+			MaxSimilarity:     maxSim,
+			MinSimilarity:     maxSim,
+			HasInvariantCheck: baseReport.HasInvariantCheck,
+			ViolationCount:    baseReport.ViolationCount,
+		}
+
+		if group != nil {
+			if len(group.pos) > 0 {
+				report.PositiveSamples = append(report.PositiveSamples, group.pos...)
+			}
+			if len(group.neg) > 0 {
+				report.NegativeSamples = append(report.NegativeSamples, group.neg...)
+			}
+		}
+
+		out = append(out, report)
+	}
+
+	return out
+}
+
+// deriveParamSummariesFromSamples 基于样本和调用帧生成参数摘要（链上规则所需）
+func (f *CallDataFuzzer) deriveParamSummariesFromSamples(
+	group *sampleGroup,
+	contractAddr common.Address,
+	call *CallFrame,
+) []ParameterSummary {
+	type paramAgg struct {
+		paramType string
+		paramName string
+		values    map[string]struct{}
+		nums      []*big.Int
+	}
+
+	aggs := make(map[int]*paramAgg)
+	addValue := func(idx int, typ, name, val string) {
+		if idx < 0 {
+			return
+		}
+		if strings.Contains(typ, "[]") {
+			// 跳过数组类型，避免 ParamType 枚举映射错误
+			return
+		}
+		if typ == "" {
+			typ = "uint256"
+		}
+		if val == "" {
+			return
+		}
+		if _, ok := aggs[idx]; !ok {
+			aggs[idx] = &paramAgg{
+				paramType: typ,
+				paramName: name,
+				values:    make(map[string]struct{}),
+			}
+		}
+		agg := aggs[idx]
+		if agg.paramType == "" {
+			agg.paramType = typ
+		}
+		if agg.paramName == "" {
+			agg.paramName = name
+		}
+		agg.values[val] = struct{}{}
+		if n, ok := parseBigInt(val); ok {
+			agg.nums = append(agg.nums, n)
+		}
+	}
+
+	collectFromSamples := func(samples []MutationSample) {
+		for _, s := range samples {
+			for _, p := range s.Params {
+				if p.IsRange {
+					if p.RangeMin != "" {
+						addValue(p.Index, p.Type, p.Name, p.RangeMin)
+					}
+					if p.RangeMax != "" {
+						addValue(p.Index, p.Type, p.Name, p.RangeMax)
+					}
+					continue
+				}
+				addValue(p.Index, p.Type, p.Name, p.Value)
+			}
+		}
+	}
+
+	if group != nil {
+		collectFromSamples(group.pos)
+		collectFromSamples(group.neg)
+	}
+
+	// 回退：若样本缺失，直接解析原始调用参数补全
+	if call != nil {
+		if parsed, method, err := f.decodeCallForSamples(contractAddr, call); err == nil && parsed != nil {
+			for idx, p := range parsed.Parameters {
+				typ := p.Type
+				name := p.Name
+				if method != nil && idx < len(method.Inputs) {
+					typ = method.Inputs[idx].Type.String()
+					name = method.Inputs[idx].Name
+				}
+				paramIdx := p.Index
+				if paramIdx == 0 {
+					paramIdx = idx
+				}
+				addValue(paramIdx, typ, name, ValueToString(p.Value))
+			}
+		}
+	}
+
+	if len(aggs) == 0 {
+		return nil
+	}
+
+	summaries := make([]ParameterSummary, 0, len(aggs))
+	for idx, agg := range aggs {
+		if agg == nil || len(agg.values) == 0 {
+			continue
+		}
+		values := make([]string, 0, len(agg.values))
+		for v := range agg.values {
+			values = append(values, v)
+		}
+		sort.Strings(values)
+
+		ps := ParameterSummary{
+			ParamIndex:      idx,
+			ParamType:       agg.paramType,
+			ParamName:       agg.paramName,
+			OccurrenceCount: len(values),
+		}
+
+		if isNumericTypeStr(agg.paramType) && len(agg.nums) >= 2 {
+			minV, maxV := agg.nums[0], agg.nums[0]
+			for _, n := range agg.nums[1:] {
+				if n.Cmp(minV) < 0 {
+					minV = n
+				}
+				if n.Cmp(maxV) > 0 {
+					maxV = n
+				}
+			}
+			ps.IsRange = true
+			ps.RangeMin = formatBigInt(minV)
+			ps.RangeMax = formatBigInt(maxV)
+		} else {
+			ps.IsRange = false
+			ps.SingleValues = values
+		}
+
+		summaries = append(summaries, ps)
+	}
+
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].ParamIndex < summaries[j].ParamIndex
+	})
+	return summaries
+}
+
+// decodeCallForSamples 尝试解析调用帧的参数与方法
+func (f *CallDataFuzzer) decodeCallForSamples(contractAddr common.Address, call *CallFrame) (*ParsedCallData, *abi.Method, error) {
+	if call == nil || len(call.Input) < 10 {
+		return nil, nil, fmt.Errorf("call input empty")
+	}
+	data, err := hexutil.Decode(call.Input)
+	if err != nil {
+		return nil, nil, err
+	}
+	return f.parseCallDataWithABI(contractAddr, data)
+}
+
+func ensureSelectorHex(sel string) string {
+	if strings.HasPrefix(sel, "0x") {
+		return strings.ToLower(sel)
+	}
+	return "0x" + strings.ToLower(sel)
+}
+
+func parseBigInt(val string) (*big.Int, bool) {
+	str := strings.TrimSpace(val)
+	if str == "" {
+		return nil, false
+	}
+	if strings.HasPrefix(str, "0x") || strings.HasPrefix(str, "0X") {
+		if bi, ok := new(big.Int).SetString(str[2:], 16); ok {
+			return bi, true
+		}
+		return nil, false
+	}
+	if bi, ok := new(big.Int).SetString(str, 10); ok {
+		return bi, true
+	}
+	return nil, false
+}
+
+func formatBigInt(n *big.Int) string {
+	if n == nil {
+		return ""
+	}
+	return "0x" + n.Text(16)
+}
+
+func isNumericTypeStr(t string) bool {
+	lt := strings.ToLower(t)
+	return strings.HasPrefix(lt, "uint") || strings.HasPrefix(lt, "int") || lt == "uint" || lt == "int"
 }

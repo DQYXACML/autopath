@@ -180,6 +180,7 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 	// 预取参数/状态数值
 	paramVals := extractNumericParams(samples)
 	stateVals := extractNumericState(samples, contract)
+	paramTypes := collectParamTypes(samples)
 
 	for pIdx, vals := range paramVals {
 		for slot, svals := range stateVals {
@@ -227,7 +228,12 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 		Contract: contract,
 		Selector: selector,
 		Terms: []LinearTerm{
-			{Kind: "param", ParamIndex: best.paramIdx, Coeff: "0x" + paramCoeff.Text(16)},
+			{
+				Kind:       "param",
+				ParamIndex: best.paramIdx,
+				ParamType:  paramTypes[best.paramIdx],
+				Coeff:      "0x" + paramCoeff.Text(16),
+			},
 			{Kind: "state", Slot: best.slot, Coeff: "0x" + stateCoeff.Text(16)},
 		},
 		Threshold:    "0x0",
@@ -252,6 +258,7 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 
 	// 构造特征向量（原始数值）
 	vectors := buildFeatureVectors(samples, featureOrder)
+	paramTypes := collectParamTypes(samples)
 
 	// 归一化并计算中心方向（近似 one-class 线性分隔）
 	centroid := make([]*big.Rat, len(featureOrder))
@@ -307,6 +314,7 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 		term := LinearTerm{Kind: feat.kind, Coeff: "0x" + coeffInt.Text(16)}
 		if feat.kind == "param" {
 			term.ParamIndex = feat.paramIndex
+			term.ParamType = paramTypes[feat.paramIndex]
 		} else {
 			term.Slot = feat.slot
 		}
@@ -346,6 +354,20 @@ func extractNumericParams(samples []constraintSample) map[int][]*big.Int {
 			if val := normalizeToBigInt(p.Value); val != nil {
 				out[p.Index] = append(out[p.Index], val)
 			}
+		}
+	}
+	return out
+}
+
+// collectParamTypes 收集每个参数索引对应的类型字符串
+func collectParamTypes(samples []constraintSample) map[int]string {
+	out := make(map[int]string)
+	for _, s := range samples {
+		for _, p := range s.params {
+			if _, ok := out[p.Index]; ok {
+				continue
+			}
+			out[p.Index] = p.Type
 		}
 	}
 	return out

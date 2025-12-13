@@ -91,7 +91,7 @@
         "signature": "executeRoute(uint32,bytes)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
     "timeout_seconds": 10,

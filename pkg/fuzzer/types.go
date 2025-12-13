@@ -175,6 +175,7 @@ type ConstraintRule struct {
 type LinearTerm struct {
 	Kind       string `json:"kind"`                  // param/state
 	ParamIndex int    `json:"param_index,omitempty"` // 当kind=param时有效
+	ParamType  string `json:"param_type,omitempty"`  // 当kind=param时有效：uint256/int256/address/bool/bytes32/bytes/string
 	Slot       string `json:"slot,omitempty"`        // 当kind=state时有效
 	Coeff      string `json:"coeff"`                 // 系数，十六进制
 }

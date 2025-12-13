@@ -63,7 +63,7 @@
         "signature": "zapToBMI(address,uint256,address,uint256,uint256,address[],uint256[],address,bytes,bool)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
     "timeout_seconds": 10,

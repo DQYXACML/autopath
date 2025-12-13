@@ -549,7 +549,7 @@
         "signature": "deposit(int24,int24,uint256,uint256)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
     "timeout_seconds": 10,
