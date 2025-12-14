@@ -83,21 +83,17 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 		cacheKey = strings.ToLower(contractAddr.Hex())
 	}
 
-	log.Printf("[Fuzzer]  加载target_functions (projectID=%s, contract=%s)", projectID, contractAddr.Hex())
-
+	// 检查缓存（包括空缓存，避免重复扫描）
 	if cached, ok := targetSelectorCache.Load(cacheKey); ok {
 		if m, ok2 := cached.(map[string]map[string]bool); ok2 {
-			// 如果缓存为空映射，尝试重新加载（避免早期空结果污染）
-			if len(m) == 0 {
-				log.Printf("[Fuzzer]  缓存命中但为空，尝试重新加载 target_functions (cacheKey=%s)", cacheKey)
-			} else {
-				return m
-			}
+			log.Printf("[Fuzzer]  缓存命中 (projectID=%s, contract=%s, selectors=%d)", projectID, contractAddr.Hex(), len(m))
+			return m  // 直接返回缓存结果（包括空map）
 		}
 	}
 
+	log.Printf("[Fuzzer]  加载target_functions (projectID=%s, contract=%s)", projectID, contractAddr.Hex())
+
 	// 优先从当前目录向上查找 pkg/invariants/configs，再尝试 autopath/pkg/invariants/configs
-	wd, _ := os.Getwd()
 	candidateDirs := []string{}
 	for depth := 0; depth <= 3; depth++ {
 		prefix := strings.Repeat(".."+string(os.PathSeparator), depth)
@@ -106,13 +102,13 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 	}
 
 	var matches []string
-	log.Printf("[Fuzzer]  当前工作目录: %s", wd)
+	// log.Printf("[Fuzzer]  当前工作目录: %s", wd)  // 降低日志级别：移除详细调试信息
 	for _, dir := range candidateDirs {
 		pattern := filepath.Join(dir, "*.json")
-		log.Printf("[Fuzzer]  尝试配置目录: %s", pattern)
+		// log.Printf("[Fuzzer]  尝试配置目录: %s", pattern)  // 降低日志级别：移除目录扫描日志
 		found, globErr := filepath.Glob(pattern)
 		if globErr != nil {
-			log.Printf("[Fuzzer]  Glob失败: %v", globErr)
+			// log.Printf("[Fuzzer]  Glob失败: %v", globErr)  // 降低日志级别：移除错误详情
 			continue
 		}
 		// 过滤掉不存在的路径，防止虚假匹配
@@ -123,7 +119,7 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 			}
 		}
 		if len(valid) > 0 {
-			log.Printf("[Fuzzer]  在目录中找到配置文件 %d 个，示例: %s", len(valid), valid[0])
+			// log.Printf("[Fuzzer]  在目录中找到配置文件 %d 个，示例: %s", len(valid), valid[0])  // 降低日志级别
 			matches = append(matches, valid...)
 		}
 	}
@@ -131,12 +127,13 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 		log.Printf("[Fuzzer]  未找到任何配置文件，跳过target_functions加载")
 		return nil
 	}
-	log.Printf("[Fuzzer]  共发现配置文件: %d", len(matches))
-	sample := matches
-	if len(sample) > 5 {
-		sample = sample[:5]
-	}
-	log.Printf("[Fuzzer]  配置文件示例: %v", sample)
+	log.Printf("[Fuzzer]  扫描配置文件: 共%d个", len(matches))
+	// 移除示例输出，减少日志量
+	// sample := matches
+	// if len(sample) > 5 {
+	// 	sample = sample[:5]
+	// }
+	// log.Printf("[Fuzzer]  配置文件示例: %v", sample)
 
 	result := make(map[string]map[string]bool)
 	for _, path := range matches {
@@ -155,9 +152,10 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 		cfgProj := strings.TrimSpace(cfg.ProjectID)
 		targetProj := strings.TrimSpace(projectID)
 
-		if projectID != "" {
-			log.Printf("[Fuzzer]  检查配置文件: %s (cfgProjectID=%s)", path, cfgProj)
-		}
+		// 降低日志级别：只在找到匹配时输出，不输出每个文件的检查过程
+		// if projectID != "" {
+		// 	log.Printf("[Fuzzer]  检查配置文件: %s (cfgProjectID=%s)", path, cfgProj)
+		// }
 
 		// 过滤匹配：优先项目ID，相同则允许（去空格+不区分大小写）
 		if targetProj != "" && !strings.EqualFold(cfgProj, targetProj) {
@@ -165,7 +163,7 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 		}
 
 		if targetProj != "" && strings.EqualFold(cfgProj, targetProj) {
-			log.Printf("[Fuzzer]  命中项目配置文件: %s", path)
+			log.Printf("[Fuzzer]  命中项目配置文件: %s (projectID=%s)", path, cfgProj)
 		}
 
 		for _, tf := range cfg.FuzzingConfig.TargetFunctions {
@@ -356,6 +354,14 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		skipInv = *config.InvariantCheck.SkipOnHighSimilarity
 	}
 
+	// 构建 basePath 用于加载约束规则
+	// Monitor通常在 autopath/ 目录启动，所以 basePath 是 ".." (父目录)
+	basePath := ".."
+	if _, err := os.Stat(filepath.Join(basePath, "DeFiHackLabs")); err != nil {
+		// 如果 "../DeFiHackLabs" 不存在，尝试当前目录
+		basePath = "."
+	}
+
 	fuzzer := &CallDataFuzzer{
 		parser:                  NewABIParser(),
 		generator:               gen,
@@ -380,7 +386,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
 		projectID:               config.ProjectID,
 		localExecution:          config.LocalExecution, //  本地执行模式
-		constraintCollector:     NewConstraintCollector(10),
+		constraintCollector:     NewConstraintCollectorWithBasePath(10, basePath),
 		sampleRecorder:          newSampleRecorder(),
 	}
 	fuzzer.simMin = math.Inf(1)
@@ -442,6 +448,14 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		skipInv = *config.InvariantCheck.SkipOnHighSimilarity
 	}
 
+	// 构建 basePath 用于加载约束规则
+	// Monitor通常在 autopath/ 目录启动，所以 basePath 是 ".." (父目录)
+	basePath := ".."
+	if _, err := os.Stat(filepath.Join(basePath, "DeFiHackLabs")); err != nil {
+		// 如果 "../DeFiHackLabs" 不存在，尝试当前目录
+		basePath = "."
+	}
+
 	fuzzer := &CallDataFuzzer{
 		parser:                  NewABIParser(),
 		generator:               gen,
@@ -466,7 +480,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
 		projectID:               config.ProjectID,
 		localExecution:          config.LocalExecution, //  本地执行模式
-		constraintCollector:     NewConstraintCollector(10),
+		constraintCollector:     NewConstraintCollectorWithBasePath(10, basePath),
 		sampleRecorder:          newSampleRecorder(),
 	}
 	fuzzer.simMin = math.Inf(1)
@@ -1774,8 +1788,9 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	// ==================================================
 
 	// 预先为本次交易的所有潜在selector准备变异参数，供Hook按selector快速取用
-	allowedSelectors := loadTargetSelectors(f.projectID, contractAddr)
-	preparedMutations := f.prepareSelectorMutations(contractAddr, trace, allowedSelectors, targetSeedCfg)
+	// 重新加载（会命中缓存，无额外开销）
+	targetSelectors := loadTargetSelectors(f.projectID, contractAddr)
+	preparedMutations := f.prepareSelectorMutations(contractAddr, trace, targetSelectors, targetSeedCfg)
 
 	// 步骤4: 生成参数组合并执行模糊测试
 	log.Printf("[Fuzzer] Generating parameter combinations...")

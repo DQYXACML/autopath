@@ -3,6 +3,7 @@ package fuzzer
 import (
     "encoding/hex"
     "fmt"
+    "log"
     "math/big"
     "sort"
     "strings"
@@ -15,6 +16,10 @@ import (
 type ResultMerger struct {
 	// 配置参数
 	mergeStrategy MergeStrategy
+	// 约束规则
+	constraintRules *ConstraintRulesV2
+	// 基础路径（用于加载约束规则）
+	basePath string
 }
 
 // MergeStrategy 合并策略
@@ -33,6 +38,15 @@ const (
 func NewResultMerger() *ResultMerger {
 	return &ResultMerger{
 		mergeStrategy: MergeAuto,
+		basePath:      "/home/dqy/Firewall/FirewallOnchain",
+	}
+}
+
+// NewResultMergerWithBasePath 创建带基础路径的结果合并器
+func NewResultMergerWithBasePath(basePath string) *ResultMerger {
+	return &ResultMerger{
+		mergeStrategy: MergeAuto,
+		basePath:      basePath,
 	}
 }
 
@@ -66,11 +80,25 @@ func (m *ResultMerger) MergeResults(
 		}
 	}
 
+	// 尝试加载约束规则（如果还没加载）
+	if m.constraintRules == nil && m.basePath != "" {
+		rules, err := LoadConstraintRulesByContractAddr(m.basePath, contractAddr)
+		if err == nil {
+			m.constraintRules = rules
+			log.Printf("[ResultMerger] Loaded constraint rules for contract %s", contractAddr.Hex())
+		} else {
+			log.Printf("[ResultMerger] No constraint rules found for contract %s: %v", contractAddr.Hex(), err)
+		}
+	}
+
 	// 按参数索引分组
 	paramGroups := m.groupByParameter(results)
 
-	// 为每个参数生成摘要
-	validParams := m.extractParameterSummaries(paramGroups)
+	// 提取函数名（用于查找约束）
+	funcName := m.extractFunctionName(results)
+
+	// 为每个参数生成摘要（使用约束规则）
+	validParams := m.extractParameterSummariesWithConstraints(paramGroups, funcName)
 
 	// 计算统计信息
 	stats := m.calculateStatistics(results)
@@ -791,4 +819,167 @@ func (m *ResultMerger) getUniqueValues(values []*big.Int) []*big.Int {
 	}
 
 	return unique
+}
+
+// extractFunctionName 从结果中提取函数名
+func (m *ResultMerger) extractFunctionName(results []FuzzingResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+
+	// 尝试从第一个结果的参数名中提取函数名
+	for _, result := range results {
+		if len(result.Parameters) > 0 && result.Parameters[0].Name != "" {
+			// 参数名通常不包含函数名，这里我们需要其他方式
+			// 暂时返回空，后续可以改进
+			break
+		}
+	}
+
+	return ""
+}
+
+// extractParameterSummariesWithConstraints 使用约束规则提取参数摘要
+func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][]ParameterValue, funcName string) []ParameterSummary {
+	summaries := []ParameterSummary{}
+
+	// 按索引排序处理
+	indices := make([]int, 0, len(groups))
+	for idx := range groups {
+		indices = append(indices, idx)
+	}
+	sort.Ints(indices)
+
+	for _, idx := range indices {
+		values := groups[idx]
+		if len(values) == 0 {
+			continue
+		}
+
+		// 获取参数类型和名称（从第一个值）
+		paramType := values[0].Type
+		paramName := values[0].Name
+
+		// 地址类型不参与最终规则/表达式推送，避免硬编码地址
+		if isAddressType(paramType) {
+			continue
+		}
+
+		summary := ParameterSummary{
+			ParamIndex:      idx,
+			ParamType:       paramType,
+			ParamName:       paramName,
+			OccurrenceCount: len(values),
+		}
+
+		// 尝试为这个参数索引查找约束
+		var paramConstraint *ParamConstraintInfo
+		if m.constraintRules != nil {
+			paramConstraint = m.findConstraintForParameter(idx, paramName)
+		}
+
+		// 根据类型决定合并策略
+		if m.shouldMergeAsRange(paramType, values) {
+			// 合并为范围
+			rangeMin, rangeMax := m.findRangeWithConstraint(values, paramConstraint)
+			summary.IsRange = true
+			summary.RangeMin = m.valueToString(rangeMin)
+			summary.RangeMax = m.valueToString(rangeMax)
+
+			// 输出约束信息
+			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
+				log.Printf("[ResultMerger] Param #%d (%s): Applied constraint - SafeMax=%s, ObservedMax=%s, FinalMax=%s",
+					idx,
+					paramName,
+					paramConstraint.SafeThreshold.String(),
+					m.valueToString(rangeMax),
+					summary.RangeMax,
+				)
+			}
+		} else {
+			// 记录离散值
+			summary.IsRange = false
+			summary.SingleValues = m.extractUniqueValues(values)
+		}
+
+		summaries = append(summaries, summary)
+	}
+
+	return summaries
+}
+
+// findConstraintForParameter 为参数索引查找约束
+func (m *ResultMerger) findConstraintForParameter(paramIndex int, paramName string) *ParamConstraintInfo {
+	if m.constraintRules == nil {
+		return nil
+	}
+
+	// 遍历所有约束，查找匹配的参数
+	for _, constraint := range m.constraintRules.Constraints {
+		// 尝试提取参数约束
+		paramConstraint := ExtractParameterConstraint(&constraint, paramIndex)
+		if paramConstraint != nil {
+			log.Printf("[ResultMerger] Found constraint for param #%d in function %s", paramIndex, constraint.Function)
+			return paramConstraint
+		}
+	}
+
+	return nil
+}
+
+// findRangeWithConstraint 查找数值范围（使用约束规则）
+func (m *ResultMerger) findRangeWithConstraint(values []ParameterValue, constraint *ParamConstraintInfo) (interface{}, interface{}) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	// 首先找出观察到的范围
+	observedMin, observedMax := m.findRange(values)
+
+	// 如果没有约束，不返回范围（避免生成错误的"允许范围"）
+	// 离散值会自动使用Blacklist规则
+	if constraint == nil || constraint.SafeThreshold == nil {
+		log.Printf("[ResultMerger] No constraint for parameter, skipping range (will use blacklist for discrete values)")
+		return nil, nil
+	}
+
+	// 应用约束规则
+	// 对于安全上界约束（amount <= safe_threshold），将 rangeMax 设置为 safe_threshold
+	// 对于安全下界约束（amount >= safe_threshold），将 rangeMin 设置为 safe_threshold
+	
+	minVal, _ := m.toBigInt(observedMin)
+	maxVal, ok := m.toBigInt(observedMax)
+
+	if !ok || maxVal == nil {
+		// 非数值类型，返回观察到的范围
+		return observedMin, observedMax
+	}
+
+	// 判断约束类型
+	if constraint.IsSafeUpper {
+		// 安全条件是上界（amount <= threshold）
+		// 规则应该允许 [0, safe_threshold]
+		// 而不是只允许 [observed_min, observed_max]（攻击参数范围）
+
+		log.Printf("[ResultMerger] Applying upper bound constraint: observed [%s, %s] -> allowed [0, %s]",
+			minVal.String(),
+			maxVal.String(),
+			constraint.SafeThreshold.String(),
+		)
+
+		// 返回 [0, safe_threshold]
+		return big.NewInt(0), constraint.SafeThreshold
+	} else {
+		// 安全条件是下界（amount >= threshold）
+		// 规则应该允许 [safe_threshold, ∞]，使用类型最大值作为上界
+		maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+
+		log.Printf("[ResultMerger] Applying lower bound constraint: observed [%s, %s] -> allowed [%s, max]",
+			minVal.String(),
+			maxVal.String(),
+			constraint.SafeThreshold.String(),
+		)
+
+		return constraint.SafeThreshold, maxUint256
+	}
 }

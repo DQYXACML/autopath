@@ -2,6 +2,7 @@ package fuzzer
 
 import (
 	"encoding/hex"
+	"log"
 	"math/big"
 	"sort"
 	"strings"
@@ -20,18 +21,24 @@ type constraintSample struct {
 
 // ConstraintCollector 收集高相似样本并生成约束规则
 type ConstraintCollector struct {
-	mu        sync.Mutex
-	samples   map[string][]constraintSample // key: contract-selector
-	rules     map[string]*ConstraintRule
-	threshold int
-	exprs     map[string]*ExpressionRule
-	exprCost  map[string]int64 // 表达式生成耗时(ms)
-	// lastGenSample 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
-	lastGenSample map[string]int
+	mu              sync.Mutex
+	samples         map[string][]constraintSample // key: contract-selector
+	rules           map[string]*ConstraintRule
+	threshold       int
+	exprs           map[string]*ExpressionRule
+	exprCost        map[string]int64 // 表达式生成耗时(ms)
+	lastGenSample   map[string]int   // 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
+	constraintRules *ConstraintRulesV2
+	basePath        string
 }
 
 // NewConstraintCollector 创建约束收集器
 func NewConstraintCollector(threshold int) *ConstraintCollector {
+	return NewConstraintCollectorWithBasePath(threshold, "")
+}
+
+// NewConstraintCollectorWithBasePath 创建带基础路径的约束收集器（用于加载constraint_rules_v2.json）
+func NewConstraintCollectorWithBasePath(threshold int, basePath string) *ConstraintCollector {
 	if threshold <= 0 {
 		threshold = 10
 	}
@@ -42,6 +49,7 @@ func NewConstraintCollector(threshold int) *ConstraintCollector {
 		exprCost:      make(map[string]int64),
 		threshold:     threshold,
 		lastGenSample: make(map[string]int),
+		basePath:      basePath,
 	}
 }
 
@@ -61,6 +69,14 @@ func (cc *ConstraintCollector) RecordSample(
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
+	// 尝试加载约束规则（首次调用时）
+	if cc.constraintRules == nil && cc.basePath != "" {
+		if rules, err := LoadConstraintRulesByContractAddr(cc.basePath, contract); err == nil {
+			cc.constraintRules = rules
+			log.Printf("[ConstraintCollector] Loaded constraint rules for contract %s", contract.Hex())
+		}
+	}
+
 	cc.samples[key] = append(cc.samples[key], constraintSample{
 		params: params,
 		state:  state,
@@ -77,8 +93,8 @@ func (cc *ConstraintCollector) RecordSample(
 	cc.lastGenSample[key] = len(cc.samples[key])
 
 	// 同步生成表达式规则（ratio/linear）
+	start := time.Now()
 	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key]); expr != nil {
-		start := time.Now()
 		cc.exprs[key] = expr
 		cc.exprCost[key] = time.Since(start).Milliseconds()
 	}
@@ -126,12 +142,22 @@ func (cc *ConstraintCollector) ruleKey(contract common.Address, selector []byte)
 }
 
 func (cc *ConstraintCollector) buildRule(contract common.Address, selector []byte, samples []constraintSample) *ConstraintRule {
-	paramRanges := aggregateParamConstraints(samples)
+	// 构造函数签名用于查找约束
+	selectorHex := "0x" + hex.EncodeToString(selector)
+	var funcConstraints []FunctionConstraint
+	if cc.constraintRules != nil {
+		funcConstraints = cc.constraintRules.GetConstraintForFunction(selectorHex)
+		if len(funcConstraints) > 0 {
+			log.Printf("[ConstraintCollector] Found %d constraint(s) for function %s", len(funcConstraints), selectorHex)
+		}
+	}
+
+	paramRanges := cc.aggregateParamConstraintsWithRules(samples, funcConstraints)
 	stateConstraints := aggregateStateConstraints(contract, samples)
 
 	return &ConstraintRule{
 		ContractAddress:   contract,
-		FunctionSelector:  "0x" + hex.EncodeToString(selector),
+		FunctionSelector:  selectorHex,
 		SampleCount:       len(samples),
 		ParamConstraints:  paramRanges,
 		StateConstraints:  stateConstraints,
@@ -219,8 +245,12 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 		return nil
 	}
 
-	paramCoeff := new(big.Int).Set(scale) // p * SCALE
-	stateCoeff := new(big.Int).Neg(kInt)  // -k * s
+	// 反转系数符号，使表达式变为拦截条件
+	// 原表达式：p*SCALE - k*s >= 0（攻击满足，会通过❌）
+	// 新表达式：-p*SCALE + k*s >= 0（攻击不满足，会被拦截✓）
+	// 即：p*SCALE <= k*s，拦截 p >= k*s/SCALE 的攻击参数
+	paramCoeff := new(big.Int).Neg(scale) // -p * SCALE
+	stateCoeff := new(big.Int).Set(kInt)  // +k * s
 	minMargin := calcMinMarginRatio(paramVals[best.paramIdx], stateVals[best.slot], paramCoeff, stateCoeff)
 
 	return &ExpressionRule{
@@ -296,6 +326,15 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 	if thresholdRat.Sign() <= 0 {
 		return nil
 	}
+
+	// 反转质心方向和阈值，使攻击样本被拦截
+	// 原：攻击样本 ∑w_i*x_i >= T，会通过❌
+	// 新：攻击样本 ∑(-w_i)*x_i < -T，会被拦截✓
+	// 链上检查：lhs >= threshold 时通过，所以需要让攻击样本不满足这个条件
+	for i := range centroid {
+		centroid[i].Neg(centroid[i]) // 反转质心方向
+	}
+	thresholdRat.Neg(thresholdRat) // 反转阈值
 
 	terms := make([]LinearTerm, 0, len(featureOrder))
 	coeffInts := make([]*big.Int, len(featureOrder))
@@ -527,6 +566,134 @@ func averageSimilarity(samples []constraintSample) float64 {
 		sum += s.sim
 	}
 	return sum / float64(len(samples))
+}
+
+// aggregateParamConstraintsWithRules 使用约束规则生成参数约束
+func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []constraintSample, funcConstraints []FunctionConstraint) []ParamConstraint {
+	if len(samples) == 0 {
+		return nil
+	}
+
+	// 使用第一条样本的参数长度为基准
+	paramCount := len(samples[0].params)
+	constraints := make([]ParamConstraint, paramCount)
+
+	for i := 0; i < paramCount; i++ {
+		constraints[i].Index = samples[0].params[i].Index
+		constraints[i].Type = samples[0].params[i].Type
+	}
+
+	for i := 0; i < paramCount; i++ {
+		pc := &constraints[i]
+		// 地址类型不生成规则，直接跳过
+		if isAddressType(pc.Type) {
+			continue
+		}
+		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
+
+		var minVal, maxVal *big.Int
+		valueSet := make(map[string]struct{})
+
+		// 收集观察到的参数值
+		for _, s := range samples {
+			if i >= len(s.params) {
+				continue
+			}
+			val := s.params[i].Value
+			if isNumeric {
+				if bi := normalizeBigIntValue(val); bi != nil {
+					if minVal == nil || bi.Cmp(minVal) < 0 {
+						minVal = new(big.Int).Set(bi)
+					}
+					if maxVal == nil || bi.Cmp(maxVal) > 0 {
+						maxVal = new(big.Int).Set(bi)
+					}
+				}
+			} else {
+				valueSet[ValueToString(val)] = struct{}{}
+			}
+		}
+
+		// 应用约束规则（如果存在）
+		if isNumeric && minVal != nil && maxVal != nil {
+			pc.IsRange = true
+
+			// 查找参数的约束规则
+			paramConstraint := pickParamConstraint(funcConstraints, i)
+
+			// 如果存在约束规则，使用 safe_threshold 作为范围上界
+			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
+				if paramConstraint.IsSafeUpper {
+					// 安全条件是上界（amount <= threshold）
+					// 规则应该允许 [0, safe_threshold]
+					log.Printf("[ConstraintCollector] Applying constraint for param #%d: observed [%s, %s] -> safe [0, %s]",
+						i, minVal.String(), maxVal.String(), paramConstraint.SafeThreshold.String())
+					pc.RangeMin = "0x0"
+					pc.RangeMax = "0x" + paramConstraint.SafeThreshold.Text(16)
+				} else {
+					// 安全条件是下界（amount >= threshold）
+					// 规则应该允许 [safe_threshold, ∞]，使用类型最大值作为上界
+					log.Printf("[ConstraintCollector] Applying constraint for param #%d: observed [%s, %s] -> safe [%s, max]",
+						i, minVal.String(), maxVal.String(), paramConstraint.SafeThreshold.String())
+					pc.RangeMin = "0x" + paramConstraint.SafeThreshold.Text(16)
+
+					// 使用类型最大值作为上界（避免使用攻击样本的最大值导致误杀）
+					if pc.Type == "uint256" {
+						maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+						pc.RangeMax = "0x" + maxUint256.Text(16)
+					} else if strings.HasPrefix(pc.Type, "uint") {
+						// 其他uint类型，使用对应的最大值
+						maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+						pc.RangeMax = "0x" + maxUint256.Text(16)
+					} else {
+						// 对于其他类型，使用观察到的最大值（保守处理）
+						pc.RangeMax = "0x" + maxVal.Text(16)
+						log.Printf("[ConstraintCollector] Warning: Using observed max for non-uint type %s", pc.Type)
+					}
+				}
+			} else {
+				// 无约束规则时，不生成Range规则（Range是允许范围，不适合拦截攻击）
+				// 离散值会自动生成Blacklist规则
+				log.Printf("[ConstraintCollector] No constraint rule for param #%d, skipping range generation (observed [%s, %s])",
+					i, minVal.String(), maxVal.String())
+				// 不设置 IsRange, RangeMin, RangeMax，让离散值使用Blacklist规则
+			}
+		} else {
+			pc.Values = dedupMapKeys(valueSet)
+		}
+	}
+
+	return constraints
+}
+
+// pickParamConstraint 从多条函数约束中挑选对指定参数最严格的阈值
+func pickParamConstraint(funcConstraints []FunctionConstraint, paramIndex int) *ParamConstraintInfo {
+	var chosen *ParamConstraintInfo
+	for i := range funcConstraints {
+		pc := ExtractParameterConstraint(&funcConstraints[i], paramIndex)
+		if pc == nil {
+			continue
+		}
+		if chosen == nil {
+			chosen = pc
+			continue
+		}
+		// 优先保留更严格的安全阈值：上界取较小，下界取较大
+		if pc.SafeThreshold != nil && chosen.SafeThreshold != nil {
+			if pc.IsSafeUpper == chosen.IsSafeUpper {
+				if pc.IsSafeUpper && pc.SafeThreshold.Cmp(chosen.SafeThreshold) < 0 {
+					chosen = pc
+				} else if !pc.IsSafeUpper && pc.SafeThreshold.Cmp(chosen.SafeThreshold) > 0 {
+					chosen = pc
+				}
+			}
+			continue
+		}
+		if chosen.SafeThreshold == nil && pc.SafeThreshold != nil {
+			chosen = pc
+		}
+	}
+	return chosen
 }
 
 func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
