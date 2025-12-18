@@ -33,12 +33,12 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "2",
+            "index": "27345345294061825628103022900114978450352795135033401968609844108243198926249",
             "severity": "critical",
-            "threshold": 0.25
+            "threshold": 5.0
           },
           "slot_1": {
-            "index": "27345345294061825628103022900114978450352795135033401968609844108243198926249",
+            "index": "2",
             "severity": "critical",
             "threshold": 0.25
           }
@@ -222,7 +222,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "flash": {
+        "flash(address,address,uint256,bytes)": {
           "0": {
             "type": "address",
             "safe_threshold": "0x04c80bb477890f3021f03b068238836ee20aa0b8",
@@ -265,9 +265,9 @@
             "value_expr": "\"\""
           }
         },
-        "debond": {
+        "debond(uint256,address[],uint8[])": {
           "0": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "3418944620969774259634176",
             "danger_threshold": "8611951186321848770844714",
             "attack_values": [
@@ -284,16 +284,16 @@
             "value_expr": "wBARL.balanceOf(address(this))"
           },
           "1": {
-            "type": "uint256",
-            "safe_threshold": "0xffffffffffffffffffffffffffffffffffffffff",
-            "danger_threshold": "0x0000000000000000000000000000000000000000",
+            "type": "address[]",
+            "safe_threshold": "0x0000000000000000000000000000000000000000",
+            "danger_threshold": "0xffffffffffffffffffffffffffffffffffffffff",
             "attack_values": [
-              "0xffffffffffffffffffffffffffffffffffffffff",
-              "0x0000000000000000000000000000000000000000"
+              "0x0000000000000000000000000000000000000000",
+              "0xffffffffffffffffffffffffffffffffffffffff"
             ],
             "range": {
-              "min": "0xffffffffffffffffffffffffffffffffffffffff",
-              "max": "0x0000000000000000000000000000000000000000"
+              "min": "0x0000000000000000000000000000000000000000",
+              "max": "0xffffffffffffffffffffffffffffffffffffffff"
             },
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.3,
@@ -315,7 +315,7 @@
             "value_expr": "percentage"
           }
         },
-        "bond": {
+        "bond(address,uint256)": {
           "1": {
             "type": "uint256",
             "safe_threshold": "3418944620969774259634176",

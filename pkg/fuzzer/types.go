@@ -49,12 +49,13 @@ type ParameterValue struct {
 // AttackParameterReport 攻击参数报告
 type AttackParameterReport struct {
 	// 基本信息
-	ContractAddress common.Address `json:"contract_address"`
-	FunctionSig     string         `json:"function_signature"`
-	FunctionName    string         `json:"function_name,omitempty"`
-	Timestamp       time.Time      `json:"timestamp"`
-	OriginalTxHash  common.Hash    `json:"original_tx_hash"`
-	BlockNumber     uint64         `json:"block_number"`
+	ContractAddress   common.Address `json:"contract_address"`
+	FunctionSig       string         `json:"function_signature"`
+	FunctionName      string         `json:"function_name,omitempty"`
+	FunctionSignature string         `json:"function_signature_full,omitempty"` // 标准函数签名（含参数类型）
+	Timestamp         time.Time      `json:"timestamp"`
+	OriginalTxHash    common.Hash    `json:"original_tx_hash"`
+	BlockNumber       uint64         `json:"block_number"`
 
 	// 有效参数组合
 	ValidParameters []ParameterSummary `json:"valid_parameters"`

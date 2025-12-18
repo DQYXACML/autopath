@@ -23,37 +23,11 @@
     "0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6",
     "0x5a770DbD3Ee6bAF2802D29a901Ef11501C44797A",
     "0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417",
-    "0x0000000000000000000000000000000000000000",
-    "0x23b872dd00000000000000000000000007d7685b",
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    "0x2bF3cC8Fa6F067cc1741c7467C8Ee9F00e837757"
+    "0x2bF3cC8Fa6F067cc1741c7467C8Ee9F00e837757",
+    "0x34cfac646f301356faa8b21e94227e3583fe3f5f"
   ],
-  "invariants": [
-    {
-      "id": "PATTERN_flash_change_001",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.25,
-        "contracts": [
-          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "5549066164583847888578675069041927512035210835734785090032633812695645315662",
-            "severity": "critical",
-            "threshold": 0.25
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.25"
-      },
-      "monitored_functions": [
-        "zapToBMI"
-      ]
-    }
-  ],
+  "invariants": [],
   "fuzzing_config": {
     "enabled": true,
     "target_functions": [
@@ -112,154 +86,77 @@
         "zone_threshold": 0.75
       },
       "enabled": true,
-      "constraint_ranges": {
-        "zapToBMI": {
-          "0": {
-            "type": "address",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(BUSD)"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// BUSD\n            0"
-          },
-          "2": {
-            "type": "address",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _amount\n            address(0)"
-          },
-          "3": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _fromUnderlying\n            0"
-          },
-          "4": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _fromUnderlyingAmount\n            0"
-          },
-          "5": {
-            "type": "address[]",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _minBMIRecv\n            bmiConstituents"
-          },
-          "6": {
-            "type": "uint256[]",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "bmiConstituentsWeightings"
-          },
-          "7": {
-            "type": "address",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(USDC)"
-          },
-          "8": {
-            "type": "bytes",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _aggregator\n            maliciousCallData"
-          },
-          "9": {
-            "type": "bool",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "// _aggregatorData\n            true"
-          }
-        }
+      "attack_seeds": {
+        "8": [
+          "0x0000000000000000023b872dd000000000000000000000000... (100 bytes)"
+        ],
+        "4": [
+          "0"
+        ],
+        "1": [
+          "0"
+        ],
+        "3": [
+          "0"
+        ]
       },
-      "range_mutation_config": {
-        "focus_percentiles": [
+      "range_config": {
+        "numeric_range_percent": [
+          1,
+          2,
+          5,
+          10,
+          20,
           50,
-          75,
-          90,
-          95,
-          99,
           100
         ],
-        "boundary_exploration": true,
-        "step_count": 20,
-        "random_within_range_ratio": 0.3
+        "address_mutation_types": [
+          "original",
+          "bitflip_1",
+          "bitflip_2",
+          "nearby"
+        ],
+        "boundary_exploration": true
       },
-      "attack_seeds": {}
+      "weights": {
+        "seed_based": 0.6,
+        "random": 0.2,
+        "boundary": 0.2
+      },
+      "symbolic_config": {
+        "enabled": true,
+        "mode": "z3",
+        "max_constraints": 30,
+        "solver_timeout": "3s",
+        "extraction": {
+          "max_trace_depth": 5000,
+          "focus_opcodes": [
+            "JUMPI",
+            "LT",
+            "GT",
+            "EQ",
+            "ISZERO",
+            "SLT",
+            "SGT"
+          ],
+          "ignore_loops": true,
+          "max_branches": 15
+        },
+        "solver": {
+          "strategy": "z3",
+          "max_solutions": 8,
+          "use_cache": true,
+          "cache_size": 1000,
+          "parallel": true,
+          "workers": 8
+        },
+        "integration": {
+          "priority": "high",
+          "merge_with_adaptive": true,
+          "confidence_threshold": 0.5,
+          "max_symbolic_seeds": 20
+        }
+      }
     }
   },
   "alert_config": {

@@ -257,7 +257,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "flash": {
+        "flash(address,address,uint256,bytes)": {
           "0": {
             "type": "address",
             "safe_threshold": "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
@@ -270,6 +270,20 @@
             "confidence": 0.3,
             "value_expr": "address(this)"
           },
+          "3": {
+            "type": "bytes",
+            "safe_threshold": "2",
+            "danger_threshold": "2",
+            "attack_values": [
+              "\"\""
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "\"\""
+          }
+        },
+        "flash(...)": {
           "2": {
             "type": "uint256",
             "safe_threshold": "88163368427964784967680",
@@ -286,23 +300,11 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.5,
             "value_expr": "Peas.balanceOf(address(ppPP))"
-          },
-          "3": {
-            "type": "bytes",
-            "safe_threshold": "2",
-            "danger_threshold": "2",
-            "attack_values": [
-              "\"\""
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "\"\""
           }
         },
-        "debond": {
+        "debond(...)": {
           "0": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "88163368427964784967680",
             "danger_threshold": "293877894759882629745878",
             "attack_values": [
@@ -317,9 +319,11 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.5,
             "value_expr": "ppPP.balanceOf(address(this))"
-          },
+          }
+        },
+        "debond(uint256,address[],uint8[])": {
           "1": {
-            "type": "uint256",
+            "type": "address[]",
             "safe_threshold": "0x0000000000000000000000000000000000000000",
             "danger_threshold": "0xffffffffffffffffffffffffffffffffffffffff",
             "attack_values": [
@@ -350,7 +354,7 @@
             "value_expr": "percentage"
           }
         },
-        "bond": {
+        "bond(...)": {
           "1": {
             "type": "uint256",
             "safe_threshold": "88163368427964784967680",

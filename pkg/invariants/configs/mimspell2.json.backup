@@ -636,7 +636,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "repayForAll": {
+        "repayForAll(uint256,uint256)": {
           "1": {
             "type": "bool",
             "safe_threshold": "0",
@@ -651,7 +651,7 @@
             "value_expr": "true"
           }
         },
-        "repay": {
+        "repay(uint256,uint256,uint256)": {
           "1": {
             "type": "bool",
             "safe_threshold": "0",
@@ -664,7 +664,9 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.2,
             "value_expr": "true"
-          },
+          }
+        },
+        "repay(...)": {
           "2": {
             "type": "uint256",
             "safe_threshold": "23720167481806814195394145442723641227958582052012384346701824",
@@ -683,7 +685,7 @@
             "value_expr": "borrowPart"
           }
         },
-        "addCollateral": {
+        "addCollateral(address,uint256,uint256)": {
           "0": {
             "type": "address",
             "safe_threshold": "0x7259e152103756e1616a77ae982353c3751a6a90",
@@ -708,7 +710,9 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.2,
             "value_expr": "true"
-          },
+          }
+        },
+        "addCollateral(...)": {
           "2": {
             "type": "uint256",
             "safe_threshold": "30",
@@ -727,7 +731,7 @@
             "value_expr": "depositAmount - 100"
           }
         },
-        "borrow": {
+        "borrow(address,uint256)": {
           "0": {
             "type": "address",
             "safe_threshold": "0x7259e152103756e1616a77ae982353c3751a6a90",
@@ -739,9 +743,11 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.3,
             "value_expr": "address(this)"
-          },
+          }
+        },
+        "borrow(...)": {
           "1": {
-            "type": "bool",
+            "type": "uint256",
             "safe_threshold": "23720167481806814195394145442723641227958582052012384346701824",
             "danger_threshold": "79067224939356047679097206782029926546469607951777785701813435",
             "attack_values": [

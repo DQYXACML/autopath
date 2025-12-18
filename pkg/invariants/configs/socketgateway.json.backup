@@ -141,7 +141,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "executeRoute": {
+        "executeRoute(...)": {
           "1": {
             "type": "bytes",
             "safe_threshold": "0",

@@ -2,6 +2,7 @@ package pusher
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -393,9 +394,15 @@ func (p *OraclePusher) stringToBytes32(val string) [32]byte {
 		if len(val) > 64 {
 			val = val[:64]
 		}
-		// 从右边填充，确保数值正确
-		padded := fmt.Sprintf("%064s", val)
-		fmt.Sscanf(padded, "%x", &result)
+		// 左侧填充零，确保数值正确（修复：使用0填充而不是空格）
+		if len(val) < 64 {
+			val = strings.Repeat("0", 64-len(val)) + val
+		}
+		// 解码十六进制字符串到bytes32
+		bytes, err := hex.DecodeString(val)
+		if err == nil {
+			copy(result[:], bytes)
+		}
 	} else {
 		// 尝试作为十进制数处理
 		if n, ok := new(big.Int).SetString(val, 10); ok {

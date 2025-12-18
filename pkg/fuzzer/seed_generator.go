@@ -1149,11 +1149,37 @@ func (sg *SeedGenerator) HasConstraintRanges() bool {
 }
 
 // GetConstraintRangeForFunc 获取指定函数的约束范围
+// 支持两种键格式: 完整签名(如"debond(uint256,address[],uint8[])") 和 简单函数名(如"debond")
 func (sg *SeedGenerator) GetConstraintRangeForFunc(funcName string) map[string]*ConstraintRange {
 	if sg.config.ConstraintRanges == nil {
 		return nil
 	}
-	return sg.config.ConstraintRanges[funcName]
+
+	// 1. 优先尝试直接匹配(可能是完整签名或简单函数名)
+	if ranges, ok := sg.config.ConstraintRanges[funcName]; ok {
+		return ranges
+	}
+
+	// 2. 如果funcName是完整签名，尝试提取简单函数名查找(向后兼容)
+	// 例如: "debond(uint256,address[],uint8[])" -> "debond"
+	if idx := strings.Index(funcName, "("); idx > 0 {
+		simpleName := funcName[:idx]
+		if ranges, ok := sg.config.ConstraintRanges[simpleName]; ok {
+			return ranges
+		}
+	}
+
+	// 3. 如果funcName是简单函数名，尝试查找匹配的完整签名(向前兼容)
+	// 遍历所有键，查找以funcName开头且包含括号的键
+	if !strings.Contains(funcName, "(") {
+		for key, ranges := range sg.config.ConstraintRanges {
+			if strings.HasPrefix(key, funcName+"(") {
+				return ranges
+			}
+		}
+	}
+
+	return nil
 }
 
 // GenerateConstraintBasedVariations 基于约束范围生成参数变异

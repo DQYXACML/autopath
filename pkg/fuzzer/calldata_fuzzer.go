@@ -87,7 +87,7 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 	if cached, ok := targetSelectorCache.Load(cacheKey); ok {
 		if m, ok2 := cached.(map[string]map[string]bool); ok2 {
 			log.Printf("[Fuzzer]  缓存命中 (projectID=%s, contract=%s, selectors=%d)", projectID, contractAddr.Hex(), len(m))
-			return m  // 直接返回缓存结果（包括空map）
+			return m // 直接返回缓存结果（包括空map）
 		}
 	}
 
@@ -1935,6 +1935,14 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		startTime,
 	)
 
+	// 记录ABI推导的标准函数签名，便于后续校验selector是否匹配
+	if targetMethod != nil {
+		report.FunctionSignature = targetMethod.Sig
+		if report.FunctionName == "" {
+			report.FunctionName = targetMethod.Name
+		}
+	}
+
 	f.attachSampleRecords(report, contractAddr, parsedData.Selector, targetMethod)
 	f.attachPreparedMutations(report, preparedMutations)
 	// 补充时间轴统计
@@ -2558,24 +2566,64 @@ func cloneAdaptiveConfig(src *AdaptiveRangeConfig) *AdaptiveRangeConfig {
 }
 
 // cloneSeedConfigForFunction 返回按函数名过滤后的种子配置副本
+// 支持两种键格式: 完整签名(如"debond(uint256,address[],uint8[])") 和 简单函数名(如"debond")
 func cloneSeedConfigForFunction(cfg *SeedConfig, method *abi.Method) *SeedConfig {
 	cloned := cloneSeedConfig(cfg)
 	if cloned == nil || method == nil || len(cloned.ConstraintRanges) == 0 {
 		return cloned
 	}
 
+	// 构造完整函数签名
+	var fullSig string
+	if method != nil {
+		// 构造签名: function(type1,type2,...)
+		paramTypes := make([]string, len(method.Inputs))
+		for i, input := range method.Inputs {
+			paramTypes[i] = input.Type.String()
+		}
+		fullSig = method.Name + "(" + strings.Join(paramTypes, ",") + ")"
+	}
+
 	fnLower := strings.ToLower(method.Name)
+
+	// 1. 优先尝试完整签名匹配(新格式)
+	if fullSig != "" {
+		if ranges, ok := cloned.ConstraintRanges[fullSig]; ok {
+			cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
+				fullSig: ranges,
+			}
+			return cloned
+		}
+	}
+
+	// 2. 尝试简单函数名匹配(向后兼容)
 	if ranges, ok := cloned.ConstraintRanges[method.Name]; ok {
 		cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
 			method.Name: ranges,
 		}
-	} else if ranges, ok := cloned.ConstraintRanges[fnLower]; ok {
+		return cloned
+	}
+
+	// 3. 尝试小写函数名匹配(向后兼容)
+	if ranges, ok := cloned.ConstraintRanges[fnLower]; ok {
 		cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
 			fnLower: ranges,
 		}
-	} else {
-		cloned.ConstraintRanges = nil
+		return cloned
 	}
+
+	// 4. 尝试查找任何以函数名开头的完整签名(模糊匹配)
+	for key, ranges := range cloned.ConstraintRanges {
+		if strings.HasPrefix(key, method.Name+"(") {
+			cloned.ConstraintRanges = map[string]map[string]*ConstraintRange{
+				key: ranges,
+			}
+			return cloned
+		}
+	}
+
+	// 未找到匹配的约束范围
+	cloned.ConstraintRanges = nil
 	return cloned
 }
 
@@ -4861,14 +4909,18 @@ func (f *CallDataFuzzer) buildChainedReportsFromSamples(
 			continue
 		}
 
+		// 优先使用ABI解析到的方法，补全函数名与标准签名
+		var decodedMethod *abi.Method
+		if _, method, err := f.decodeCallForSamples(contractAddr, c); err == nil {
+			decodedMethod = method
+		}
+
 		funcName := ""
 		if group != nil && group.functionName != "" {
 			funcName = group.functionName
 		}
-		if funcName == "" {
-			if _, method, err := f.decodeCallForSamples(contractAddr, c); err == nil && method != nil {
-				funcName = method.Name
-			}
+		if funcName == "" && decodedMethod != nil {
+			funcName = decodedMethod.Name
 		}
 
 		totalSamples := 1
@@ -4903,6 +4955,9 @@ func (f *CallDataFuzzer) buildChainedReportsFromSamples(
 			MinSimilarity:     maxSim,
 			HasInvariantCheck: baseReport.HasInvariantCheck,
 			ViolationCount:    baseReport.ViolationCount,
+		}
+		if decodedMethod != nil {
+			report.FunctionSignature = decodedMethod.Sig
 		}
 
 		if group != nil {

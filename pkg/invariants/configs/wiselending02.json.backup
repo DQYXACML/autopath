@@ -1389,9 +1389,9 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "getPositionLendingShares": {
+        "getPositionLendingShares(...)": {
           "0": {
-            "type": "address => LendingPoolEntry",
+            "type": "uint256",
             "safe_threshold": "300000000000000000",
             "danger_threshold": "1000000000000000000",
             "attack_values": [

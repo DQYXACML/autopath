@@ -310,7 +310,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "startPrank": {
+        "startPrank(...)": {
           "0": {
             "type": "address",
             "safe_threshold": "0",
@@ -325,7 +325,7 @@
             "value_expr": "attacker"
           }
         },
-        "deposit": {
+        "deposit(...)": {
           "0": {
             "type": "address",
             "safe_threshold": "0",
@@ -431,7 +431,7 @@
             "value_expr": "0"
           }
         },
-        "swapPath": {
+        "swapPath(...)": {
           "0": {
             "type": "address",
             "safe_threshold": "0",

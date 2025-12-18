@@ -200,7 +200,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "withdraw": {
+        "withdraw(...)": {
           "0": {
             "type": "address",
             "safe_threshold": "0",
@@ -217,18 +217,6 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.5,
             "value_expr": "orbitHubContractAddress"
-          },
-          "1": {
-            "type": "string",
-            "safe_threshold": "7",
-            "danger_threshold": "7",
-            "attack_values": [
-              "\"ORBIT\""
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "\"ORBIT\""
           },
           "2": {
             "type": "bytes",
@@ -263,6 +251,20 @@
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.5,
             "value_expr": "orbitExploiterToAddr"
+          }
+        },
+        "withdraw(uint256,bytes,uint256,uint256,address,address[],uint256[],bytes,uint8[],address[],address[])": {
+          "1": {
+            "type": "string",
+            "safe_threshold": "7",
+            "danger_threshold": "7",
+            "attack_values": [
+              "\"ORBIT\""
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "\"ORBIT\""
           },
           "5": {
             "type": "bytes32[]",
@@ -386,13 +388,13 @@
       },
       "attack_seeds": {
         "10": [
-          "0x0cc266abfa2ba924ffa7dab0cd8f7bb1a14891ec",
+          "0x18303ee09818b0575ea4a5c2ed25b1e78523aa2b",
+          "0x6b6ddbaaafc5f0580b670ad9d0913ca4c60df275",
           "0x37da521031f0a65dd8466d4def41c44a69796f69",
           "0x725fa18d06acb4f6f8a5b143bca088d76f77d953",
+          "0x0cc266abfa2ba924ffa7dab0cd8f7bb1a14891ec",
           "0x739fe72bab59a2eead1e36fdf71441e0407332c5",
-          "0x6b6ddbaaafc5f0580b670ad9d0913ca4c60df275",
-          "0x5443cf63033ab211f205076622b2426b994ce370",
-          "0x18303ee09818b0575ea4a5c2ed25b1e78523aa2b"
+          "0x5443cf63033ab211f205076622b2426b994ce370"
         ]
       }
     }

@@ -1,15 +1,16 @@
 package fuzzer
 
 import (
-    "encoding/hex"
-    "fmt"
-    "log"
-    "math/big"
-    "sort"
-    "strings"
-    "time"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"math/big"
+	"sort"
+	"strings"
+	"time"
 
-    "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // ResultMerger 结果合并器
@@ -117,20 +118,20 @@ func (m *ResultMerger) MergeResults(
 	}
 
 	return &AttackParameterReport{
-		ContractAddress:     contractAddr,
-		FunctionSig:         "0x" + hex.EncodeToString(selector),
-		Timestamp:           startTime,
-		OriginalTxHash:      txHash,
-		BlockNumber:         blockNumber,
-		ValidParameters:     validParams,
-		TotalCombinations:   stats.totalTested,
-		ValidCombinations:   len(results),
-		AverageSimilarity:   stats.avgSimilarity,
-		MaxSimilarity:       stats.maxSimilarity,
-		MinSimilarity:       stats.minSimilarity,
-		ExecutionTimeMs:     int64(time.Since(startTime).Milliseconds()),
-		HasInvariantCheck:   hasInvariantCheck,  // 标记是否经过不变量检查
-		ViolationCount:      violationCount,       // 违规总数
+		ContractAddress:   contractAddr,
+		FunctionSig:       "0x" + hex.EncodeToString(selector),
+		Timestamp:         startTime,
+		OriginalTxHash:    txHash,
+		BlockNumber:       blockNumber,
+		ValidParameters:   validParams,
+		TotalCombinations: stats.totalTested,
+		ValidCombinations: len(results),
+		AverageSimilarity: stats.avgSimilarity,
+		MaxSimilarity:     stats.maxSimilarity,
+		MinSimilarity:     stats.minSimilarity,
+		ExecutionTimeMs:   int64(time.Since(startTime).Milliseconds()),
+		HasInvariantCheck: hasInvariantCheck, // 标记是否经过不变量检查
+		ViolationCount:    violationCount,    // 违规总数
 	}
 }
 
@@ -433,12 +434,13 @@ func (m *ResultMerger) MergeMultipleReports(reports []*AttackParameterReport) *A
 
 	// 使用第一个报告作为基础
 	merged := &AttackParameterReport{
-		ContractAddress: reports[0].ContractAddress,
-		FunctionSig:     reports[0].FunctionSig,
-		FunctionName:    reports[0].FunctionName,
-		Timestamp:       reports[0].Timestamp,
-		OriginalTxHash:  reports[0].OriginalTxHash,
-		BlockNumber:     reports[0].BlockNumber,
+		ContractAddress:   reports[0].ContractAddress,
+		FunctionSig:       reports[0].FunctionSig,
+		FunctionName:      reports[0].FunctionName,
+		FunctionSignature: reports[0].FunctionSignature,
+		Timestamp:         reports[0].Timestamp,
+		OriginalTxHash:    reports[0].OriginalTxHash,
+		BlockNumber:       reports[0].BlockNumber,
 	}
 
 	// 合并参数
@@ -578,12 +580,12 @@ func (m *ResultMerger) AnalyzeParameterDistribution(results []FuzzingResult) map
 
 // ParameterDistribution 参数分布信息
 type ParameterDistribution struct {
-	TotalValues   int                    // 总值数量
-	UniqueValues  int                    // 唯一值数量
-	ValueCounts   map[string]int         // 值出现次数
-	NumericStats  *NumericStats          // 数值统计（如果是数值类型）
-	MostCommon    []string               // 最常见的值
-	Distribution  string                 // 分布类型描述
+	TotalValues  int            // 总值数量
+	UniqueValues int            // 唯一值数量
+	ValueCounts  map[string]int // 值出现次数
+	NumericStats *NumericStats  // 数值统计（如果是数值类型）
+	MostCommon   []string       // 最常见的值
+	Distribution string         // 分布类型描述
 }
 
 // NumericStats 数值统计
@@ -598,8 +600,8 @@ type NumericStats struct {
 // analyzeDistribution 分析单个参数的分布
 func (m *ResultMerger) analyzeDistribution(values []interface{}) *ParameterDistribution {
 	dist := &ParameterDistribution{
-		TotalValues:  len(values),
-		ValueCounts:  make(map[string]int),
+		TotalValues: len(values),
+		ValueCounts: make(map[string]int),
 	}
 
 	// 统计值出现次数
@@ -827,12 +829,11 @@ func (m *ResultMerger) extractFunctionName(results []FuzzingResult) string {
 		return ""
 	}
 
-	// 尝试从第一个结果的参数名中提取函数名
+	// 从CallData中提取函数selector（前4字节）
 	for _, result := range results {
-		if len(result.Parameters) > 0 && result.Parameters[0].Name != "" {
-			// 参数名通常不包含函数名，这里我们需要其他方式
-			// 暂时返回空，后续可以改进
-			break
+		if len(result.CallData) >= 4 {
+			selector := fmt.Sprintf("0x%x", result.CallData[0:4])
+			return selector
 		}
 	}
 
@@ -840,7 +841,7 @@ func (m *ResultMerger) extractFunctionName(results []FuzzingResult) string {
 }
 
 // extractParameterSummariesWithConstraints 使用约束规则提取参数摘要
-func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][]ParameterValue, funcName string) []ParameterSummary {
+func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][]ParameterValue, funcSelector string) []ParameterSummary {
 	summaries := []ParameterSummary{}
 
 	// 按索引排序处理
@@ -872,10 +873,10 @@ func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][
 			OccurrenceCount: len(values),
 		}
 
-		// 尝试为这个参数索引查找约束
+		// 尝试为这个参数索引查找约束（传入函数selector用于匹配）
 		var paramConstraint *ParamConstraintInfo
 		if m.constraintRules != nil {
-			paramConstraint = m.findConstraintForParameter(idx, paramName)
+			paramConstraint = m.findConstraintForParameter(idx, paramName, funcSelector)
 		}
 
 		// 根据类型决定合并策略
@@ -909,22 +910,64 @@ func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][
 }
 
 // findConstraintForParameter 为参数索引查找约束
-func (m *ResultMerger) findConstraintForParameter(paramIndex int, paramName string) *ParamConstraintInfo {
+func (m *ResultMerger) findConstraintForParameter(paramIndex int, paramName string, funcSelector string) *ParamConstraintInfo {
 	if m.constraintRules == nil {
 		return nil
 	}
+
+	// 从selector计算期望的函数名
+	// 注意：这里假设约束规则中的function字段与selector对应的函数名一致
+	// 例如 selector 0xee9c79da 对应 function "debond"
 
 	// 遍历所有约束，查找匹配的参数
 	for _, constraint := range m.constraintRules.Constraints {
 		// 尝试提取参数约束
 		paramConstraint := ExtractParameterConstraint(&constraint, paramIndex)
-		if paramConstraint != nil {
-			log.Printf("[ResultMerger] Found constraint for param #%d in function %s", paramIndex, constraint.Function)
+		if paramConstraint == nil {
+			continue // 这个约束不包含当前参数
+		}
+
+		// 如果提供了selector，检查是否属于同一个函数
+		if funcSelector != "" {
+			// 计算约束对应的selector
+			var constraintSelector string
+			if constraint.Signature != "" {
+				// 从完整签名计算selector
+				constraintSelector = calculateSelector(constraint.Signature)
+			}
+
+			// 检查是否匹配
+			if constraintSelector == "" || strings.EqualFold(constraintSelector, funcSelector) {
+				// Selector匹配或无法计算selector（使用函数名匹配）
+				log.Printf("[ResultMerger] ✓ Found constraint for param #%d in function %s (selector: %s)",
+					paramIndex, constraint.Function, funcSelector)
+				return paramConstraint
+			}
+		} else {
+			// 没有selector，返回第一个匹配的
+			log.Printf("[ResultMerger] Found constraint for param #%d in function %s (no selector)", paramIndex, constraint.Function)
 			return paramConstraint
 		}
 	}
 
+	log.Printf("[ResultMerger] ✗ No constraint found for param #%d with selector %s", paramIndex, funcSelector)
 	return nil
+}
+
+// calculateSelector 从函数签名计算selector
+func calculateSelector(signature string) string {
+	// 移除空格
+	sig := strings.TrimSpace(signature)
+
+	// 如果是简化签名如"debond(...)"，无法计算selector
+	if strings.Contains(sig, "...") {
+		return ""
+	}
+
+	// 计算keccak256并取前4字节
+	hash := crypto.Keccak256([]byte(sig))
+	selector := fmt.Sprintf("0x%x", hash[:4])
+	return selector
 }
 
 // findRangeWithConstraint 查找数值范围（使用约束规则）
@@ -946,7 +989,7 @@ func (m *ResultMerger) findRangeWithConstraint(values []ParameterValue, constrai
 	// 应用约束规则
 	// 对于安全上界约束（amount <= safe_threshold），将 rangeMax 设置为 safe_threshold
 	// 对于安全下界约束（amount >= safe_threshold），将 rangeMin 设置为 safe_threshold
-	
+
 	minVal, _ := m.toBigInt(observedMin)
 	maxVal, ok := m.toBigInt(observedMax)
 

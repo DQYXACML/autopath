@@ -294,7 +294,7 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "redeem": {
+        "redeem(...)": {
           "0": {
             "type": "uint256",
             "safe_threshold": "5951614269374999822336",
@@ -311,21 +311,6 @@
             "mutation_strategy": "progressive_approach",
             "confidence": 0.75,
             "value_expr": "1"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [
-              "0"
-            ],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "0"
           },
           "2": {
             "type": "uint256",
@@ -360,6 +345,23 @@
             "mutation_strategy": "progressive_approach",
             "confidence": 0.75,
             "value_expr": "1"
+          }
+        },
+        "redeem(uint256,uint256,uint256,uint256)": {
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
           }
         }
       },

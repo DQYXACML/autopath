@@ -43,47 +43,14 @@
     
     "0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417",
     
-    "0x0000000000000000000000000000000000000000",
-    
-    "0x23b872dd00000000000000000000000007d7685b",
-    
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
     
-    "0x2bF3cC8Fa6F067cc1741c7467C8Ee9F00e837757"
+    "0x2bF3cC8Fa6F067cc1741c7467C8Ee9F00e837757",
+    
+    "0x34cfac646f301356faa8b21e94227e3583fe3f5f"
     
   ],
   "invariants": [
-    
-    {
-      "id": "PATTERN_flash_change_001",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.25,
-        "contracts": ["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"],
-        "slots": {"slot_0": {"index": "5549066164583847888578675069041927512035210835734785090032633812695645315662", "severity": "critical", "threshold": 0.25}},
-        "formula": "abs(value_after - value_before) / value_before <= 0.25"
-        
-      },
-      "monitored_functions": ["zapToBMI"]
-    }
     
   ],
   "fuzzing_config": {
