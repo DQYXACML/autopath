@@ -288,17 +288,13 @@ func TestResultMerging(t *testing.T) {
 
 	assert.NotNil(t, report)
 	assert.Equal(t, 3, report.ValidCombinations)
-	assert.Len(t, report.ValidParameters, 2, "Should have 2 parameters")
+	// 地址类型会被过滤，避免链上规则硬编码地址
+	assert.Len(t, report.ValidParameters, 1, "Should have 1 non-address parameter")
 
 	// 验证参数0的范围（100-200）
 	param0 := report.ValidParameters[0]
 	assert.Equal(t, 0, param0.ParamIndex)
 	assert.Equal(t, "uint256", param0.ParamType)
-
-	// 验证参数1的值
-	param1 := report.ValidParameters[1]
-	assert.Equal(t, 1, param1.ParamIndex)
-	assert.Equal(t, "address", param1.ParamType)
 }
 
 // TestLCSAlgorithm 测试最长公共子序列算法

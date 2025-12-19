@@ -614,50 +614,41 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			}
 		}
 
-		// 应用约束规则（如果存在）
 		if isNumeric && minVal != nil && maxVal != nil {
-			pc.IsRange = true
-
 			// 查找参数的约束规则
 			paramConstraint := pickParamConstraint(funcConstraints, i)
 
-			// 如果存在约束规则，使用 safe_threshold 作为范围上界
-			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
-				if paramConstraint.IsSafeUpper {
-					// 安全条件是上界（amount <= threshold）
-					// 规则应该允许 [0, safe_threshold]
-					log.Printf("[ConstraintCollector] Applying constraint for param #%d: observed [%s, %s] -> safe [0, %s]",
-						i, minVal.String(), maxVal.String(), paramConstraint.SafeThreshold.String())
-					pc.RangeMin = "0x0"
-					pc.RangeMax = "0x" + paramConstraint.SafeThreshold.Text(16)
-				} else {
-					// 安全条件是下界（amount >= threshold）
-					// 规则应该允许 [safe_threshold, ∞]，使用类型最大值作为上界
-					log.Printf("[ConstraintCollector] Applying constraint for param #%d: observed [%s, %s] -> safe [%s, max]",
-						i, minVal.String(), maxVal.String(), paramConstraint.SafeThreshold.String())
-					pc.RangeMin = "0x" + paramConstraint.SafeThreshold.Text(16)
+			// 默认使用攻击样本范围作为黑名单区间
+			rangeMinHex := "0x" + minVal.Text(16)
+			rangeMaxHex := "0x" + maxVal.Text(16)
 
-					// 使用类型最大值作为上界（避免使用攻击样本的最大值导致误杀）
-					if pc.Type == "uint256" {
+			// 如果存在安全阈值，转换为“拦截 unsafe 区间”的范围
+			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
+				thresholdHex := "0x" + paramConstraint.SafeThreshold.Text(16)
+				if paramConstraint.IsSafeUpper {
+					// 拦截 >= safe_threshold 的高危数值
+					rangeMinHex = thresholdHex
+					if strings.HasPrefix(pc.Type, "uint") {
 						maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-						pc.RangeMax = "0x" + maxUint256.Text(16)
-					} else if strings.HasPrefix(pc.Type, "uint") {
-						// 其他uint类型，使用对应的最大值
-						maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-						pc.RangeMax = "0x" + maxUint256.Text(16)
+						rangeMaxHex = "0x" + maxUint256.Text(16)
 					} else {
-						// 对于其他类型，使用观察到的最大值（保守处理）
-						pc.RangeMax = "0x" + maxVal.Text(16)
-						log.Printf("[ConstraintCollector] Warning: Using observed max for non-uint type %s", pc.Type)
+						rangeMaxHex = "0x" + maxVal.Text(16)
+						log.Printf("[ConstraintCollector] Warning: 使用观察到的最大值作为上界（非uint类型 %s）", pc.Type)
 					}
+					log.Printf("[ConstraintCollector] 应用上界拦截: param#%d unsafe >= %s", i, thresholdHex)
+				} else {
+					// 拦截 <= safe_threshold 的低危数值
+					rangeMinHex = "0x0"
+					rangeMaxHex = thresholdHex
+					log.Printf("[ConstraintCollector] 应用下界拦截: param#%d unsafe <= %s", i, thresholdHex)
 				}
 			} else {
-				// 无约束规则时，不生成Range规则（Range是允许范围，不适合拦截攻击）
-				// 离散值会自动生成Blacklist规则
-				log.Printf("[ConstraintCollector] No constraint rule for param #%d, skipping range generation (observed [%s, %s])",
-					i, minVal.String(), maxVal.String())
-				// 不设置 IsRange, RangeMin, RangeMax，让离散值使用Blacklist规则
+				log.Printf("[ConstraintCollector] 使用攻击样本范围作为黑名单: param#%d [%s, %s]", i, minVal.String(), maxVal.String())
 			}
+
+			pc.IsRange = true
+			pc.RangeMin = rangeMinHex
+			pc.RangeMax = rangeMaxHex
 		} else {
 			pc.Values = dedupMapKeys(valueSet)
 		}

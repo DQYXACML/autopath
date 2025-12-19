@@ -154,6 +154,10 @@ func (p *OraclePusher) ProcessFuzzingReport(
 ) error {
 	hasExpr := len(report.ExpressionRules) > 0
 	hasParams := len(report.ValidParameters) > 0
+	// 优先使用参数黑名单；仅当没有参数规则时才推送表达式，避免过度拦截
+	if hasParams {
+		hasExpr = false
+	}
 
 	// 没有表达式也没有范围/离散值时跳过
 	if !hasExpr && !hasParams {
@@ -288,6 +292,10 @@ func (p *OraclePusher) pushGroup(ctx context.Context, key string, requests []*Pu
 
 	hasExpr := len(exprRules) > 0
 	hasParams := len(latest.Report.ValidParameters) > 0
+	// 优先使用参数黑名单；只有在没有参数规则时才推送表达式
+	if hasParams {
+		hasExpr = false
+	}
 
 	// 相似度过滤
 	if latest.Report.MaxSimilarity < p.config.PushThreshold {

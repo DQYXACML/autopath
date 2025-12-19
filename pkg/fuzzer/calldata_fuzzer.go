@@ -1496,17 +1496,61 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	blockNumber uint64,
 	tx *types.Transaction, // 新增：可选的交易对象
 ) ([]*AttackParameterReport, error) {
-	// 全局超时控制（整轮Fuzz）
-	if f.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, f.timeout)
+	// 全局超时控制（整轮Fuzz+规则推送），默认20s
+	budget := f.timeout
+	if budget <= 0 {
+		budget = 20 * time.Second
+	}
+	var cancel context.CancelFunc
+	if _, ok := ctx.Deadline(); !ok {
+		ctx, cancel = context.WithTimeout(ctx, budget)
+	}
+	if cancel != nil {
 		defer cancel()
-		log.Printf("[Fuzzer] 计时 整轮Fuzz时间预算: %v", f.timeout)
+	}
+
+	deadline, hasDeadline := ctx.Deadline()
+	if hasDeadline {
+		remaining := time.Until(deadline)
+		if remaining < 0 {
+			remaining = 0
+		}
+		log.Printf("[Fuzzer] 计时 整轮Fuzz+推送时间预算: %v", remaining)
+	} else {
+		log.Printf("[Fuzzer] 计时 整轮Fuzz时间预算: %v", budget)
+	}
+
+	// 将总时间拆分：10s 用于 fuzz，预留 10s 用于规则生成/分类器/推送
+	const fuzzQuota = 10 * time.Second
+	const pushReserve = 10 * time.Second
+	remaining := budget
+	if hasDeadline {
+		remaining = time.Until(deadline)
+		if remaining < 0 {
+			remaining = 0
+		}
+	}
+	availableForFuzz := remaining - pushReserve
+	if availableForFuzz < 0 {
+		availableForFuzz = 0
+	}
+	fuzzBudget := fuzzQuota
+	if availableForFuzz < fuzzBudget {
+		fuzzBudget = availableForFuzz
+	}
+	var fuzzCtx context.Context = ctx
+	var fuzzCancel context.CancelFunc
+	if fuzzBudget > 0 {
+		fuzzCtx, fuzzCancel = context.WithTimeout(ctx, fuzzBudget)
+		defer fuzzCancel()
+		log.Printf("[Fuzzer] 计时 Fuzz阶段预算: %v，预留推送/规则生成: %v，剩余总时长: %v", fuzzBudget, pushReserve, remaining)
+	} else {
+		log.Printf("[Fuzzer] 计时 无可用Fuzz时间（remaining=%v，预留%v），将直接生成兜底规则", remaining, pushReserve)
 	}
 
 	// 步骤1: 获取原始交易信息和执行路径（传入受保护合约地址）
 	log.Printf("[Fuzzer] Fetching original transaction: %s", txHash.Hex())
-	txObj, originalPath, stateOverride, err := f.getOriginalExecution(ctx, txHash, blockNumber, contractAddr, tx)
+	txObj, originalPath, stateOverride, err := f.getOriginalExecution(fuzzCtx, txHash, blockNumber, contractAddr, tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get original execution: %w", err)
 	}
@@ -1534,7 +1578,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 
 	// 步骤1.5: 基于 prestate 重放交易，提取调用树
 	log.Printf("[Fuzzer] Tracing transaction (prestate) to extract call tree...")
-	trace, err := f.simulator.TraceCallTreeWithOverride(ctx, txObj, blockNumber, stateOverride)
+	trace, err := f.simulator.TraceCallTreeWithOverride(fuzzCtx, txObj, blockNumber, stateOverride)
 	if err != nil {
 		log.Printf("[Fuzzer]   基于 prestate 的 traceCall 失败，回退链上 callTracer: %v", err)
 		trace, err = f.tracer.TraceTransaction(txHash)
@@ -1663,9 +1707,30 @@ func (f *CallDataFuzzer) FuzzTransaction(
 
 	var chainedCalls []*CallFrame
 	if len(targetCalls) > 1 {
-		log.Printf("[Fuzzer]  只对首个受保护函数主动变异，其余函数复用连锁调用样本生成规则")
-		chainedCalls = targetCalls[1:]
-		targetCalls = targetCalls[:1]
+		chainableSelectors, detectErr := f.detectChainedSampleChanges(fuzzCtx, contractAddr, targetCalls, blockNumber, stateOverride, trace)
+		if detectErr != nil {
+			log.Printf("[Fuzzer]  连锁样本试探失败，退化为逐个变异: %v", detectErr)
+		}
+
+		pendingTargets := make([]*CallFrame, 0, len(targetCalls))
+		if len(targetCalls) > 0 {
+			pendingTargets = append(pendingTargets, targetCalls[0])
+		}
+		for _, c := range targetCalls[1:] {
+			if len(c.Input) < 10 {
+				continue
+			}
+			selector := strings.ToLower(c.Input[:10])
+			if chainableSelectors != nil && chainableSelectors[selector] {
+				chainedCalls = append(chainedCalls, c)
+			} else {
+				pendingTargets = append(pendingTargets, c)
+			}
+		}
+		targetCalls = pendingTargets
+
+		log.Printf("[Fuzzer]  连锁样本检测结果: 可复用首个函数的=%d，需要单独变异的=%d",
+			len(chainedCalls), len(targetCalls)-1)
 	}
 
 	log.Printf("[Fuzzer]  将依次Fuzz %d 个目标调用 (合约=%s)", len(targetCalls), contractAddr.Hex())
@@ -1676,22 +1741,59 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		return nil, fmt.Errorf("未找到可Fuzz的受保护调用")
 	}
 
-	targetCall := targetCalls[0]
-	if len(targetCall.Input) < 10 {
-		return nil, fmt.Errorf("目标调用输入过短")
+	totalTargets := len(targetCalls)
+	fuzzDeadline, fuzzHasDeadline := fuzzCtx.Deadline()
+	if fuzzBudget == 0 {
+		log.Printf("[Fuzzer] 计时 本次无可用Fuzz时间，所有目标将直接生成兜底规则")
 	}
-	log.Printf("[Fuzzer] 进度 [1/1] selector=%s from=%s to=%s", targetCall.Input[:10], targetCall.From, targetCall.To)
+	for i, targetCall := range targetCalls {
+		if len(targetCall.Input) < 10 {
+			return nil, fmt.Errorf("目标调用输入过短")
+		}
+		log.Printf("[Fuzzer] 进度 [%d/%d] selector=%s from=%s to=%s", i+1, totalTargets, targetCall.Input[:10], targetCall.From, targetCall.To)
 
-	report, err := f.fuzzSingleTargetCall(ctx, txHash, contractAddr, blockNumber, targetCall, originalPath, stateOverride, trace)
-	if err != nil {
-		return nil, fmt.Errorf("当前目标fuzz失败: %w", err)
-	}
-	reports = append(reports, report)
+		targetCtx := fuzzCtx
+		var targetCancel context.CancelFunc
+		if fuzzBudget == 0 {
+			report := f.buildFallbackReportForCall(contractAddr, targetCall, txHash, blockNumber, "Fuzz阶段预算为空")
+			if report != nil {
+				reports = append(reports, report)
+			}
+			continue
+		}
+		if fuzzHasDeadline {
+			remaining := time.Until(fuzzDeadline)
+			if remaining <= 0 {
+				report := f.buildFallbackReportForCall(contractAddr, targetCall, txHash, blockNumber, "Fuzz阶段预算耗尽")
+				if report != nil {
+					reports = append(reports, report)
+				}
+				continue
+			}
+			perBudget := remaining / time.Duration(totalTargets-i)
+			if perBudget > 0 {
+				targetCtx, targetCancel = context.WithTimeout(fuzzCtx, perBudget)
+			}
+		}
 
-	// 基于连锁调用样本为其他 target_functions 生成规则报告（不再额外模糊测试）
-	if len(chainedCalls) > 0 {
-		if extra := f.buildChainedReportsFromSamples(report, chainedCalls, contractAddr, txHash, blockNumber); len(extra) > 0 {
-			reports = append(reports, extra...)
+		report, err := f.fuzzSingleTargetCall(targetCtx, txHash, contractAddr, blockNumber, targetCall, originalPath, stateOverride, trace)
+		if targetCancel != nil {
+			targetCancel()
+		}
+		if err != nil {
+			log.Printf("[Fuzzer]  当前目标fuzz失败，使用兜底规则继续: %v", err)
+			report = f.buildFallbackReportForCall(contractAddr, targetCall, txHash, blockNumber, "fuzz失败")
+		}
+		if report == nil {
+			continue
+		}
+		reports = append(reports, report)
+
+		// 仅用首个目标的样本去推导连锁调用规则
+		if i == 0 && len(chainedCalls) > 0 {
+			if extra := f.buildChainedReportsFromSamples(report, chainedCalls, contractAddr, txHash, blockNumber); len(extra) > 0 {
+				reports = append(reports, extra...)
+			}
 		}
 	}
 
@@ -1712,6 +1814,20 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	if targetCall == nil {
 		return nil, fmt.Errorf("target call is nil")
 	}
+
+	// 单函数时间预算：使用全局deadline剩余时间
+	budget := time.Second * 20
+	if dl, ok := ctx.Deadline(); ok {
+		remaining := time.Until(dl)
+		if remaining <= 0 {
+			log.Printf("[Fuzzer] 计时 当前函数预算耗尽，使用兜底规则")
+			return f.buildFallbackReportForCall(contractAddr, targetCall, txHash, blockNumber, "当前函数预算耗尽"), nil
+		}
+		budget = remaining
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	log.Printf("[Fuzzer] 计时 当前函数Fuzz时间预算: %v", budget)
 
 	startTime := time.Now()
 	f.stats.StartTime = startTime
@@ -1976,6 +2092,24 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	// 应用约束规则（若已生成）
 	f.applyConstraintRule(report, contractAddr, parsedData.Selector)
 
+	// 兜底：若未生成表达式/范围规则，回退使用原始调用参数生成黑名单范围
+	if len(report.ExpressionRules) == 0 && len(report.ValidParameters) == 0 {
+		fallback := f.deriveParamSummariesFromSamples(nil, contractAddr, targetCall)
+		if len(fallback) > 0 {
+			report.ValidParameters = fallback
+			if report.MaxSimilarity < f.threshold {
+				report.MaxSimilarity = f.threshold
+			}
+			if report.AverageSimilarity < report.MaxSimilarity {
+				report.AverageSimilarity = report.MaxSimilarity
+			}
+			if report.MinSimilarity == 0 || report.MinSimilarity > report.MaxSimilarity {
+				report.MinSimilarity = report.MaxSimilarity
+			}
+			log.Printf("[Fuzzer]  使用原始调用参数生成兜底拦截范围 (selector=%s)", hexutil.Encode(parsedData.Selector))
+		}
+	}
+
 	// 输出时间轴统计
 	if report.FirstHitSeconds > 0 {
 		log.Printf("[Fuzzer] 计时 首个达标样本出现在 %.2f 秒", report.FirstHitSeconds)
@@ -2002,6 +2136,68 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	log.Printf("[Fuzzer] Fuzzing completed in %v", f.stats.EndTime.Sub(f.stats.StartTime))
 
 	return report, nil
+}
+
+// buildFallbackReportForCall 在预算不足或fuzz失败时使用原始参数生成兜底报告
+func (f *CallDataFuzzer) buildFallbackReportForCall(
+	contractAddr common.Address,
+	call *CallFrame,
+	txHash common.Hash,
+	blockNumber uint64,
+	reason string,
+) *AttackParameterReport {
+	if call == nil {
+		return nil
+	}
+
+	selector := ""
+	if len(call.Input) >= 10 {
+		selector = ensureSelectorHex(call.Input[:10])
+	}
+
+	report := &AttackParameterReport{
+		ContractAddress:   contractAddr,
+		FunctionSig:       selector,
+		Timestamp:         time.Now(),
+		OriginalTxHash:    txHash,
+		BlockNumber:       blockNumber,
+		TotalCombinations: 1,
+		ValidCombinations: 1,
+		AverageSimilarity: 1.0,
+		MaxSimilarity:     1.0,
+		MinSimilarity:     1.0,
+	}
+
+	if parsed, method, err := f.decodeCallForSamples(contractAddr, call); err == nil && parsed != nil {
+		if len(parsed.Selector) >= 4 {
+			report.FunctionSig = hexutil.Encode(parsed.Selector[:4])
+		}
+		if method != nil {
+			report.FunctionSignature = method.Sig
+			report.FunctionName = method.Name
+		}
+	}
+
+	report.ValidParameters = f.deriveParamSummariesFromSamples(nil, contractAddr, call)
+	if len(report.ValidParameters) > 0 {
+		filtered := make([]ParameterSummary, 0, len(report.ValidParameters))
+		for _, ps := range report.ValidParameters {
+			// 兜底规则仅保留数值型参数，避免将常量地址/bytes加入黑名单导致正常交易被误拦截
+			if !isNumericTypeStr(ps.ParamType) {
+				continue
+			}
+			filtered = append(filtered, ps)
+		}
+		report.ValidParameters = filtered
+	}
+	if len(report.ValidParameters) == 0 {
+		log.Printf("[Fuzzer]  兜底报告未解析到参数，selector=%s", report.FunctionSig)
+	}
+	if reason != "" {
+		log.Printf("[Fuzzer]  生成兜底报告: %s selector=%s", reason, report.FunctionSig)
+	}
+
+	return report
 }
 
 // parseCallDataWithABI 优先使用ABI解析，失败则回退到启发式解析
@@ -2056,6 +2252,9 @@ func (f *CallDataFuzzer) waitForTraceAvailable(ctx context.Context, txHash commo
 
 	// 第1步：轮询交易收据，确认交易已上链
 	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		receipt, err := f.client.TransactionReceipt(ctx, txHash)
 		if err == nil && receipt != nil {
 			elapsed := time.Since(start)
@@ -2068,14 +2267,31 @@ func (f *CallDataFuzzer) waitForTraceAvailable(ctx context.Context, txHash commo
 			return fmt.Errorf("timeout (%v) waiting for transaction receipt", timeout)
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		select {
+		case <-time.After(200 * time.Millisecond):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	// 第2步：收据就绪后，额外等待让Anvil生成trace数据
 	// 原因：Anvil的trace生成是异步的，在交易上链后可能还需要几秒钟
 	traceWaitTime := 5 * time.Second
+	if dl, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(dl); remaining <= 0 {
+			return ctx.Err()
+		} else if remaining < traceWaitTime {
+			traceWaitTime = remaining
+		}
+	}
 	log.Printf("[Fuzzer] 等待 收据已就绪，再等待%v让Anvil生成trace数据...", traceWaitTime)
-	time.Sleep(traceWaitTime)
+	if traceWaitTime > 0 {
+		select {
+		case <-time.After(traceWaitTime):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	log.Printf("[Fuzzer]  智能等待完成，trace数据应该已就绪")
 
 	return nil
@@ -2204,12 +2420,21 @@ func (f *CallDataFuzzer) executeFuzzing(
 	//  创建带超时的可取消context，限定整轮fuzz耗时；默认使用配置的 timeout_seconds
 	totalBudget := f.timeout
 	if totalBudget <= 0 {
-		totalBudget = 10 * time.Second
+		totalBudget = 20 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(ctx, totalBudget)
+	effectiveBudget := totalBudget
+	if dl, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(dl); remaining <= 0 {
+			log.Printf("[Fuzzer] 计时 单轮Fuzz预算已耗尽，跳过本轮执行")
+			return nil
+		} else if remaining < effectiveBudget {
+			effectiveBudget = remaining
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, effectiveBudget)
 	defer cancel()
 
-	log.Printf("[Fuzzer] 计时 单轮Fuzz时间预算: %v", totalBudget)
+	log.Printf("[Fuzzer] 计时 单轮Fuzz时间预算: %v", effectiveBudget)
 
 	// 结果收集
 	results := []FuzzingResult{}
@@ -2291,7 +2516,7 @@ func (f *CallDataFuzzer) executeFuzzing(
 	wg.Wait()
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		log.Printf("[Fuzzer] 计时 已达单轮fuzz时限(%v)，提前停止后续组合", totalBudget)
+		log.Printf("[Fuzzer] 计时 已达单轮fuzz时限(%v)，提前停止后续组合", effectiveBudget)
 	}
 
 	// 更新统计（累加以支持自适应多轮汇总）
@@ -2808,6 +3033,171 @@ func simpleMutateValue(paramType string, original interface{}) interface{} {
 		}
 	}
 	return original
+}
+
+// summarizeParamsForChainDetection 将参数列表压缩为用于连锁判定的唯一键（跳过地址与数组）
+func summarizeParamsForChainDetection(params []ParameterValue) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(params))
+	for _, p := range params {
+		lower := strings.ToLower(p.Type)
+		if strings.Contains(lower, "[]") {
+			continue
+		}
+		if strings.HasPrefix(lower, "address") {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d=%s", p.Index, ValueToString(p.Value)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, "|")
+}
+
+// detectChainedSampleChanges 试探首个受保护调用的变异是否会联动后续受保护调用的实参
+func (f *CallDataFuzzer) detectChainedSampleChanges(
+	ctx context.Context,
+	contractAddr common.Address,
+	targetCalls []*CallFrame,
+	blockNumber uint64,
+	stateOverride simulator.StateOverride,
+	trace *CallFrame,
+) (map[string]bool, error) {
+	if len(targetCalls) < 2 || trace == nil {
+		return nil, nil
+	}
+	primary := targetCalls[0]
+	if len(primary.Input) < 10 {
+		return nil, fmt.Errorf("primary call input too short")
+	}
+
+	targetSelectorSet := make(map[string]bool)
+	for _, c := range targetCalls[1:] {
+		if len(c.Input) < 10 {
+			continue
+		}
+		targetSelectorSet[strings.ToLower(c.Input[:10])] = true
+	}
+	if len(targetSelectorSet) == 0 {
+		return nil, nil
+	}
+
+	primarySelector := strings.ToLower(primary.Input[:10])
+	origCallData, err := hexutil.Decode(primary.Input)
+	if err != nil {
+		return nil, fmt.Errorf("decode primary call failed: %w", err)
+	}
+
+	probeInputs := [][]byte{origCallData}
+	if mutatedCalldata, _, mutErr := f.buildMutationForCall(contractAddr, primary, nil); mutErr == nil && mutatedCalldata != nil && !bytes.Equal(mutatedCalldata, origCallData) {
+		probeInputs = append(probeInputs, mutatedCalldata)
+	} else if mutErr != nil {
+		log.Printf("[Fuzzer]  连锁样本试探变异失败，使用原始参数: %v", mutErr)
+	}
+
+	if len(probeInputs) < 2 {
+		log.Printf("[Fuzzer]  连锁样本试探未生成有效变异，默认对所有受保护函数单独变异")
+		return nil, nil
+	}
+
+	observed := make(map[string]map[string]struct{})
+	recordParams := func(selector string, params []ParameterValue) {
+		if !targetSelectorSet[selector] {
+			return
+		}
+		key := summarizeParamsForChainDetection(params)
+		if key == "" {
+			return
+		}
+		if observed[selector] == nil {
+			observed[selector] = make(map[string]struct{})
+		}
+		observed[selector][key] = struct{}{}
+	}
+
+	for idx, calldata := range probeInputs {
+		mutationApplied := false
+		hookMutator := func(frame *CallFrame, original []byte) ([]byte, bool, error) {
+			if !strings.EqualFold(frame.To, contractAddr.Hex()) || len(frame.Input) < 10 {
+				return original, false, nil
+			}
+			selectorHex := strings.ToLower(frame.Input[:10])
+
+			if selectorHex == primarySelector && !mutationApplied {
+				mutationApplied = true
+				if params, _ := f.decodeParamsForSample(contractAddr, calldata, nil, selectorHex); len(params) > 0 {
+					recordParams(selectorHex, params)
+				}
+				return calldata, true, nil
+			}
+
+			if params, _ := f.decodeParamsForSample(contractAddr, original, nil, selectorHex); len(params) > 0 {
+				recordParams(selectorHex, params)
+			}
+			return original, false, nil
+		}
+
+		if f.localExecution {
+			localSim := f.primarySimulator()
+			if localSim == nil {
+				return nil, fmt.Errorf("本地执行器不可用")
+			}
+			entry := trace
+			entryFrom := common.HexToAddress(entry.From)
+			entryTo := common.HexToAddress(entry.To)
+			entryData, decodeErr := hexutil.Decode(entry.Input)
+			if decodeErr != nil {
+				return nil, fmt.Errorf("解码入口calldata失败: %w", decodeErr)
+			}
+			entryValue := big.NewInt(0)
+			if entry.Value != "" && entry.Value != "0x0" {
+				if v, err := hexutil.DecodeBig(entry.Value); err == nil {
+					entryValue = v
+				}
+			}
+			_, simErr := localSim.SimulateWithCallDataV2(
+				ctx,
+				entryFrom,
+				entryTo,
+				entryData,
+				entryValue,
+				blockNumber,
+				stateOverride,
+				map[common.Address]local.CallMutatorV2{
+					contractAddr: simulator.AdaptCallMutator(hookMutator),
+				},
+			)
+			if simErr != nil {
+				log.Printf("[Fuzzer]  连锁试探执行失败（样本#%d）: %v", idx+1, simErr)
+			}
+		} else {
+			_, simErr := f.simulator.ExecuteWithHooks(
+				ctx,
+				trace,
+				blockNumber,
+				stateOverride,
+				map[string]simulator.CallMutator{strings.ToLower(contractAddr.Hex()): hookMutator},
+			)
+			if simErr != nil {
+				log.Printf("[Fuzzer]  连锁试探执行失败（样本#%d）: %v", idx+1, simErr)
+			}
+		}
+	}
+
+	chainable := make(map[string]bool)
+	for sel, vals := range observed {
+		if len(vals) > 1 {
+			chainable[sel] = true
+		}
+	}
+	if len(chainable) > 0 {
+		log.Printf("[Fuzzer]  检测到以下受保护函数输入会随首个调用变异: %v", mapKeys(chainable))
+	}
+	return chainable, nil
 }
 
 type observedCall struct {
@@ -3468,6 +3858,24 @@ func (f *CallDataFuzzer) worker(
 			if f.constraintCollector != nil && similarity >= f.threshold {
 				if rule := f.constraintCollector.RecordSample(contractAddr, selector, paramValues, simResult.StateChanges, similarity); rule != nil {
 					log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
+				}
+				// 同步记录连锁调用样本，便于为其他受保护函数生成表达式规则
+				if len(observedCalls) > 0 {
+					for _, oc := range observedCalls {
+						if oc.selector == "" || len(oc.params) == 0 {
+							continue
+						}
+						if strings.EqualFold(oc.selector, targetSelectorHex) {
+							continue
+						}
+						selBytes, err := hexutil.Decode(oc.selector)
+						if err != nil || len(selBytes) < 4 {
+							continue
+						}
+						if rule := f.constraintCollector.RecordSample(contractAddr, selBytes[:4], oc.params, simResult.StateChanges, similarity); rule != nil {
+							log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
+						}
+					}
 				}
 			}
 
@@ -4824,6 +5232,13 @@ func convertParamConstraintsToSummaries(constraints []ParamConstraint) []Paramet
 		if isAddressType(c.Type) {
 			continue
 		}
+		// 跳过空规则，避免推送空黑名单
+		if !c.IsRange && len(c.Values) == 0 {
+			continue
+		}
+		if c.IsRange && strings.TrimSpace(c.RangeMin) == "" && strings.TrimSpace(c.RangeMax) == "" {
+			continue
+		}
 		ps := ParameterSummary{
 			ParamIndex:      c.Index,
 			ParamType:       c.Type,
@@ -4967,6 +5382,10 @@ func (f *CallDataFuzzer) buildChainedReportsFromSamples(
 			if len(group.neg) > 0 {
 				report.NegativeSamples = append(report.NegativeSamples, group.neg...)
 			}
+		}
+
+		if selBytes, err := hexutil.Decode(selector); err == nil && len(selBytes) >= 4 {
+			f.applyConstraintRule(report, contractAddr, selBytes[:4])
 		}
 
 		out = append(out, report)
