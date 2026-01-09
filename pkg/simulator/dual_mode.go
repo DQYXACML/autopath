@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
 
@@ -38,9 +39,10 @@ func (m ExecutionMode) String() string {
 
 // DualModeSimulator 支持RPC和本地执行的双模式模拟器
 type DualModeSimulator struct {
-	*EVMSimulator                         // 嵌入原有的EVMSimulator
-	localExecutor *local.LocalEVMExecutor // 本地EVM执行器
-	mode          ExecutionMode           // 当前执行模式
+	*EVMSimulator                           // 嵌入原有的EVMSimulator
+	localExecutor   *local.LocalEVMExecutor // 本地EVM执行器
+	mode            ExecutionMode           // 当前执行模式
+	recordFullTrace bool                    // 是否记录全交易路径
 }
 
 // NewDualModeSimulator 创建双模式模拟器
@@ -53,6 +55,12 @@ func NewDualModeSimulator(rpcURL string) (*DualModeSimulator, error) {
 
 	// 创建本地执行器
 	localExec := local.NewLocalEVMExecutor(nil)
+	localExec.SetLazyStateProvider(local.NewRPCStateProvider(baseSimulator.rpcClient, func() *big.Int {
+		if cfg := localExec.GetConfig(); cfg != nil {
+			return cfg.BlockNumber
+		}
+		return nil
+	}))
 
 	return &DualModeSimulator{
 		EVMSimulator:  baseSimulator,
@@ -65,6 +73,12 @@ func NewDualModeSimulator(rpcURL string) (*DualModeSimulator, error) {
 func NewDualModeSimulatorWithClients(rpcClient *rpc.Client, client *ethclient.Client) *DualModeSimulator {
 	baseSimulator := NewEVMSimulatorWithClients(rpcClient, client)
 	localExec := local.NewLocalEVMExecutor(nil)
+	localExec.SetLazyStateProvider(local.NewRPCStateProvider(rpcClient, func() *big.Int {
+		if cfg := localExec.GetConfig(); cfg != nil {
+			return cfg.BlockNumber
+		}
+		return nil
+	}))
 
 	return &DualModeSimulator{
 		EVMSimulator:  baseSimulator,
@@ -77,6 +91,11 @@ func NewDualModeSimulatorWithClients(rpcClient *rpc.Client, client *ethclient.Cl
 func (s *DualModeSimulator) SetExecutionMode(mode ExecutionMode) {
 	s.mode = mode
 	fmt.Printf("[DualModeSimulator] 执行模式切换为: %s\n", mode)
+}
+
+// SetRecordFullTrace 设置是否记录全交易路径
+func (s *DualModeSimulator) SetRecordFullTrace(enable bool) {
+	s.recordFullTrace = enable
 }
 
 // GetExecutionMode 获取当前执行模式
@@ -168,7 +187,13 @@ func (s *DualModeSimulator) SimulateWithCallDataV2(
 ) (*ReplayResult, error) {
 	// 如果有mutators，使用本地执行
 	if len(mutators) > 0 || s.mode == ModeLocal {
-		return s.executeLocal(ctx, from, to, callData, value, blockNumber, override, mutators, nil)
+		// 从mutators中提取受保护合约地址（mutators的key就是受保护合约）
+		protectedAddrs := make([]common.Address, 0, len(mutators))
+		for addr := range mutators {
+			protectedAddrs = append(protectedAddrs, addr)
+		}
+		// 注意：不清除防火墙slot，因为fuzzing阶段防火墙没有规则，不会拦截
+		return s.executeLocal(ctx, from, to, callData, value, blockNumber, override, mutators, protectedAddrs)
 	}
 
 	// 否则使用RPC执行
@@ -186,11 +211,18 @@ func (s *DualModeSimulator) executeLocal(
 	mutators map[common.Address]local.CallMutatorV2,
 	protectedAddrs []common.Address,
 ) (*ReplayResult, error) {
+	// 注意：不清除防火墙slot
+	// fuzzing阶段防火墙已部署但ParamCheckModule没有规则，不会拦截任何调用
+	// 清除防火墙会导致执行路径和原始攻击不一致
+
 	// 转换StateOverride格式
 	localOverride := convertToLocalOverride(override)
 
 	// 计算受保护合约集合（mutators + 显式指定）
 	effectiveProtected := mergeProtectedAddrs(mutators, protectedAddrs)
+	if s.recordFullTrace {
+		effectiveProtected = nil
+	}
 
 	// 配置块高度，保证与原始攻击交易一致
 	if blockNumber > 0 {
@@ -395,4 +427,35 @@ func senderFromTx(tx *types.Transaction) (common.Address, error) {
 	}
 
 	return types.Sender(signer, tx)
+}
+
+// clearFirewallSlots 清除受保护合约的防火墙slot，模拟原始攻击时没有防火墙的状态
+// 防火墙slot: keccak256('firewall.router.storage') - 1 = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
+func clearFirewallSlots(override StateOverride, protectedAddrs []common.Address) StateOverride {
+	if override == nil || len(protectedAddrs) == 0 {
+		return override
+	}
+
+	// ERC1967风格防火墙slot
+	firewallSlot := "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+	zeroValue := "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+	clearedCount := 0
+	for _, addr := range protectedAddrs {
+		addrStr := strings.ToLower(addr.Hex())
+		if ov, ok := override[addrStr]; ok && ov != nil {
+			if ov.State == nil {
+				ov.State = make(map[string]string)
+			}
+			// 设置防火墙slot为0
+			ov.State[firewallSlot] = zeroValue
+			clearedCount++
+		}
+	}
+
+	if clearedCount > 0 {
+		log.Printf("[StateOverride]  已清除 %d 个合约的防火墙slot（模拟无防火墙状态）", clearedCount)
+	}
+
+	return override
 }

@@ -21,6 +21,8 @@ type ResultMerger struct {
 	constraintRules *ConstraintRulesV2
 	// 基础路径（用于加载约束规则）
 	basePath string
+	// 项目标识（用于按协议优先加载约束）
+	projectID string
 }
 
 // MergeStrategy 合并策略
@@ -49,6 +51,14 @@ func NewResultMergerWithBasePath(basePath string) *ResultMerger {
 		mergeStrategy: MergeAuto,
 		basePath:      basePath,
 	}
+}
+
+// SetProjectID 设置项目ID（用于优先加载对应协议的约束规则）
+func (m *ResultMerger) SetProjectID(projectID string) {
+	if m == nil {
+		return
+	}
+	m.projectID = projectID
 }
 
 // NewResultMergerWithStrategy 使用指定策略创建结果合并器
@@ -83,12 +93,24 @@ func (m *ResultMerger) MergeResults(
 
 	// 尝试加载约束规则（如果还没加载）
 	if m.constraintRules == nil && m.basePath != "" {
-		rules, err := LoadConstraintRulesByContractAddr(m.basePath, contractAddr)
-		if err == nil {
-			m.constraintRules = rules
-			log.Printf("[ResultMerger] Loaded constraint rules for contract %s", contractAddr.Hex())
-		} else {
-			log.Printf("[ResultMerger] No constraint rules found for contract %s: %v", contractAddr.Hex(), err)
+		if m.projectID != "" {
+			if rules, err := LoadConstraintRules(m.basePath, m.projectID); err == nil {
+				if strings.EqualFold(rules.VulnerableContract.Address, contractAddr.Hex()) {
+					m.constraintRules = rules
+					log.Printf("[ResultMerger] Loaded constraint rules for contract %s", contractAddr.Hex())
+				} else {
+					log.Printf("[ResultMerger] 项目 %s 约束不匹配合约 %s，回退按地址查找", m.projectID, contractAddr.Hex())
+				}
+			}
+		}
+		if m.constraintRules == nil {
+			rules, err := LoadConstraintRulesByContractAddr(m.basePath, contractAddr)
+			if err == nil {
+				m.constraintRules = rules
+				log.Printf("[ResultMerger] Loaded constraint rules for contract %s", contractAddr.Hex())
+			} else {
+				log.Printf("[ResultMerger] No constraint rules found for contract %s: %v", contractAddr.Hex(), err)
+			}
 		}
 	}
 

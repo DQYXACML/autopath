@@ -34,7 +34,7 @@ deploy_lodestar.log
 monitor_dynamic_*.log
 
 # exe
-monitor
+./monitor
 monitor_dynamic_*.pid
 
 # claude and codex

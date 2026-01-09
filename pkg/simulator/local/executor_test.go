@@ -196,7 +196,7 @@ func TestStateAdapter(t *testing.T) {
 		},
 	}
 
-	stateDB := NewStateAdapter(override)
+	stateDB := NewStateAdapter(override, nil)
 	addr := common.HexToAddress("0x1111111111111111111111111111111111111111")
 
 	// 验证余额
@@ -224,7 +224,7 @@ func TestSnapshotRevert(t *testing.T) {
 		},
 	}
 
-	stateDB := NewStateAdapter(override)
+	stateDB := NewStateAdapter(override, nil)
 	addr := common.HexToAddress("0x1111111111111111111111111111111111111111")
 
 	// 创建快照

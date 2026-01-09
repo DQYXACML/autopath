@@ -73,6 +73,8 @@ type FuzzingConfig struct {
 	PrintRealtime          bool             `json:"print_realtime"`
 	OutputPath             string           `json:"output_path"`
 	EntryCallProtectedOnly bool             `json:"entry_call_protected_only"`
+	StrictPrestate         bool             `json:"strict_prestate"`
+	AttackStateCodeOnly    bool             `json:"attack_state_code_only"`
 }
 
 // TargetFunction 目标函数定义

@@ -4,6 +4,7 @@ package local
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"sync"
 
@@ -49,6 +50,9 @@ type CallInterceptor struct {
 
 	// firstProtectedHit 记录首个命中的受保护调用
 	firstProtectedHit *ProtectedCallHit
+
+	// callStack 记录调用上下文，用于revert诊断
+	callStack map[int]*callSnapshot
 }
 
 // NewCallInterceptor 创建新的CallInterceptor（向后兼容版本）
@@ -59,6 +63,7 @@ func NewCallInterceptor(collector *TraceCollector) *CallInterceptor {
 		collector:        collector,
 		enabled:          true,
 		mutationEnabled:  true,
+		callStack:        make(map[int]*callSnapshot),
 	}
 }
 
@@ -78,6 +83,7 @@ func NewCallInterceptorWithComponents(
 		collector:        collector,
 		enabled:          true,
 		mutationEnabled:  true,
+		callStack:        make(map[int]*callSnapshot),
 	}
 }
 
@@ -190,6 +196,27 @@ func (i *CallInterceptor) onEnter(depth int, typ byte, from, to common.Address,
 
 	// 注意：OnEnter是只读的，无法在此修改input
 	// 实际的calldata修改在JumpTable Hook中实现
+	selector := "0x"
+	if len(input) >= 4 {
+		selector = "0x" + hex.EncodeToString(input[:4])
+	} else if len(input) > 0 {
+		selector = "0x" + hex.EncodeToString(input)
+	}
+
+	var valueCopy *big.Int
+	if value != nil {
+		valueCopy = new(big.Int).Set(value)
+	}
+	i.mu.Lock()
+	i.callStack[depth] = &callSnapshot{
+		opType:   typ,
+		from:     from,
+		to:       to,
+		selector: selector,
+		inputLen: len(input),
+		value:    valueCopy,
+	}
+	i.mu.Unlock()
 }
 
 // onExit 在CALL退出时触发
@@ -197,7 +224,48 @@ func (i *CallInterceptor) onExit(depth int, output []byte, gasUsed uint64, err e
 	// 清理该深度的pending override
 	i.mu.Lock()
 	delete(i.pendingOverrides, depth)
+	snapshot := i.callStack[depth]
+	delete(i.callStack, depth)
 	i.mu.Unlock()
+
+	if !i.enabled {
+		return
+	}
+
+	if reverted || err != nil {
+		revertMsg := decodeRevertMessage(output)
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+		retHex := ""
+		if len(output) > 0 {
+			retHex = "0x" + hex.EncodeToString(output)
+			if len(retHex) > 74 {
+				retHex = retHex[:74] + "..."
+			}
+		}
+
+		opLabel := "UNKNOWN"
+		fromStr := ""
+		toStr := ""
+		selector := ""
+		inputLen := 0
+		valueStr := ""
+		if snapshot != nil {
+			opLabel = OpTypeString(snapshot.opType)
+			fromStr = snapshot.from.Hex()
+			toStr = snapshot.to.Hex()
+			selector = snapshot.selector
+			inputLen = snapshot.inputLen
+			if snapshot.value != nil {
+				valueStr = snapshot.value.String()
+			}
+		}
+
+		log.Printf("[LocalEVM] 调用revert: depth=%d op=%s from=%s to=%s selector=%s inputLen=%d value=%s gasUsed=%d reason=%s return=%s err=%s",
+			depth, opLabel, fromStr, toStr, selector, inputLen, valueStr, gasUsed, revertMsg, retHex, errMsg)
+	}
 }
 
 // onOpcode 在每个操作码执行时触发
@@ -369,6 +437,28 @@ func (i *CallInterceptor) Reset() {
 	defer i.mu.Unlock()
 	i.pendingOverrides = make(map[int][]byte)
 	i.firstProtectedHit = nil
+	i.callStack = make(map[int]*callSnapshot)
+}
+
+// callSnapshot 记录调用关键信息，便于revert诊断
+type callSnapshot struct {
+	opType   byte
+	from     common.Address
+	to       common.Address
+	selector string
+	inputLen int
+	value    *big.Int
+}
+
+// decodeRevertMessage 从返回数据中解码revert原因
+func decodeRevertMessage(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	if msg, err := abi.UnpackRevert(data); err == nil {
+		return msg
+	}
+	return "0x" + hex.EncodeToString(data)
 }
 
 // recordFirstProtectedHit 记录首个受保护调用命中

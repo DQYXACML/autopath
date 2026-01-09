@@ -2,6 +2,7 @@
 package local
 
 import (
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -25,6 +26,15 @@ type StateAdapter struct {
 
 	// 账户状态
 	accounts map[common.Address]*AccountState
+
+	// 延迟状态提供者
+	provider LazyStateProvider
+
+	// 覆盖字段标记（用于避免覆盖显式提供的状态）
+	overrideFlags map[common.Address]*overrideFieldFlags
+
+	// 延迟加载标记（避免重复RPC查询）
+	lazyLoaded map[common.Address]*lazyLoadedFlags
 
 	// 快照机制
 	snapshots  map[int]map[common.Address]*AccountState
@@ -57,8 +67,22 @@ type StateAdapter struct {
 	refund uint64
 }
 
+type overrideFieldFlags struct {
+	balance bool
+	nonce   bool
+	code    bool
+	storage map[common.Hash]bool
+}
+
+type lazyLoadedFlags struct {
+	balance bool
+	nonce   bool
+	code    bool
+	storage map[common.Hash]bool
+}
+
 // NewStateAdapter 从 StateOverride 创建 StateAdapter
-func NewStateAdapter(override StateOverride) *StateAdapter {
+func NewStateAdapter(override StateOverride, provider LazyStateProvider) *StateAdapter {
 	sa := &StateAdapter{
 		accounts:          make(map[common.Address]*AccountState),
 		snapshots:         make(map[int]map[common.Address]*AccountState),
@@ -69,6 +93,9 @@ func NewStateAdapter(override StateOverride) *StateAdapter {
 		stateChanges:      make(map[common.Address]map[common.Hash]StorageDiff),
 		selfDestructed:    make(map[common.Address]struct{}),
 		created:           make(map[common.Address]struct{}),
+		provider:          provider,
+		overrideFlags:     make(map[common.Address]*overrideFieldFlags),
+		lazyLoaded:        make(map[common.Address]*lazyLoadedFlags),
 	}
 
 	// 从 StateOverride 初始化状态
@@ -78,12 +105,14 @@ func NewStateAdapter(override StateOverride) *StateAdapter {
 		}
 		addr := common.HexToAddress(addrStr)
 		account := NewAccountState()
+		flags := &overrideFieldFlags{storage: make(map[common.Hash]bool)}
 
 		// 解析余额
 		if ov.Balance != "" {
 			balance, ok := parseHexOrDecimal(ov.Balance)
 			if ok {
 				account.Balance = balance
+				flags.balance = true
 			}
 		}
 
@@ -96,6 +125,7 @@ func NewStateAdapter(override StateOverride) *StateAdapter {
 				nonce, _ := strconv.ParseUint(ov.Nonce, 10, 64)
 				account.Nonce = nonce
 			}
+			flags.nonce = true
 		}
 
 		// 解析Code
@@ -103,6 +133,16 @@ func NewStateAdapter(override StateOverride) *StateAdapter {
 			account.Code = common.FromHex(ov.Code)
 			if len(account.Code) > 0 {
 				account.CodeHash = crypto.Keccak256Hash(account.Code)
+				// Debug: 记录CitadelRedeem的code加载情况
+				if strings.ToLower(addr.Hex()) == "0x34b666992fcce34669940ab6b017fe11e5750799" {
+					log.Printf("[StateAdapter] ✅ 加载CitadelRedeem code: size=%d bytes, hash=%s", len(account.Code), account.CodeHash.Hex())
+				}
+			}
+			flags.code = true
+		} else {
+			// Debug: 记录code为空的情况
+			if strings.ToLower(addr.Hex()) == "0x34b666992fcce34669940ab6b017fe11e5750799" {
+				log.Printf("[StateAdapter] ⚠️  CitadelRedeem code为空！")
 			}
 		}
 
@@ -111,9 +151,13 @@ func NewStateAdapter(override StateOverride) *StateAdapter {
 			slot := common.HexToHash(slotStr)
 			value := common.HexToHash(valueStr)
 			account.Storage[slot] = value
+			if flags.storage != nil {
+				flags.storage[slot] = true
+			}
 		}
 
 		sa.accounts[addr] = account
+		sa.overrideFlags[addr] = flags
 	}
 
 	return sa
@@ -134,6 +178,189 @@ func parseHexOrDecimal(s string) (*big.Int, bool) {
 	return val, ok
 }
 
+// ============ 延迟加载辅助 ============
+
+func (s *StateAdapter) getLazyFlagsLocked(addr common.Address) *lazyLoadedFlags {
+	flags, ok := s.lazyLoaded[addr]
+	if !ok {
+		flags = &lazyLoadedFlags{storage: make(map[common.Hash]bool)}
+		s.lazyLoaded[addr] = flags
+	}
+	if flags.storage == nil {
+		flags.storage = make(map[common.Hash]bool)
+	}
+	return flags
+}
+
+func (s *StateAdapter) getOverrideFlagsLocked(addr common.Address) *overrideFieldFlags {
+	flags, ok := s.overrideFlags[addr]
+	if !ok {
+		return nil
+	}
+	return flags
+}
+
+func (s *StateAdapter) loadAccountBasicsIfNeeded(addr common.Address) {
+	s.loadBalanceIfNeeded(addr)
+	s.loadNonceIfNeeded(addr)
+	s.loadCodeIfNeeded(addr)
+}
+
+func (s *StateAdapter) loadBalanceIfNeeded(addr common.Address) {
+	if s.provider == nil {
+		return
+	}
+
+	s.mu.RLock()
+	override := s.getOverrideFlagsLocked(addr)
+	loaded := s.lazyLoaded[addr]
+	if override != nil && override.balance {
+		s.mu.RUnlock()
+		return
+	}
+	if loaded != nil && loaded.balance {
+		s.mu.RUnlock()
+		return
+	}
+	s.mu.RUnlock()
+
+	balance, err := s.provider.GetBalance(addr)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	override = s.getOverrideFlagsLocked(addr)
+	loaded = s.getLazyFlagsLocked(addr)
+	if loaded.balance || (override != nil && override.balance) {
+		return
+	}
+	if err == nil && balance != nil {
+		account := s.getOrCreateAccount(addr)
+		account.Balance = balance
+	} else if err != nil {
+		log.Printf("[StateAdapter] ⚠️  拉取余额失败 addr=%s err=%v", addr.Hex(), err)
+	}
+	loaded.balance = true
+}
+
+func (s *StateAdapter) loadNonceIfNeeded(addr common.Address) {
+	if s.provider == nil {
+		return
+	}
+
+	s.mu.RLock()
+	override := s.getOverrideFlagsLocked(addr)
+	loaded := s.lazyLoaded[addr]
+	if override != nil && override.nonce {
+		s.mu.RUnlock()
+		return
+	}
+	if loaded != nil && loaded.nonce {
+		s.mu.RUnlock()
+		return
+	}
+	s.mu.RUnlock()
+
+	nonce, err := s.provider.GetNonce(addr)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	override = s.getOverrideFlagsLocked(addr)
+	loaded = s.getLazyFlagsLocked(addr)
+	if loaded.nonce || (override != nil && override.nonce) {
+		return
+	}
+	if err == nil {
+		account := s.getOrCreateAccount(addr)
+		account.Nonce = nonce
+	} else {
+		log.Printf("[StateAdapter] ⚠️  拉取nonce失败 addr=%s err=%v", addr.Hex(), err)
+	}
+	loaded.nonce = true
+}
+
+func (s *StateAdapter) loadCodeIfNeeded(addr common.Address) {
+	if s.provider == nil {
+		return
+	}
+
+	s.mu.RLock()
+	override := s.getOverrideFlagsLocked(addr)
+	loaded := s.lazyLoaded[addr]
+	if override != nil && override.code {
+		s.mu.RUnlock()
+		return
+	}
+	if loaded != nil && loaded.code {
+		s.mu.RUnlock()
+		return
+	}
+	s.mu.RUnlock()
+
+	code, err := s.provider.GetCode(addr)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	override = s.getOverrideFlagsLocked(addr)
+	loaded = s.getLazyFlagsLocked(addr)
+	if loaded.code || (override != nil && override.code) {
+		return
+	}
+	if err == nil && code != nil {
+		account := s.getOrCreateAccount(addr)
+		account.Code = code
+		if len(code) > 0 {
+			account.CodeHash = crypto.Keccak256Hash(code)
+		} else {
+			account.CodeHash = common.Hash{}
+		}
+	} else if err != nil {
+		log.Printf("[StateAdapter] ⚠️  拉取代码失败 addr=%s err=%v", addr.Hex(), err)
+	}
+	loaded.code = true
+}
+
+func (s *StateAdapter) loadStorageIfNeeded(addr common.Address, key common.Hash) {
+	if s.provider == nil {
+		return
+	}
+
+	s.mu.RLock()
+	override := s.getOverrideFlagsLocked(addr)
+	if override != nil && override.storage != nil && override.storage[key] {
+		s.mu.RUnlock()
+		return
+	}
+	if account, ok := s.accounts[addr]; ok {
+		if _, ok := account.Storage[key]; ok {
+			s.mu.RUnlock()
+			return
+		}
+	}
+	loaded := s.lazyLoaded[addr]
+	if loaded != nil && loaded.storage != nil && loaded.storage[key] {
+		s.mu.RUnlock()
+		return
+	}
+	s.mu.RUnlock()
+
+	value, err := s.provider.GetStorage(addr, key)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	override = s.getOverrideFlagsLocked(addr)
+	loaded = s.getLazyFlagsLocked(addr)
+	if loaded.storage[key] || (override != nil && override.storage != nil && override.storage[key]) {
+		return
+	}
+	if err == nil {
+		account := s.getOrCreateAccount(addr)
+		account.Storage[key] = value
+	} else {
+		log.Printf("[StateAdapter] ⚠️  拉取storage失败 addr=%s slot=%s err=%v", addr.Hex(), key.Hex(), err)
+	}
+	loaded.storage[key] = true
+}
+
 // ============ 账户创建 ============
 
 func (s *StateAdapter) CreateAccount(addr common.Address) {
@@ -151,6 +378,7 @@ func (s *StateAdapter) CreateContract(addr common.Address) {
 // ============ 余额操作 ============
 
 func (s *StateAdapter) GetBalance(addr common.Address) *uint256.Int {
+	s.loadBalanceIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -184,6 +412,7 @@ func (s *StateAdapter) AddBalance(addr common.Address, amount *uint256.Int, reas
 // ============ Nonce操作 ============
 
 func (s *StateAdapter) GetNonce(addr common.Address) uint64 {
+	s.loadNonceIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -204,6 +433,7 @@ func (s *StateAdapter) SetNonce(addr common.Address, nonce uint64, reason tracin
 // ============ 代码操作 ============
 
 func (s *StateAdapter) GetCode(addr common.Address) []byte {
+	s.loadCodeIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -214,6 +444,7 @@ func (s *StateAdapter) GetCode(addr common.Address) []byte {
 }
 
 func (s *StateAdapter) GetCodeHash(addr common.Address) common.Hash {
+	s.loadCodeIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -228,6 +459,7 @@ func (s *StateAdapter) GetCodeHash(addr common.Address) common.Hash {
 }
 
 func (s *StateAdapter) GetCodeSize(addr common.Address) int {
+	s.loadCodeIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -255,6 +487,7 @@ func (s *StateAdapter) SetCode(addr common.Address, code []byte) []byte {
 // ============ 存储操作 ============
 
 func (s *StateAdapter) GetState(addr common.Address, key common.Hash) common.Hash {
+	s.loadStorageIfNeeded(addr, key)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -365,6 +598,7 @@ func (s *StateAdapter) SelfDestruct6780(addr common.Address) (uint256.Int, bool)
 // ============ 账户存在性检查 ============
 
 func (s *StateAdapter) Exist(addr common.Address) bool {
+	s.loadAccountBasicsIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -377,6 +611,7 @@ func (s *StateAdapter) Exist(addr common.Address) bool {
 }
 
 func (s *StateAdapter) Empty(addr common.Address) bool {
+	s.loadAccountBasicsIfNeeded(addr)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

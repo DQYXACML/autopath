@@ -478,59 +478,56 @@ func (s *EVMSimulator) ReplayTransactionWithOverride(
 		fmt.Sprintf("0x%x", blockNumber),
 		options,
 	}
-	if override != nil && len(override) > 0 {
-		params = append(params, override)
+
+	isStateOverrideErr := func(err error) bool {
+		if err == nil {
+			return false
+		}
+		errStr := err.Error()
+		return strings.Contains(errStr, "stateOverrides") ||
+			strings.Contains(errStr, "unexpected EOF") ||
+			strings.Contains(errStr, "invalid length") ||
+			strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall")
 	}
 
 	var result json.RawMessage
-	err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 
-	if err != nil && override != nil && len(override) > 0 {
-		errStr := err.Error()
-		if strings.Contains(errStr, "stateOverrides") ||
-			strings.Contains(errStr, "unexpected EOF") ||
-			strings.Contains(errStr, "invalid length") {
-			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+	// 优先尝试Anvil格式（stateOverrides放在options里）
+	if override != nil && len(override) > 0 {
+		options["stateOverrides"] = override
+		err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 
-			paramsFallback := []interface{}{
+		// Anvil格式失败时尝试Geth格式（override作为第四参数）
+		if err != nil && isStateOverrideErr(err) {
+			delete(options, "stateOverrides")
+			params = []interface{}{
 				msg,
 				fmt.Sprintf("0x%x", blockNumber),
-				map[string]interface{}{"tracer": tracerCode},
+				options,
+				override,
 			}
-			var retryRaw json.RawMessage
-			if retryErr := s.rpcClient.CallContext(ctx, &retryRaw, "debug_traceCall", paramsFallback...); retryErr == nil {
-				result = retryRaw
-				err = nil
-			} else {
-				err = retryErr
-			}
+			err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 		}
+	} else {
+		err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 	}
 
-	if err != nil {
-		// 某些节点不支持 stateOverrides 或返回未标记的枚举错误
-		errStr := err.Error()
-		if override != nil && len(override) > 0 &&
-			(strings.Contains(errStr, "stateOverrides") ||
-				strings.Contains(errStr, "unexpected EOF") ||
-				strings.Contains(errStr, "invalid length") ||
-				strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall")) {
-			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
+	// 节点不支持stateOverrides时，回退到链上注入
+	if err != nil && override != nil && len(override) > 0 && isStateOverrideErr(err) {
+		setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+		log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 
-			paramsFallback := []interface{}{
-				msg,
-				fmt.Sprintf("0x%x", blockNumber),
-				map[string]interface{}{"tracer": tracerCode},
-			}
-			var retryRaw json.RawMessage
-			if retryErr := s.rpcClient.CallContext(ctx, &retryRaw, "debug_traceCall", paramsFallback...); retryErr == nil {
-				result = retryRaw
-				err = nil
-			} else {
-				err = retryErr
-			}
+		paramsFallback := []interface{}{
+			msg,
+			fmt.Sprintf("0x%x", blockNumber),
+			map[string]interface{}{"tracer": tracerCode},
+		}
+		var retryRaw json.RawMessage
+		if retryErr := s.rpcClient.CallContext(ctx, &retryRaw, "debug_traceCall", paramsFallback...); retryErr == nil {
+			result = retryRaw
+			err = nil
+		} else {
+			err = retryErr
 		}
 	}
 
@@ -561,34 +558,44 @@ func (s *EVMSimulator) TraceCallTreeWithOverride(
 		},
 	}
 
-	params := []interface{}{
-		msg,
-		fmt.Sprintf("0x%x", blockNumber),
-		options,
-	}
+	// 智能检测节点类型：先尝试 Anvil 格式（stateOverride in options）
+	var params []interface{}
 	if override != nil && len(override) > 0 {
-		params = append(params, override)
+		options["stateOverrides"] = override // Anvil 格式
+		params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options}
+	} else {
+		params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options}
 	}
 
 	var raw json.RawMessage
 	callErr := s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", params...)
+
+	// 如果 Anvil 格式失败，尝试 Geth 格式（stateOverride 作为第4参数）
 	if callErr != nil && override != nil && len(override) > 0 {
 		errStr := callErr.Error()
-		if strings.Contains(errStr, "stateOverrides") ||
+		if strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall") ||
+			strings.Contains(errStr, "stateOverrides") ||
 			strings.Contains(errStr, "unexpected EOF") ||
 			strings.Contains(errStr, "invalid length") {
-			setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-			log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
 
-			paramsFallback := []interface{}{
-				msg,
-				fmt.Sprintf("0x%x", blockNumber),
-				options,
-			}
-			if retryErr := s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", paramsFallback...); retryErr == nil {
+			log.Printf("[Simulator] Anvil格式失败,尝试Geth格式 (err=%v)", callErr)
+
+			// 移除 options 中的 stateOverrides，作为第4参数传递
+			delete(options, "stateOverrides")
+			params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options, override}
+
+			if retryErr := s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", params...); retryErr == nil {
 				callErr = nil
+				log.Printf("[Simulator] ✅ Geth格式成功")
 			} else {
-				callErr = retryErr
+				// Geth格式也失败，执行本地状态注入
+				log.Printf("[Simulator] Geth格式也失败,注入链上状态 (err=%v)", retryErr)
+				setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+				log.Printf("[Simulator] 已注入 (accounts=%d, slots=%d)", setAccounts, setSlots)
+
+				// 移除 stateOverride 重试
+				params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options}
+				callErr = s.rpcClient.CallContext(ctx, &raw, "debug_traceCall", params...)
 			}
 		}
 	}
@@ -1059,44 +1066,47 @@ func (s *EVMSimulator) SimulateWithCallData(
 	// 使用debug_traceCall执行模拟
 	options := map[string]interface{}{"tracer": tracerCode}
 
-	params := []interface{}{
-		msg,
-		fmt.Sprintf("0x%x", blockNumber),
-		options,
-	}
+	// 智能检测节点类型：先尝试 Anvil 格式（stateOverride in options）
+	var params []interface{}
 	if override != nil && len(override) > 0 {
-		// 兼容部分节点需要单独传递 stateOverrides 参数
-		params = append(params, override)
+		options["stateOverrides"] = override // Anvil 格式
+		params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options}
+	} else {
+		params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options}
 	}
 
 	var result json.RawMessage
 	err := s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 
-	if err != nil {
+	// 如果 Anvil 格式失败，尝试 Geth 格式（stateOverride 作为第4参数）
+	if err != nil && override != nil && len(override) > 0 {
 		errStr := err.Error()
 		// 某些节点可能仍然不识别 stateOverrides，回退为无覆盖调用，并尝试写链
-		if override != nil && len(override) > 0 &&
-			(strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall") ||
-				strings.Contains(errStr, "unexpected EOF") ||
-				strings.Contains(errStr, "invalid length") ||
-				strings.Contains(errStr, "stateOverrides")) {
-			if override != nil {
-				log.Printf("[Simulator]  debug_traceCall 不支持 stateOverride，回退为无覆盖调用 (override账户数=%d, err=%v)", len(override), err)
-				// 尝试直接将 stateOverride 写入本地节点，再以无覆盖方式重放
-				setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
-				log.Printf("[Simulator]  已将 stateOverride 注入本地区块链 (accounts=%d, slots=%d)", setAccounts, setSlots)
-			}
-			paramsFallback := []interface{}{
-				msg,
-				fmt.Sprintf("0x%x", blockNumber),
-				map[string]interface{}{"tracer": tracerCode},
-			}
+		if strings.Contains(errStr, "did not match any variant of untagged enum EthRpcCall") ||
+			strings.Contains(errStr, "unexpected EOF") ||
+			strings.Contains(errStr, "invalid length") ||
+			strings.Contains(errStr, "stateOverrides") {
+
+			log.Printf("[Simulator] Anvil格式失败,尝试Geth格式 (override账户数=%d, err=%v)", len(override), err)
+
+			// 移除 options 中的 stateOverrides，作为第4参数传递
+			delete(options, "stateOverrides")
+			params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), options, override}
+
 			var retryResult json.RawMessage
-			if retryErr := s.rpcClient.CallContext(ctx, &retryResult, "debug_traceCall", paramsFallback...); retryErr == nil {
+			if retryErr := s.rpcClient.CallContext(ctx, &retryResult, "debug_traceCall", params...); retryErr == nil {
 				result = retryResult
 				err = nil
+				log.Printf("[Simulator] ✅ Geth格式成功")
 			} else {
-				err = retryErr
+				// Geth格式也失败，执行本地状态注入
+				log.Printf("[Simulator] Geth格式也失败,注入链上状态 (err=%v)", retryErr)
+				setAccounts, setSlots := s.applyOverrideOnChain(ctx, override)
+				log.Printf("[Simulator] 已注入 (accounts=%d, slots=%d)", setAccounts, setSlots)
+
+				// 移除 stateOverride 重试
+				params = []interface{}{msg, fmt.Sprintf("0x%x", blockNumber), map[string]interface{}{"tracer": tracerCode}}
+				err = s.rpcClient.CallContext(ctx, &result, "debug_traceCall", params...)
 			}
 		}
 	}

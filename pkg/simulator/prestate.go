@@ -44,6 +44,49 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		return nil, fmt.Errorf("failed to unmarshal prestate: %w", err)
 	}
 
+	// 【调试】检查Router是否在prestate中
+	routerAddr := "0xe03811dd501fb48751f44c1bc8801b7ffcf7c2ad"
+	attackExecutorAddr := "0xfcf88e5e1314ca3b6be7eed851568834233f8b49"
+
+	foundRouter := false
+	foundExecutor := false
+
+	for addr := range prestate {
+		if strings.EqualFold(addr, routerAddr) {
+			foundRouter = true
+			account := prestate[addr]
+			hasCode := account.Code != "" && account.Code != "0x"
+			storageCount := len(account.State)
+			log.Printf("[Prestate] ✅ Router在prestate中: %s (code=%v, codeSize=%d, storage=%d slots)",
+				addr, hasCode, len(account.Code), storageCount)
+		}
+		if strings.EqualFold(addr, attackExecutorAddr) {
+			foundExecutor = true
+			account := prestate[addr]
+			hasCode := account.Code != "" && account.Code != "0x"
+			storageCount := len(account.State)
+			log.Printf("[Prestate] ✅ AttackExecutor在prestate中: %s (code=%v, codeSize=%d, storage=%d slots)",
+				addr, hasCode, len(account.Code), storageCount)
+		}
+	}
+
+	if !foundRouter {
+		log.Printf("[Prestate] ❌ Router不在prestate中（共%d个账户）", len(prestate))
+	}
+	if !foundExecutor {
+		log.Printf("[Prestate] ❌ AttackExecutor不在prestate中（共%d个账户）", len(prestate))
+		log.Printf("[Prestate]    这会导致本地EVM执行失败！")
+		// 列出前10个地址供参考
+		count := 0
+		for addr := range prestate {
+			log.Printf("[Prestate]   账户%d: %s", count+1, addr)
+			count++
+			if count >= 10 {
+				break
+			}
+		}
+	}
+
 	overrides := make(StateOverride, len(prestate))
 	for addr, account := range prestate {
 		override := &AccountOverride{}
@@ -81,15 +124,45 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 	//  补充本地已部署合约的代码
 	// 处理场景：攻击合约通过 anvil_setCode 注入但 prestateTracer 未包含
 	for addr, override := range overrides {
+		isCitadelRedeem := strings.ToLower(addr) == "0x34b666992fcce34669940ab6b017fe11e5750799"
+		isAttackExecutor := strings.ToLower(addr) == "0xfcf88e5e1314ca3b6be7eed851568834233f8b49"
+
+		if isCitadelRedeem {
+			codePreview := override.Code
+			if len(codePreview) > 20 {
+				codePreview = codePreview[:20] + "..."
+			}
+			log.Printf("[StateOverride] 🔍 检查CitadelRedeem code: 现有=%s", codePreview)
+		}
+		if isAttackExecutor {
+			codePreview := override.Code
+			if len(codePreview) > 20 {
+				codePreview = codePreview[:20] + "..."
+			}
+			log.Printf("[StateOverride] 🔍 检查AttackExecutor code: 现有=%s", codePreview)
+		}
+
 		if override.Code == "" || override.Code == "0x" {
 			// 查询本地节点上的合约代码
 			var localCode string
 			if err := s.rpcClient.CallContext(ctx, &localCode, "eth_getCode", addr, "latest"); err == nil {
 				if localCode != "" && localCode != "0x" && len(localCode) > 2 {
 					override.Code = strings.ToLower(localCode)
-					log.Printf("[StateOverride]  从本地节点补充合约代码: %s (size=%d bytes)",
-						addr, (len(localCode)-2)/2)
+					if isCitadelRedeem {
+						log.Printf("[StateOverride] ✅ 从本地节点补充CitadelRedeem代码: size=%d bytes", (len(localCode)-2)/2)
+					} else if isAttackExecutor {
+						log.Printf("[StateOverride] ✅ 从本地节点补充AttackExecutor代码: size=%d bytes", (len(localCode)-2)/2)
+					} else {
+						log.Printf("[StateOverride]  从本地节点补充合约代码: %s (size=%d bytes)",
+							addr, (len(localCode)-2)/2)
+					}
 				}
+			}
+		} else {
+			if isCitadelRedeem {
+				log.Printf("[StateOverride] ✅ CitadelRedeem code已存在于prestate: size=%d bytes", (len(override.Code)-2)/2)
+			} else if isAttackExecutor {
+				log.Printf("[StateOverride] ✅ AttackExecutor code已存在于prestate: size=%d bytes", (len(override.Code)-2)/2)
 			}
 		}
 	}

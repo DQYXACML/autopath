@@ -31,6 +31,9 @@ type LocalEVMExecutor struct {
 
 	// 是否启用Hook
 	enableHook bool
+
+	// 延迟状态提供者（按需从RPC补齐状态）
+	lazyProvider LazyStateProvider
 }
 
 // NewLocalEVMExecutor 创建本地EVM执行器
@@ -79,6 +82,11 @@ func (e *LocalEVMExecutor) SetProtectedAddresses(addrs []common.Address) {
 	e.protectedAddrs = addrs
 }
 
+// SetLazyStateProvider 设置延迟状态提供者
+func (e *LocalEVMExecutor) SetLazyStateProvider(provider LazyStateProvider) {
+	e.lazyProvider = provider
+}
+
 // ResetProtectedTracking 重置首个受保护调用记录
 func (e *LocalEVMExecutor) ResetProtectedTracking() {
 	if e.interceptor != nil {
@@ -123,7 +131,7 @@ func (e *LocalEVMExecutor) Execute(
 	override StateOverride,
 ) (*ExecutionResult, error) {
 	// 1. 创建StateAdapter
-	stateDB := NewStateAdapter(override)
+	stateDB := NewStateAdapter(override, e.lazyProvider)
 
 	// 2. 配置拦截器
 	e.interceptor.SetStateDB(stateDB)

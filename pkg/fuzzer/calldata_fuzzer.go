@@ -49,6 +49,10 @@ type TransactionTracer struct {
 var attackStatePathCache sync.Map // key: 项目/合约 -> 路径
 var attackStateCache sync.Map     // key: 路径 -> *attackStateFile
 
+// baseline_state路径与内容缓存，减少重复IO
+var baselineStatePathCache sync.Map // key: 项目 -> 路径
+var baselineStateCache sync.Map     // key: 路径 -> *baselineStateFile
+
 // targetSelectorCache 缓存项目的目标函数选择器（contract -> selectors）
 var targetSelectorCache sync.Map // key: cacheKey, value: map[string]map[string]bool
 
@@ -240,14 +244,15 @@ func (t *TransactionTracer) TraceTransaction(txHash common.Hash) (*CallFrame, er
 // CallDataFuzzer 主控制器
 type CallDataFuzzer struct {
 	// 核心组件
-	simulator      *simulator.EVMSimulator      // RPC模式模拟器
-	dualSimulator  *simulator.DualModeSimulator //  双模式模拟器（支持本地执行）
-	localExecution bool                         //  是否启用本地执行模式
-	parser         *ABIParser
-	generator      *ParamGenerator
-	comparator     *PathComparator
-	merger         *ResultMerger
-	tracer         *TransactionTracer
+	simulator       *simulator.EVMSimulator      // RPC模式模拟器
+	dualSimulator   *simulator.DualModeSimulator //  双模式模拟器（支持本地执行）
+	localExecution  bool                         //  是否启用本地执行模式
+	recordFullTrace bool                         //  是否记录全交易路径
+	parser          *ABIParser
+	generator       *ParamGenerator
+	comparator      *PathComparator
+	merger          *ResultMerger
+	tracer          *TransactionTracer
 
 	// 配置
 	threshold  float64
@@ -297,6 +302,12 @@ type CallDataFuzzer struct {
 
 	// 项目标识（用于定位attack_state等外部状态）
 	projectID string
+	// 基线状态路径（用于本地EVM补全）
+	baselineStatePath string
+	// 严格prestate模式（禁止attack_state覆盖，仅允许baseline_state补全）
+	strictPrestate bool
+	// attack_state仅补代码（不写入余额/存储）
+	attackStateCodeOnly bool
 
 	// === 新架构组件 (Phase 3集成) ===
 	registry       local.ProtectedRegistry // 受保护合约注册表（首个执行器）
@@ -385,11 +396,25 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
 		projectID:               config.ProjectID,
+		baselineStatePath:       config.BaselineStatePath,
+		strictPrestate:          config.StrictPrestate,
+		attackStateCodeOnly:     config.AttackStateCodeOnly,
 		localExecution:          config.LocalExecution, //  本地执行模式
-		constraintCollector:     NewConstraintCollectorWithBasePath(10, basePath),
+		recordFullTrace:         config.RecordFullTrace,
+		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
 		sampleRecorder:          newSampleRecorder(),
 	}
+	if fuzzer.merger != nil {
+		fuzzer.merger.SetProjectID(config.ProjectID)
+	}
 	fuzzer.simMin = math.Inf(1)
+	if fuzzer.strictPrestate {
+		if fuzzer.attackStateCodeOnly {
+			log.Printf("[Fuzzer]  严格prestate已启用：attack_state仅补代码")
+		} else {
+			log.Printf("[Fuzzer]  严格prestate已启用：跳过attack_state注入")
+		}
+	}
 
 	//  根据配置选择模拟器类型
 	if config.LocalExecution {
@@ -401,6 +426,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		for i := 0; i < poolSize; i++ {
 			dualSim := simulator.NewDualModeSimulatorWithClients(rpcClient, client)
 			dualSim.SetExecutionMode(simulator.ModeLocal)
+			dualSim.SetRecordFullTrace(config.RecordFullTrace)
 			fuzzer.dualSimulators = append(fuzzer.dualSimulators, dualSim)
 		}
 		if len(fuzzer.dualSimulators) > 0 {
@@ -479,11 +505,25 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
 		projectID:               config.ProjectID,
+		baselineStatePath:       config.BaselineStatePath,
+		strictPrestate:          config.StrictPrestate,
+		attackStateCodeOnly:     config.AttackStateCodeOnly,
 		localExecution:          config.LocalExecution, //  本地执行模式
-		constraintCollector:     NewConstraintCollectorWithBasePath(10, basePath),
+		recordFullTrace:         config.RecordFullTrace,
+		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
 		sampleRecorder:          newSampleRecorder(),
 	}
+	if fuzzer.merger != nil {
+		fuzzer.merger.SetProjectID(config.ProjectID)
+	}
 	fuzzer.simMin = math.Inf(1)
+	if fuzzer.strictPrestate {
+		if fuzzer.attackStateCodeOnly {
+			log.Printf("[Fuzzer]  严格prestate已启用：attack_state仅补代码")
+		} else {
+			log.Printf("[Fuzzer]  严格prestate已启用：跳过attack_state注入")
+		}
+	}
 
 	//  根据配置选择模拟器类型
 	if config.LocalExecution {
@@ -495,6 +535,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		for i := 0; i < poolSize; i++ {
 			dualSim := simulator.NewDualModeSimulatorWithClients(rpcClient, client)
 			dualSim.SetExecutionMode(simulator.ModeLocal)
+			dualSim.SetRecordFullTrace(config.RecordFullTrace)
 			fuzzer.dualSimulators = append(fuzzer.dualSimulators, dualSim)
 		}
 		if len(fuzzer.dualSimulators) > 0 {
@@ -823,7 +864,13 @@ func extractProtectedContractPath(path []ContractJumpDest, contract common.Addre
 	if len(res) > 0 {
 		log.Printf("[extractProtectedContractPath][%s] 成功提取 %d 个JUMPDEST (从索引=%d起, 路径总长=%d)", source, len(res), firstIdx, len(path))
 	} else {
-		log.Printf("[extractProtectedContractPath][%s]  未能提取任何JUMPDEST (未找到合约=%s, 路径长度=%d)", source, target, len(path))
+		// 【增强】列出路径中实际包含的合约地址
+		contracts := make(map[string]int)
+		for _, jd := range path {
+			contracts[strings.ToLower(jd.Contract)]++
+		}
+		log.Printf("[extractProtectedContractPath][%s] ⚠️ 未找到目标合约 %s (路径长度=%d, 路径包含的合约: %v)",
+			source, target, len(path), contracts)
 	}
 
 	return res
@@ -1010,6 +1057,20 @@ type attackStateFile struct {
 	Addresses map[string]attackStateEntry `json:"addresses"`
 }
 
+// baseline_state.json 结构体（只保留必要字段）
+type baselineContractEntry struct {
+	Balance string            `json:"balance"`
+	Nonce   string            `json:"nonce,omitempty"`
+	Code    string            `json:"code"`
+	Storage map[string]string `json:"storage"`
+}
+
+type baselineStateFile struct {
+	BlockNumber    uint64                           `json:"block_number"`
+	BlockTimestamp uint64                           `json:"block_timestamp"`
+	Contracts      map[string]baselineContractEntry `json:"contracts"`
+}
+
 // isZeroLikeHex 判断字符串是否等价于0
 func isZeroLikeHex(value string) bool {
 	lower := strings.ToLower(strings.TrimSpace(value))
@@ -1050,6 +1111,21 @@ func normalizeAttackQuantity(v interface{}) string {
 		return fmt.Sprintf("0x%x", val)
 	case uint64:
 		return fmt.Sprintf("0x%x", val)
+	}
+	return ""
+}
+
+// normalizeBaselineQuantity 将baseline中的数值统一转为0x前缀十六进制
+func normalizeBaselineQuantity(value string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "0x") || strings.HasPrefix(raw, "0X") {
+		return strings.ToLower(raw)
+	}
+	if bi, ok := new(big.Int).SetString(raw, 10); ok {
+		return "0x" + strings.ToLower(bi.Text(16))
 	}
 	return ""
 }
@@ -1268,6 +1344,47 @@ func mergeAttackStateIntoOverride(base simulator.StateOverride, attack *attackSt
 	return base
 }
 
+// mergeAttackStateCodeOnlyIntoOverride 仅从attack_state补齐代码（不写入余额/nonce/存储）
+func mergeAttackStateCodeOnlyIntoOverride(base simulator.StateOverride, attack *attackStateFile, path string) simulator.StateOverride {
+	if attack == nil || len(attack.Addresses) == 0 {
+		return base
+	}
+
+	if base == nil {
+		base = make(simulator.StateOverride)
+	}
+
+	injected := 0
+	skipped := 0
+	for rawAddr, entry := range attack.Addresses {
+		lowerAddr := strings.ToLower(rawAddr)
+		if lowerAddr == "0x0000000000000000000000000000000000000000" || lowerAddr == "" {
+			continue
+		}
+		if entry.Code == "" || entry.Code == "0x" {
+			continue
+		}
+
+		ov := base[lowerAddr]
+		if ov == nil {
+			ov = &simulator.AccountOverride{}
+		}
+		if ov.Code != "" && ov.Code != "0x" {
+			skipped++
+			base[lowerAddr] = ov
+			continue
+		}
+		ov.Code = strings.ToLower(entry.Code)
+		base[lowerAddr] = ov
+		injected++
+	}
+
+	if injected > 0 {
+		log.Printf("[AttackState]  已从%s补齐代码：%d个账户，跳过已有代码 %d 个", path, injected, skipped)
+	}
+	return base
+}
+
 // injectAttackStateIfAvailable 尝试注入attack_state.json中的状态
 func (f *CallDataFuzzer) injectAttackStateIfAvailable(base simulator.StateOverride, contractAddr common.Address) simulator.StateOverride {
 	attackState, path := f.loadAttackState(contractAddr)
@@ -1275,6 +1392,222 @@ func (f *CallDataFuzzer) injectAttackStateIfAvailable(base simulator.StateOverri
 		return base
 	}
 	return mergeAttackStateIntoOverride(base, attackState, path)
+}
+
+// injectAttackStateCodeOnlyIfAvailable 尝试仅从attack_state.json补齐代码
+func (f *CallDataFuzzer) injectAttackStateCodeOnlyIfAvailable(base simulator.StateOverride, contractAddr common.Address) simulator.StateOverride {
+	attackState, path := f.loadAttackState(contractAddr)
+	if attackState == nil {
+		return base
+	}
+	return mergeAttackStateCodeOnlyIntoOverride(base, attackState, path)
+}
+
+// locateBaselineStatePath 基于项目ID或显式配置定位baseline_state.json
+func (f *CallDataFuzzer) locateBaselineStatePath() (string, error) {
+	cacheKey := f.projectID
+	if cacheKey == "" {
+		cacheKey = "default"
+	}
+	if cached, ok := baselineStatePathCache.Load(cacheKey); ok {
+		if path, ok2 := cached.(string); ok2 && path != "" {
+			return path, nil
+		}
+	}
+
+	if strings.TrimSpace(f.baselineStatePath) != "" {
+		baselineStatePathCache.Store(cacheKey, f.baselineStatePath)
+		return f.baselineStatePath, nil
+	}
+
+	if env := strings.TrimSpace(os.Getenv("AUTOPATH_BASELINE_STATE")); env != "" {
+		baselineStatePathCache.Store(cacheKey, env)
+		return env, nil
+	}
+	if env := strings.TrimSpace(os.Getenv("BASELINE_STATE_FILE")); env != "" {
+		baselineStatePathCache.Store(cacheKey, env)
+		return env, nil
+	}
+
+	if f.projectID == "" {
+		return "", fmt.Errorf("项目ID为空，无法定位baseline_state.json")
+	}
+
+	var candidates []string
+	if wd, err := os.Getwd(); err == nil {
+		for depth := 0; depth <= 3; depth++ {
+			up := wd
+			for i := 0; i < depth; i++ {
+				up = filepath.Dir(up)
+			}
+			candidates = append(candidates, filepath.Join(up, "generated", f.projectID, "baseline_state.json"))
+		}
+	}
+	candidates = append(candidates, filepath.Join("generated", f.projectID, "baseline_state.json"))
+
+	for _, cand := range candidates {
+		if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+			baselineStatePathCache.Store(cacheKey, cand)
+			return cand, nil
+		}
+	}
+
+	return "", fmt.Errorf("未找到baseline_state.json")
+}
+
+// loadBaselineState 读取并缓存baseline_state.json
+func (f *CallDataFuzzer) loadBaselineState() (*baselineStateFile, string) {
+	path, err := f.locateBaselineStatePath()
+	if err != nil {
+		log.Printf("[BaselineState]  未找到baseline_state.json: %v", err)
+		return nil, ""
+	}
+
+	if cached, ok := baselineStateCache.Load(path); ok {
+		if parsed, ok2 := cached.(*baselineStateFile); ok2 && parsed != nil {
+			return parsed, path
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("[BaselineState]  读取baseline_state失败(%s): %v", path, err)
+		return nil, ""
+	}
+
+	var parsed baselineStateFile
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		log.Printf("[BaselineState]  解析baseline_state失败(%s): %v", path, err)
+		return nil, ""
+	}
+	if len(parsed.Contracts) == 0 {
+		log.Printf("[BaselineState]  baseline_state(%s)未包含contracts字段", path)
+		return nil, ""
+	}
+
+	baselineStateCache.Store(path, &parsed)
+	return &parsed, path
+}
+
+// mergeBaselineStateIntoOverride 将baseline_state中的余额/代码/存储注入StateOverride
+func mergeBaselineStateIntoOverride(base simulator.StateOverride, baseline *baselineStateFile, path string) simulator.StateOverride {
+	if baseline == nil || len(baseline.Contracts) == 0 {
+		return base
+	}
+
+	if base == nil {
+		base = make(simulator.StateOverride)
+	}
+
+	injected := 0
+	skipped := 0
+	for rawAddr, entry := range baseline.Contracts {
+		lowerAddr := strings.ToLower(rawAddr)
+		if lowerAddr == "0x0000000000000000000000000000000000000000" || lowerAddr == "" {
+			continue
+		}
+
+		ov := base[lowerAddr]
+		if ov == nil {
+			ov = &simulator.AccountOverride{}
+		}
+
+		if balHex := normalizeBaselineQuantity(entry.Balance); balHex != "" && !isZeroLikeHex(balHex) {
+			if ov.Balance == "" || isZeroLikeHex(ov.Balance) {
+				ov.Balance = balHex
+			}
+		}
+
+		if nonceHex := normalizeBaselineQuantity(entry.Nonce); nonceHex != "" && !isZeroLikeHex(nonceHex) {
+			if ov.Nonce == "" || isZeroLikeHex(ov.Nonce) {
+				ov.Nonce = nonceHex
+			}
+		}
+
+		if entry.Code != "" && (ov.Code == "" || ov.Code == "0x") {
+			ov.Code = strings.ToLower(entry.Code)
+		}
+
+		if len(entry.Storage) > 0 {
+			if ov.State == nil {
+				ov.State = make(map[string]string)
+			}
+			for slot, val := range entry.Storage {
+				nSlot := normalizeAttackSlotKey(slot)
+				nVal := normalizeAttackSlotValue(val)
+				if exist, ok := ov.State[nSlot]; ok && !isZeroLikeHex(exist) {
+					skipped++
+					continue
+				}
+				if exist, ok := ov.State[nSlot]; !ok || isZeroLikeHex(exist) {
+					ov.State[nSlot] = nVal
+				}
+			}
+		}
+
+		base[lowerAddr] = ov
+		injected++
+	}
+
+	if injected > 0 {
+		log.Printf("[BaselineState]  已从%s注入状态：%d个账户，跳过已存在非零槽位 %d 个", path, injected, skipped)
+	}
+	return base
+}
+
+// injectBaselineStateIfAvailable 尝试注入baseline_state.json中的状态
+func (f *CallDataFuzzer) injectBaselineStateIfAvailable(base simulator.StateOverride) simulator.StateOverride {
+	baseline, path := f.loadBaselineState()
+	if baseline == nil {
+		return base
+	}
+	return mergeBaselineStateIntoOverride(base, baseline, path)
+}
+
+// applyBaselineBlockTimeIfAvailable 使用baseline_state中的时间戳对齐本地EVM
+func (f *CallDataFuzzer) applyBaselineBlockTimeIfAvailable(blockNumber uint64) {
+	if !f.localExecution {
+		return
+	}
+	baseline, path := f.loadBaselineState()
+	if baseline == nil {
+		return
+	}
+	if baseline.BlockTimestamp == 0 {
+		log.Printf("[BaselineState]  baseline_state(%s)未包含block_timestamp，跳过本地EVM时间对齐", path)
+		return
+	}
+	if baseline.BlockNumber != 0 && blockNumber != 0 && baseline.BlockNumber != blockNumber {
+		log.Printf("[BaselineState]  block_number不一致，仍使用baseline时间戳 (baseline=%d, tx=%d)", baseline.BlockNumber, blockNumber)
+	}
+
+	sims := f.dualSimulators
+	if len(sims) == 0 && f.dualSimulator != nil {
+		sims = []*simulator.DualModeSimulator{f.dualSimulator}
+	}
+
+	updated := 0
+	for _, sim := range sims {
+		if sim == nil {
+			continue
+		}
+		localExec := sim.GetLocalExecutor()
+		if localExec == nil {
+			continue
+		}
+		cfg := localExec.GetConfig()
+		if cfg == nil {
+			cfg = local.DefaultExecutionConfig()
+		}
+		cfgCopy := *cfg
+		cfgCopy.Time = baseline.BlockTimestamp
+		localExec.SetConfig(&cfgCopy)
+		updated++
+	}
+
+	if updated > 0 {
+		log.Printf("[BaselineState]  已对齐本地EVM时间戳=%d (source=%s)", baseline.BlockTimestamp, path)
+	}
 }
 
 // primeSeedsWithOriginalParams 如果某个参数没有种子，则注入原始调用参数作为种子，避免只生成极少组合
@@ -2074,6 +2407,10 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		report.AverageSimilarity = sum / float64(attempts)
 		report.MinSimilarity = minSim
 		report.MaxSimilarity = maxSim
+		report.RawStatsAvailable = true
+		report.RawAverageSimilarity = report.AverageSimilarity
+		report.RawMaxSimilarity = report.MaxSimilarity
+		report.RawMinSimilarity = report.MinSimilarity
 		log.Printf("[Fuzzer]  报告统计（含低相似度）：total=%d avg=%.4f min=%.4f max=%.4f 阈值=%.4f 有效=%d",
 			attempts, report.AverageSimilarity, report.MinSimilarity, report.MaxSimilarity, f.threshold, len(results))
 	} else {
@@ -2297,6 +2634,34 @@ func (f *CallDataFuzzer) waitForTraceAvailable(ctx context.Context, txHash commo
 	return nil
 }
 
+// validateBaselinePath 确保基准路径包含目标合约的JUMPDEST（避免对比失真）
+func validateBaselinePath(result *simulator.ReplayResult, contractAddr common.Address, source string) error {
+	if result == nil {
+		return fmt.Errorf("[基准路径校验] %s 结果为空，无法校验目标合约", source)
+	}
+	if contractAddr == (common.Address{}) {
+		return nil
+	}
+	if len(result.ContractJumpDests) == 0 {
+		return fmt.Errorf("[基准路径校验] %s 未包含合约维度JUMPDEST，无法校验目标合约 %s", source, contractAddr.Hex())
+	}
+
+	target := strings.ToLower(contractAddr.Hex())
+	found := false
+	contracts := make(map[string]int)
+	for _, jd := range result.ContractJumpDests {
+		addr := strings.ToLower(jd.Contract)
+		contracts[addr]++
+		if addr == target {
+			found = true
+		}
+	}
+	if !found {
+		return fmt.Errorf("[基准路径校验] %s 未包含目标合约 %s (合约数量=%d, 合约分布=%v)", source, contractAddr.Hex(), len(contracts), contracts)
+	}
+	return nil
+}
+
 // getOriginalExecution 获取原始交易的执行路径
 // providedTx 参数可选：如果提供则直接使用，否则通过 txHash 查询（带重试）
 func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common.Hash, blockNumber uint64, contractAddr common.Address, providedTx *types.Transaction) (*types.Transaction, *simulator.ReplayResult, simulator.StateOverride, error) {
@@ -2324,10 +2689,56 @@ func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common
 		// 不直接返回错误，让后续的重试机制继续尝试
 	}
 
+	// 优先使用 debug_traceTransaction 获取原始执行路径（链上真实轨迹）
+	var directResult *simulator.ReplayResult
+	if f.simulator != nil {
+		traceContract := contractAddr
+		if f.recordFullTrace {
+			traceContract = common.Address{}
+		}
+		if res, traceErr := f.simulator.ForkAndReplay(ctx, blockNumber, txHash, traceContract); traceErr != nil {
+			log.Printf("[Fuzzer]  debug_traceTransaction失败，回退prestate重放: %v", traceErr)
+		} else {
+			directResult = res
+			if receipt, rerr := f.client.TransactionReceipt(ctx, txHash); rerr == nil && receipt != nil {
+				receiptSuccess := receipt.Status == types.ReceiptStatusSuccessful
+				if directResult.Success != receiptSuccess {
+					log.Printf("[Fuzzer]  以收据状态覆盖trace success: trace=%v, receipt=%v", directResult.Success, receiptSuccess)
+					directResult.Success = receiptSuccess
+				}
+			} else if rerr != nil {
+				log.Printf("[Fuzzer]  获取交易收据失败，无法覆盖trace success: %v", rerr)
+			}
+			log.Printf("[Fuzzer]  原始执行摘要(基于traceTransaction): success=%v, gas=%d, stateChanges=%d, jumpDests=%d, contractJumpDests=%d",
+				directResult.Success, directResult.GasUsed, len(directResult.StateChanges), len(directResult.JumpDests), len(directResult.ContractJumpDests))
+			if err := validateBaselinePath(directResult, contractAddr, "traceTransaction"); err != nil {
+				return nil, nil, nil, err
+			}
+		}
+	}
+
 	// 构建交易执行前的 prestate，用于离线重放
 	override, err := f.simulator.BuildStateOverride(ctx, txHash)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to build state override: %w", err)
+	}
+	if f.localExecution {
+		override = f.injectBaselineStateIfAvailable(override)
+		f.applyBaselineBlockTimeIfAvailable(blockNumber)
+		if f.strictPrestate {
+			if f.attackStateCodeOnly {
+				override = f.injectAttackStateCodeOnlyIfAvailable(override, contractAddr)
+			}
+		} else if f.attackStateCodeOnly {
+			override = f.injectAttackStateCodeOnlyIfAvailable(override, contractAddr)
+		} else {
+			override = f.injectAttackStateIfAvailable(override, contractAddr)
+		}
+	}
+
+	// 若已成功拿到链上真实轨迹，直接作为原始路径返回
+	if directResult != nil {
+		return tx, directResult, override, nil
 	}
 
 	// 使用RPC重放原始攻击交易，作为基线路径
@@ -2358,6 +2769,9 @@ func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common
 				if localErr == nil && localRes != nil {
 					log.Printf("[Fuzzer]  本地回退原始执行摘要: success=%v, gas=%d, stateChanges=%d, contractJumpDests=%d",
 						localRes.Success, localRes.GasUsed, len(localRes.StateChanges), len(localRes.ContractJumpDests))
+					if err := validateBaselinePath(localRes, contractAddr, "local_replay"); err != nil {
+						return nil, nil, nil, err
+					}
 					return tx, localRes, override, nil
 				}
 				log.Printf("[Fuzzer]  本地回退重放失败: %v", localErr)
@@ -2369,6 +2783,9 @@ func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common
 
 	log.Printf("[Fuzzer]  原始执行摘要(基于prestate RPC): success=%v, gas=%d, stateChanges=%d, jumpDests=%d, contractJumpDests=%d",
 		result.Success, result.GasUsed, len(result.StateChanges), len(result.JumpDests), len(result.ContractJumpDests))
+	if err := validateBaselinePath(result, contractAddr, "prestate RPC"); err != nil {
+		return nil, nil, nil, err
+	}
 
 	return tx, result, override, nil
 }
@@ -2417,6 +2834,10 @@ func (f *CallDataFuzzer) executeFuzzing(
 	loopBaseline bool,
 	preparedMutations map[string]*PreparedMutation,
 ) []FuzzingResult {
+	// 【增强】记录fuzzing配置信息
+	log.Printf("[Fuzzer] executeFuzzing配置: localExecution=%v, dualSimulators数量=%d, useRPC=%v",
+		f.localExecution, len(f.dualSimulators), !f.localExecution || len(f.dualSimulators) == 0)
+
 	//  创建带超时的可取消context，限定整轮fuzz耗时；默认使用配置的 timeout_seconds
 	totalBudget := f.timeout
 	if totalBudget <= 0 {
@@ -3304,7 +3725,18 @@ func (f *CallDataFuzzer) worker(
 			// 构造入口调用参数（优先使用调用树根节点）
 			entry := callTree
 			if entry == nil {
+				if workerID == 0 { // 只用worker 0打印一次，避免日志爆炸
+					log.Printf("[Worker %d] ⚠️  callTree为nil，使用targetCall作为入口", workerID)
+					log.Printf("[Worker %d]   targetCall: from=%s, to=%s, selector=%s",
+						workerID, targetCall.From, targetCall.To, targetCall.Input[:10])
+				}
 				entry = targetCall
+			} else {
+				if workerID == 0 { // 只用worker 0打印一次
+					log.Printf("[Worker %d] ✅ 使用callTree作为入口", workerID)
+					log.Printf("[Worker %d]   entry: from=%s, to=%s, selector=%s",
+						workerID, entry.From, entry.To, entry.Input[:10])
+				}
 			}
 			if entry == nil {
 				log.Printf("[Worker %d]  无法获取入口调用，跳过本次组合", workerID)
@@ -3522,10 +3954,9 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
-		// 统一使用全量基准：从索引0开始提取目标合约的所有JUMPDEST，避免受ProtectedStartIndex限制
-		baselineStart = 0
-		baseline := extractProtectedContractPath(origContractJumpDests, contractAddr, baselineStart, "基准全量")
-		candidatePath := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0, "候选")
+		// 入口对齐 + 固定窗口 + overlap：基准/候选路径从受保护合约首次命中开始截取
+		baseline := extractProtectedContractPath(origContractJumpDests, contractAddr, baselineStart, "基准入口对齐")
+		candidatePath := extractProtectedContractPath(simResult.ContractJumpDests, contractAddr, 0, "候选入口对齐")
 		if len(baseline) == 0 || len(candidatePath) == 0 {
 			log.Printf("[Worker %d]  基准或候选路径为空，跳过比较 (baseline=%d, candidate=%d)", workerID, len(baseline), len(candidatePath))
 			f.recordAttempt(0)
@@ -3533,63 +3964,39 @@ func (f *CallDataFuzzer) worker(
 			continue
 		}
 
-		// 入口对齐：用基准首个PC在候选中寻找对齐位置，找不到则从0开始
-		alignStart := 0
-		if len(baseline) > 0 {
-			entryPC := baseline[0].PC
-			entryContract := strings.ToLower(baseline[0].Contract)
-			for i, jd := range candidatePath {
-				if strings.EqualFold(jd.Contract, entryContract) && jd.PC == entryPC {
-					alignStart = i
-					break
-				}
+		// 入口对齐：用候选入口PC在基准中定位对齐点，找不到则从基准起点开始
+		baselineAlignIndex := 0
+		if len(candidatePath) > 0 {
+			entryPC := candidatePath[0].PC
+			if idx := findFunctionEntryIndex(baseline, contractAddr, entryPC); idx >= 0 {
+				baselineAlignIndex = idx
 			}
 		}
 
-		// 多窗口尝试：1.0x/1.5x/2.0x 基准长度，取相似度最佳的窗口
-		windowFactors := []float64{1.0, 1.5, 2.0}
-		bestSim := -1.0
-		var bestWindow []ContractJumpDest
-		bestFactor := 0.0
-		for _, factor := range windowFactors {
-			targetLen := int(float64(len(baseline)) * factor)
-			if targetLen < len(baseline) {
-				targetLen = len(baseline)
-			}
-			if alignStart+targetLen > len(candidatePath) {
-				targetLen = len(candidatePath) - alignStart
-			}
-			if targetLen <= 0 {
-				continue
-			}
-			window := candidatePath[alignStart : alignStart+targetLen]
-			sim := f.comparator.CompareContractJumpDests(
-				baseline,
-				window,
-				baselineStart,
-			)
-			if sim > bestSim {
-				bestSim = sim
-				bestWindow = window
-				bestFactor = factor
-			}
+		alignedBaseline := baseline[baselineAlignIndex:]
+		windowLen := len(alignedBaseline)
+		if len(candidatePath) < windowLen {
+			windowLen = len(candidatePath)
 		}
-
-		if len(bestWindow) == 0 {
-			log.Printf("[Worker %d]  候选窗口为空，跳过比较 (candidateLen=%d, alignStart=%d)", workerID, len(candidatePath), alignStart)
+		if windowLen <= 0 {
+			log.Printf("[Worker %d]  固定窗口为空，跳过比较 (candidateLen=%d, baselineLen=%d, alignIndex=%d)", workerID, len(candidatePath), len(baseline), baselineAlignIndex)
 			f.recordAttempt(0)
 			f.recordSamples(contractAddr, 0, observedCalls)
 			continue
 		}
 
+		compareBaseline := alignedBaseline[:windowLen]
+		compareCandidate := candidatePath[:windowLen]
+		similarity := f.comparator.OverlapContractJumpDests(compareBaseline, compareCandidate)
+
 		// 统计集合规模与交集，便于确认相似度来源
-		baseSet := make(map[string]struct{}, len(baseline))
-		for _, jd := range baseline {
+		baseSet := make(map[string]struct{}, len(compareBaseline))
+		for _, jd := range compareBaseline {
 			key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
 			baseSet[key] = struct{}{}
 		}
-		candSet := make(map[string]struct{}, len(bestWindow))
-		for _, jd := range bestWindow {
+		candSet := make(map[string]struct{}, len(compareCandidate))
+		for _, jd := range compareCandidate {
 			key := fmt.Sprintf("%s:%d", strings.ToLower(jd.Contract), jd.PC)
 			candSet[key] = struct{}{}
 		}
@@ -3600,7 +4007,7 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 		if currentCount <= 5 || currentCount%500 == 0 {
-			log.Printf("[Worker %d] 路径集合统计: 基准唯一=%d, 候选唯一=%d, 交集=%d, 窗口len=%d/%d, factor=%.1f, alignStart=%d", workerID, len(baseSet), len(candSet), intersection, len(bestWindow), len(candidatePath), bestFactor, alignStart)
+			log.Printf("[Worker %d] 路径集合统计: 基准唯一=%d, 候选唯一=%d, 交集=%d, 窗口len=%d, baselineAlign=%d", workerID, len(baseSet), len(candSet), intersection, windowLen, baselineAlignIndex)
 		}
 
 		// 不再对基线/候选路径做循环体裁剪，保持完整路径对齐
@@ -3674,7 +4081,7 @@ func (f *CallDataFuzzer) worker(
 								endIdx = len(loopSeg)
 							}
 							windowSeg := loopSeg[offset:endIdx]
-							sim := f.comparator.CompareContractJumpDests(windowSeg, candidatePath, 0)
+							sim := f.comparator.OverlapContractJumpDests(windowSeg, candidatePath)
 							if sim > bestAlignSim {
 								bestAlignSim = sim
 								bestAlignIdx = offset
@@ -3726,8 +4133,6 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
-		similarity := bestSim
-
 		// 记录全量尝试（包含低相似度样本）
 		f.recordAttempt(similarity)
 		f.recordSamples(contractAddr, similarity, observedCalls)
@@ -3750,8 +4155,8 @@ func (f *CallDataFuzzer) worker(
 		//  修复：打印实际比较的baseline和candidatePath，而非原始的origContractJumpDests
 		if similarity >= f.threshold && (currentCount <= 5 || currentCount%500 == 0) {
 			log.Printf("[Worker %d] 路径片段: 基准%s ; Fuzz%s (sim=%.4f)", workerID,
-				formatPathSnippet(baseline, baselineStart),
-				formatPathSnippet(candidatePath, 0),
+				formatPathSnippet(compareBaseline, 0),
+				formatPathSnippet(compareCandidate, 0),
 				similarity,
 			)
 		}
@@ -3764,14 +4169,13 @@ func (f *CallDataFuzzer) worker(
 
 		// 如果相似度超过阈值，进行后续检查
 		if similarity >= f.threshold {
-			log.Printf("[Worker %d]  相似度达标参数: sim=%.4f, selector=%s, params=%s, 窗口len=%d, factor=%.1f, alignStart=%d",
+			log.Printf("[Worker %d]  相似度达标参数: sim=%.4f, selector=%s, params=%s, 窗口len=%d, baselineAlign=%d",
 				workerID,
 				similarity,
 				formatSelectorForLog(newCallData),
 				formatParamValuesForLog(combo),
-				len(bestWindow),
-				bestFactor,
-				alignStart,
+				windowLen,
+				baselineAlignIndex,
 			)
 
 			// 记录模拟执行概况，便于诊断“高相似度但无违规”的原因
@@ -3782,8 +4186,8 @@ func (f *CallDataFuzzer) worker(
 						workerID,
 						formatSelectorForLog(newCallData),
 						formatParamValuesForLog(combo),
-						len(candidatePath),
-						len(baseline),
+						len(compareCandidate),
+						len(compareBaseline),
 						len(simResult.ContractJumpDests),
 						overrideAccounts, overrideSlots, overrideTargetSlots)
 				}
@@ -4532,6 +4936,7 @@ func findProtectedStartIndex(jumps []ContractJumpDest, target common.Address) in
 	return -1
 }
 
+// containsContractJumpDest 检查路径中是否包含目标合约的JUMPDEST
 // formatPathSnippet 格式化路径片段，避免日志过长
 func formatPathSnippet(jumps []ContractJumpDest, start int) string {
 	total := len(jumps)
@@ -5356,20 +5761,24 @@ func (f *CallDataFuzzer) buildChainedReportsFromSamples(
 		}
 
 		report := &AttackParameterReport{
-			ContractAddress:   contractAddr,
-			FunctionSig:       ensureSelectorHex(selector),
-			FunctionName:      funcName,
-			Timestamp:         time.Now(),
-			OriginalTxHash:    txHash,
-			BlockNumber:       blockNumber,
-			ValidParameters:   params,
-			TotalCombinations: totalSamples,
-			ValidCombinations: totalSamples,
-			AverageSimilarity: avgSim,
-			MaxSimilarity:     maxSim,
-			MinSimilarity:     maxSim,
-			HasInvariantCheck: baseReport.HasInvariantCheck,
-			ViolationCount:    baseReport.ViolationCount,
+			ContractAddress:      contractAddr,
+			FunctionSig:          ensureSelectorHex(selector),
+			FunctionName:         funcName,
+			Timestamp:            time.Now(),
+			OriginalTxHash:       txHash,
+			BlockNumber:          blockNumber,
+			ValidParameters:      params,
+			TotalCombinations:    totalSamples,
+			ValidCombinations:    totalSamples,
+			AverageSimilarity:    avgSim,
+			MaxSimilarity:        maxSim,
+			MinSimilarity:        maxSim,
+			RawStatsAvailable:    baseReport.RawStatsAvailable,
+			RawAverageSimilarity: baseReport.RawAverageSimilarity,
+			RawMaxSimilarity:     baseReport.RawMaxSimilarity,
+			RawMinSimilarity:     baseReport.RawMinSimilarity,
+			HasInvariantCheck:    baseReport.HasInvariantCheck,
+			ViolationCount:       baseReport.ViolationCount,
 		}
 		if decodedMethod != nil {
 			report.FunctionSignature = decodedMethod.Sig

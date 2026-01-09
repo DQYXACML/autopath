@@ -30,6 +30,7 @@ type ConstraintCollector struct {
 	lastGenSample   map[string]int   // 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
 	constraintRules *ConstraintRulesV2
 	basePath        string
+	projectID       string
 }
 
 // NewConstraintCollector 创建约束收集器
@@ -53,6 +54,13 @@ func NewConstraintCollectorWithBasePath(threshold int, basePath string) *Constra
 	}
 }
 
+// NewConstraintCollectorWithProject 创建带基础路径和项目ID的约束收集器
+func NewConstraintCollectorWithProject(threshold int, basePath, projectID string) *ConstraintCollector {
+	cc := NewConstraintCollectorWithBasePath(threshold, basePath)
+	cc.projectID = projectID
+	return cc
+}
+
 // RecordSample 记录一次高相似模拟结果，满足阈值时生成规则
 func (cc *ConstraintCollector) RecordSample(
 	contract common.Address,
@@ -71,9 +79,21 @@ func (cc *ConstraintCollector) RecordSample(
 
 	// 尝试加载约束规则（首次调用时）
 	if cc.constraintRules == nil && cc.basePath != "" {
-		if rules, err := LoadConstraintRulesByContractAddr(cc.basePath, contract); err == nil {
-			cc.constraintRules = rules
-			log.Printf("[ConstraintCollector] Loaded constraint rules for contract %s", contract.Hex())
+		if cc.projectID != "" {
+			if rules, err := LoadConstraintRules(cc.basePath, cc.projectID); err == nil {
+				if strings.EqualFold(rules.VulnerableContract.Address, contract.Hex()) {
+					cc.constraintRules = rules
+					log.Printf("[ConstraintCollector] Loaded constraint rules for contract %s", contract.Hex())
+				} else {
+					log.Printf("[ConstraintCollector] 项目 %s 约束不匹配合约 %s，回退按地址查找", cc.projectID, contract.Hex())
+				}
+			}
+		}
+		if cc.constraintRules == nil {
+			if rules, err := LoadConstraintRulesByContractAddr(cc.basePath, contract); err == nil {
+				cc.constraintRules = rules
+				log.Printf("[ConstraintCollector] Loaded constraint rules for contract %s", contract.Hex())
+			}
 		}
 	}
 

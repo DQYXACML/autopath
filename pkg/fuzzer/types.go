@@ -62,12 +62,16 @@ type AttackParameterReport struct {
 	ExpressionRules []ExpressionRule   `json:"expression_rules,omitempty"`
 
 	// 统计信息
-	TotalCombinations int     `json:"total_combinations_tested"`
-	ValidCombinations int     `json:"valid_combinations_found"`
-	AverageSimilarity float64 `json:"average_similarity"`
-	MaxSimilarity     float64 `json:"max_similarity"`
-	MinSimilarity     float64 `json:"min_similarity"`
-	ExecutionTimeMs   int64   `json:"execution_time_ms"`
+	TotalCombinations    int     `json:"total_combinations_tested"`
+	ValidCombinations    int     `json:"valid_combinations_found"`
+	AverageSimilarity    float64 `json:"average_similarity"`
+	MaxSimilarity        float64 `json:"max_similarity"`
+	MinSimilarity        float64 `json:"min_similarity"`
+	RawStatsAvailable    bool    `json:"raw_stats_available,omitempty"`
+	RawAverageSimilarity float64 `json:"raw_average_similarity,omitempty"`
+	RawMaxSimilarity     float64 `json:"raw_max_similarity,omitempty"`
+	RawMinSimilarity     float64 `json:"raw_min_similarity,omitempty"`
+	ExecutionTimeMs      int64   `json:"execution_time_ms"`
 	// 时间轴统计：首个达标样本/最高相似度出现的时间（相对模糊开始，秒）
 	FirstHitSeconds float64 `json:"first_hit_seconds,omitempty"`
 	MaxSimSeconds   float64 `json:"max_sim_seconds,omitempty"`
@@ -271,6 +275,9 @@ type Config struct {
 	// 项目标识（用于定位attack_state.json等外部资料）
 	ProjectID string `yaml:"project_id"`
 
+	// 基线状态文件路径（用于本地EVM补全状态）
+	BaselineStatePath string `yaml:"baseline_state_path"`
+
 	// 相似度阈值
 	Threshold float64 `yaml:"jumpdest_similarity_threshold"`
 
@@ -301,6 +308,14 @@ type Config struct {
 
 	//  本地执行模式配置
 	LocalExecution bool `yaml:"local_execution"` // 使用本地EVM执行替代RPC调用
+
+	//  全交易路径记录
+	RecordFullTrace bool `yaml:"record_full_trace"` // 记录全交易路径（不截断到受保护合约）
+
+	//  严格prestate模式（禁止attack_state覆盖，仅允许baseline_state补全）
+	StrictPrestate bool `yaml:"strict_prestate" json:"strict_prestate"`
+	//  attack_state仅补代码（不写入余额/存储）
+	AttackStateCodeOnly bool `yaml:"attack_state_code_only" json:"attack_state_code_only"`
 
 	//  新架构开关（配合本地执行）
 	EnableNewArch bool `yaml:"enable_new_arch" json:"enable_new_arch"`

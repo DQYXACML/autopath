@@ -329,7 +329,8 @@ func (p *PathComparator) cosineSimilarity(seq1, seq2 []uint64) float64 {
 
 // CompareContractJumpDests 比较带合约地址的 JUMPDEST 序列
 // 从受保护合约开始的索引截取后比较
-//  修复：当LCS相似度较低时，自动切换到Jaccard相似度（适用于循环场景）
+//
+//	修复：当LCS相似度较低时，自动切换到Jaccard相似度（适用于循环场景）
 func (p *PathComparator) CompareContractJumpDests(
 	original, variant []ContractJumpDest,
 	startIndex int,
@@ -372,6 +373,24 @@ func (p *PathComparator) CompareContractJumpDests(
 	}
 
 	return diceSimilarity
+}
+
+// OverlapContractJumpDests 计算带合约地址的JUMPDEST序列重叠相似度（Overlap系数）
+// Overlap = LCS / min(len1, len2)，更适合“候选路径包含基准路径片段”的场景
+func (p *PathComparator) OverlapContractJumpDests(seq1, seq2 []ContractJumpDest) float64 {
+	if len(seq1) == 0 && len(seq2) == 0 {
+		return 1.0
+	}
+	if len(seq1) == 0 || len(seq2) == 0 {
+		return 0.0
+	}
+
+	lcsLength := p.lcsContractJumpDests(seq1, seq2)
+	denom := min(len(seq1), len(seq2))
+	if denom == 0 {
+		return 0.0
+	}
+	return float64(lcsLength) / float64(denom)
 }
 
 // jaccardContractJumpDests 计算ContractJumpDest的Jaccard相似度（忽略顺序）

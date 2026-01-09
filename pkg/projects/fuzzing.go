@@ -50,6 +50,7 @@ func ConvertFuzzingConfig(jsonConfig *FuzzingConfigJSON, projectID string) *moni
 		SaveHighSimilarity:   jsonConfig.SaveHighSimilarity,
 		PrintRealtime:        jsonConfig.PrintRealtime,
 		InvariantCheck:       invariantCfg,
+		BaselineStatePath:    jsonConfig.BaselineStatePath,
 
 		//  Unlimited fuzzing配置
 		UnlimitedMode:     jsonConfig.UnlimitedMode,
@@ -64,6 +65,13 @@ func ConvertFuzzingConfig(jsonConfig *FuzzingConfigJSON, projectID string) *moni
 
 		//  本地执行模式
 		LocalExecution: jsonConfig.LocalExecution,
+
+		//  全交易路径记录
+		RecordFullTrace: jsonConfig.RecordFullTrace,
+
+		// 严格prestate模式与attack_state代码补齐
+		StrictPrestate:      jsonConfig.StrictPrestate,
+		AttackStateCodeOnly: jsonConfig.AttackStateCodeOnly,
 
 		// 项目标识
 		ProjectID: projectIdentifier,

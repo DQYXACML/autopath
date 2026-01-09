@@ -26,6 +26,7 @@ type FuzzingConfigJSON struct {
 	SaveHighSimilarity   bool                `json:"save_high_similarity"`
 	PrintRealtime        bool                `json:"print_realtime"`
 	ProjectID            string              `json:"project_id"`
+	BaselineStatePath    string              `json:"baseline_state_path"`
 	InvariantCheck       *InvariantCheckJSON `json:"invariant_check"`
 
 	//  Unlimited fuzzing模式配置
@@ -41,6 +42,14 @@ type FuzzingConfigJSON struct {
 
 	//  本地执行模式
 	LocalExecution bool `json:"local_execution"` // 使用本地EVM执行替代RPC调用
+
+	//  全交易路径记录
+	RecordFullTrace bool `json:"record_full_trace"` // 记录全交易路径（不截断到受保护合约）
+
+	//  严格prestate模式（禁止attack_state覆盖，仅允许baseline_state补全）
+	StrictPrestate bool `json:"strict_prestate"`
+	//  attack_state仅补代码（不写入余额/存储）
+	AttackStateCodeOnly bool `json:"attack_state_code_only"`
 }
 
 // InvariantCheckJSON 不变量检查配置
