@@ -4,34 +4,20 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    
     "0x3a23F943181408EAC424116Af7b7790c94Cb97a5",
-    
     "0x50DF5a2217588772471B84aDBbe4194A2Ed39066",
-    
     "0xf2D5951bB0A4d14BdcC37b66f919f9A1009C05d1",
-    
     "0xCC5fDA5e3cA925bd0bb428C8b2669496eE43067e",
-    
     "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    
     "0x7d03149A2843E4200f07e858d6c0216806Ca4242",
-    
     "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
-    
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    
     "0x7899f9ed000000000000000000000000a0b86991",
-    
     "0x0000000000000000000000000000000000000000",
-    
     "0x23b872dd0000000000000000000000007d03149a",
-    
     "0x77726170706564546f6b656e5377617070657249"
-    
   ],
   "invariants": [
-    
     {
       "id": "PATTERN_flash_change_001",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -39,30 +25,46 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.03,
-        "contracts": ["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"],
-        "slots": {"slot_0": {"index": "90598234900054307995722345735337251336628784422463505215821707809724155282288", "severity": "critical", "threshold": 0.03}},
+        "contracts": [
+          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "90598234900054307995722345735337251336628784422463505215821707809724155282288",
+            "severity": "critical",
+            "threshold": 0.03
+          },
+          "slot_1": {
+            "index": "25237463513630661527061538961904601929936825465357017181786854028034196222294",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_2": {
+            "index": "32621392007125843880811723470429057479694966944279354554547446578534681973899",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_3": {
+            "index": "61895945783756664986065206569310664816763057358460395439720732442535626597378",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_4": {
+            "index": "115423257724541336627300982565046009547615839300894947263661898421728913361048",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
         "formula": "abs(value_after - value_before) / value_before <= 0.03"
-        
       },
-      "monitored_functions": ["executeRoute", "executeRoute", "executeRoute", "executeRoute"]
+      "monitored_functions": [
+        "executeRoute",
+        "executeRoute",
+        "executeRoute",
+        "executeRoute"
+      ]
     },
-    
     {
       "id": "PATTERN_reentrancy_balance_001",
       "name": "Limit balance changes to prevent reentrancy attacks",
@@ -70,59 +72,44 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.03,
-        "contracts": ["0x50DF5a2217588772471B84aDBbe4194A2Ed39066"],
+        "contracts": [
+          "0x50DF5a2217588772471B84aDBbe4194A2Ed39066"
+        ],
         "slots": {},
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.03"
-        
       },
-      "monitored_functions": ["executeRoute", "executeRoute", "executeRoute", "executeRoute"]
+      "monitored_functions": [
+        "executeRoute",
+        "executeRoute",
+        "executeRoute",
+        "executeRoute"
+      ]
     }
-    
   ],
   "fuzzing_config": {
     "enabled": true,
     "target_functions": [
-      
       {
         "contract": "0x3a23F943181408EAC424116Af7b7790c94Cb97a5",
         "function": "executeRoute",
         "signature": "executeRoute(uint32,bytes)"
       },
-      
       {
         "contract": "0x3a23F943181408EAC424116Af7b7790c94Cb97a5",
         "function": "executeRoute",
         "signature": "executeRoute(uint32,bytes)"
       },
-      
       {
         "contract": "0x3a23F943181408EAC424116Af7b7790c94Cb97a5",
         "function": "executeRoute",
         "signature": "executeRoute(uint32,bytes)"
       },
-      
       {
         "contract": "0x3a23F943181408EAC424116Af7b7790c94Cb97a5",
         "function": "executeRoute",
         "signature": "executeRoute(uint32,bytes)"
       }
-      
     ],
     "threshold": 0.7,
     "max_variations": 5000,
@@ -142,7 +129,38 @@
     "target_similarity": 0.95,
     "max_high_sim_results": 10,
     "unlimited_mode": true,
-    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

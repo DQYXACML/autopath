@@ -137,8 +137,14 @@ func (e *LocalEVMExecutor) Execute(
 	e.interceptor.SetStateDB(stateDB)
 	e.interceptor.Reset()
 
-	// 3. 重置收集器
-	e.collector.ResetWithProtected(e.protectedAddrs)
+	// 3. 重置收集器并设置StateDB（用于代理解析）
+	// 创建新的collector支持delegatecall追踪
+	collector := NewTraceCollectorWithStateDB(stateDB)
+	collector.ResetWithProtected(e.protectedAddrs)
+	// 更新executor的collector引用
+	e.collector = collector
+	// 更新interceptor的collector引用
+	e.interceptor.collector = collector
 
 	// 4. 创建EVM
 	blockCtx := e.buildBlockContext()

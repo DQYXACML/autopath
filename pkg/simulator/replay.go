@@ -56,6 +56,9 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 		data: {
 			jumpDests: [],
 			contractJumpDests: [],
+			callTargets: [],
+			callEdges: [],
+			protectedCallTargets: [],
 			protectedContract: "%s",
 			recordingStarted: false,
 			recordAll: %t,
@@ -76,7 +79,12 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 			}
 		},
 		formatHex: function(value) {
-			var hex = toHex(value);
+			var hex;
+			if (typeof value === "bigint") {
+				hex = "0x" + value.toString(16);
+			} else {
+				hex = toHex(value);
+			}
 			if (hex === "0x") {
 				return "0x0";
 			}
@@ -87,7 +95,17 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 			if (body.length %% 2 === 1) {
 				body = "0" + body;
 			}
-			return "0x" + body;
+			return "0x" + body.toLowerCase();
+		},
+		formatAddress: function(value) {
+			var body = this.formatHex(value).slice(2);
+			while (body.length < 40) {
+				body = "0" + body;
+			}
+			if (body.length > 40) {
+				body = body.slice(body.length - 40);
+			}
+			return "0x" + body.toLowerCase();
 		},
 		formatWord: function(value) {
 			var body = this.formatHex(value).slice(2);
@@ -103,15 +121,30 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 			this.data.success = false;
 			this.data.error = log.getError();
 		},
-		step: function(log, db) {
-			var currentContract = toHex(log.contract.getAddress());
-			var currentLower = currentContract.toLowerCase();
+			step: function(log, db) {
+				var currentContract = toHex(log.contract.getAddress());
+				var currentLower = currentContract.toLowerCase();
+				var opName = log.op.toString();
 
-			this.data.debugInfo.totalSteps++;
+				this.data.debugInfo.totalSteps++;
 
-			if (this.data.recordAll && this.data.protectedStartIndex === -1) {
-				this.data.protectedStartIndex = 0;
-			}
+				if (opName === "CALL" || opName === "DELEGATECALL" || opName === "STATICCALL" || opName === "CALLCODE") {
+					var targetAddr = this.formatAddress(log.stack.peek(1));
+					this.data.callTargets.push(targetAddr);
+					this.data.callEdges.push({
+						caller: currentLower,
+						target: targetAddr,
+						op: opName,
+						depth: log.getDepth()
+					});
+					if (this.data.protectedContract !== "" && currentLower === this.data.protectedContract) {
+						this.data.protectedCallTargets.push(targetAddr);
+					}
+				}
+
+				if (this.data.recordAll && this.data.protectedStartIndex === -1) {
+					this.data.protectedStartIndex = 0;
+				}
 
 			if (!this.data.recordAll && this.data.protectedContract !== "" && currentLower === this.data.protectedContract) {
 				if (!this.data.recordingStarted) {
@@ -131,7 +164,7 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 
 			this.data.debugInfo.protectedSteps++;
 
-			if (log.op.toString() === "JUMPDEST") {
+			if (opName === "JUMPDEST") {
 				this.data.debugInfo.jumpDestCount++;
 				this.data.jumpDests.push(log.getPC());
 				this.data.contractJumpDests.push({
@@ -141,7 +174,7 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 			}
 
 			// 记录状态变化
-			if (log.op.toString() === "SSTORE") {
+			if (opName === "SSTORE") {
 				var addrKey = currentLower;
 				if (!this.data.stateChanges[addrKey]) {
 					var balance = this.formatHex(db.getBalance(log.contract.getAddress()));
@@ -164,7 +197,7 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 				state.balanceAfter = this.formatHex(db.getBalance(log.contract.getAddress()));
 			}
 
-			if (log.op.toString() === "SSTORE") {
+			if (opName === "SSTORE") {
 				var addrKey = currentLower;
 				if (!this.data.stateChanges[addrKey]) {
 					var balance = this.formatHex(db.getBalance(log.contract.getAddress()));
@@ -186,7 +219,8 @@ func buildReplayTracerCode(protectedAddr string, recordAll bool) string {
 				};
 				state.balanceAfter = this.formatHex(db.getBalance(log.contract.getAddress()));
 			}
-		},
+
+			},
 		result: function(ctx, db) {
 			this.data.gasUsed = ctx.gasUsed;
 			if (ctx.type === "REVERT") {
@@ -251,6 +285,8 @@ func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
 		Error               string             `json:"error,omitempty"`
 		JumpDests           []uint64           `json:"jumpDests"`
 		ContractJumpDests   []ContractJumpDest `json:"contractJumpDests"`
+		CallTargets         []string           `json:"callTargets"`
+		CallEdges           []CallEdge         `json:"callEdges"`
 		ProtectedStartIndex int                `json:"protectedStartIndex"`
 		ProtectedEndIndex   int                `json:"protectedEndIndex"`
 		ExecutionPath       []PathStep         `json:"executionPath"`
@@ -281,6 +317,8 @@ func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
 		decoded.DebugInfo.RecordingTrigger, decoded.DebugInfo.FirstProtectedContract)
 	fmt.Printf("[DEBUG tracer result] raw.JumpDests length=%d, raw.ContractJumpDests length=%d\n",
 		len(decoded.JumpDests), len(decoded.ContractJumpDests))
+	fmt.Printf("[DEBUG tracer result] callEdges=%d, callTargets=%d\n",
+		len(decoded.CallEdges), len(decoded.CallTargets))
 
 	contractJumpDests := decoded.ContractJumpDests
 
@@ -307,6 +345,8 @@ func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
 		ReturnData:          decoded.ReturnData,
 		JumpDests:           decoded.JumpDests,
 		ContractJumpDests:   contractJumpDests,
+		CallTargets:         decoded.CallTargets,
+		CallEdges:           decoded.CallEdges,
 		ProtectedStartIndex: decoded.ProtectedStartIndex,
 		ProtectedEndIndex:   decoded.ProtectedEndIndex,
 		ExecutionPath:       decoded.ExecutionPath,
@@ -321,6 +361,14 @@ func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
 type ContractJumpDest struct {
 	Contract string `json:"contract"` // 合约地址
 	PC       uint64 `json:"pc"`       // 程序计数器
+}
+
+// CallEdge 记录调用边（caller -> target）
+type CallEdge struct {
+	Caller string `json:"caller"`
+	Target string `json:"target"`
+	Op     string `json:"op"`
+	Depth  int    `json:"depth"`
 }
 
 // CallFrame callTracer 的调用帧
@@ -346,6 +394,8 @@ type ReplayResult struct {
 	StateChanges        map[string]StateChange `json:"state_changes"`
 	JumpDests           []uint64               `json:"jump_dests"`            // 保留向后兼容
 	ContractJumpDests   []ContractJumpDest     `json:"contract_jump_dests"`   // 新增：带合约地址的路径
+	CallTargets         []string               `json:"call_targets"`          // 新增：CALL目标地址序列
+	CallEdges           []CallEdge             `json:"call_edges"`            // 新增：CALL调用边
 	ProtectedStartIndex int                    `json:"protected_start_index"` // 新增：受保护合约开始索引
 	ProtectedEndIndex   int                    `json:"protected_end_index"`   // 新增：受保护合约结束索引
 	ExecutionPath       []PathStep             `json:"execution_path"`

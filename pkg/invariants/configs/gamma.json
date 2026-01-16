@@ -62,7 +62,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -82,7 +82,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -93,7 +93,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -113,7 +113,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -124,7 +124,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -144,7 +144,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -155,7 +155,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -175,7 +175,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -186,7 +186,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -206,7 +206,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -217,7 +217,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -237,7 +237,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -248,7 +248,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -268,7 +268,7 @@
         "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.18"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -279,7 +279,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -299,7 +299,7 @@
         "formula": "(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -310,7 +310,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -330,7 +330,7 @@
         "formula": "(value_after - value_before) / value_before <= 0.08"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -341,7 +341,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -361,7 +361,7 @@
         "formula": "(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -372,7 +372,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -392,7 +392,7 @@
         "formula": "(value_after - value_before) / value_before <= 0.36"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -403,7 +403,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -423,7 +423,7 @@
         "formula": "(value_after - value_before) / value_before <= 5.0"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -434,7 +434,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -454,7 +454,7 @@
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.15"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     },
     
     {
@@ -465,7 +465,7 @@
       "enabled": true,
       "parameters": {
         
-        {# 使用旧的扁平结构 #}
+        
         
         
         
@@ -485,7 +485,7 @@
         "formula": "abs(balance_change_A + balance_change_B) <= gas_tolerance"
         
       },
-      "monitored_functions": ["deposit", "deposit", "deposit", "deposit"]
+      "monitored_functions": ["deposit", "deposit"]
     }
     
   ],
@@ -496,32 +496,20 @@
       {
         "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
         "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
+        "signature": "deposit(uint256,uint256,address,address,uint256[4])"
       },
       
       {
         "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
         "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
-      },
-      
-      {
-        "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
-        "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
-      },
-      
-      {
-        "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
-        "function": "deposit",
-        "signature": "deposit(int24,int24,uint256,uint256)"
+        "signature": "deposit(uint256,uint256,address,address,uint256[4])"
       }
       
     ],
     "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 10,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,

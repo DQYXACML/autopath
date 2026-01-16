@@ -56,8 +56,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -83,8 +81,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -109,8 +105,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -162,8 +156,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -188,8 +180,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -220,8 +210,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -268,8 +256,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -305,8 +291,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -336,8 +320,6 @@
         "formula": "(value_after - value_before) / value_before <= 0.08"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -419,8 +401,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -450,8 +430,6 @@
         "formula": "(value_after - value_before) / value_before <= 0.36"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -483,8 +461,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     },
@@ -503,8 +479,6 @@
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.15"
       },
       "monitored_functions": [
-        "deposit",
-        "deposit",
         "deposit",
         "deposit"
       ]
@@ -526,8 +500,6 @@
       },
       "monitored_functions": [
         "deposit",
-        "deposit",
-        "deposit",
         "deposit"
       ]
     }
@@ -544,16 +516,6 @@
         "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
         "function": "deposit",
         "signature": "deposit(uint256,uint256,address,address,uint256)"
-      },
-      {
-        "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
-        "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
-      },
-      {
-        "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
-        "function": "deposit",
-        "signature": "deposit(int24,int24,uint256,uint256)"
       }
     ],
     "threshold": 0.7,
@@ -866,7 +828,7 @@
         },
         "deposit(uint256,uint256,address,uint256,uint8[])": {
           "0": {
-            "type": "int24",
+            "type": "uint256",
             "safe_threshold": "1",
             "danger_threshold": "1",
             "attack_values": [
@@ -881,7 +843,7 @@
             "value_expr": "1"
           },
           "1": {
-            "type": "int24",
+            "type": "uint256",
             "safe_threshold": "300000000000",
             "danger_threshold": "300000000000",
             "attack_values": [
@@ -896,7 +858,7 @@
             "value_expr": "300_000_000_000"
           },
           "2": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -909,7 +871,7 @@
             "value_expr": "address(this)"
           },
           "3": {
-            "type": "uint256",
+            "type": "address",
             "safe_threshold": "557511996805926995234183060689310483985464235492",
             "danger_threshold": "557511996805926995234183060689310483985464235492",
             "attack_values": [
@@ -986,7 +948,8 @@
           "231584178474632390847141970017375815706539969331281128078915168015826259279870"
         ]
       }
-    }
+    },
+    "record_full_trace": true
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

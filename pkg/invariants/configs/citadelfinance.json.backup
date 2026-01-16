@@ -245,7 +245,7 @@
     "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 10,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
@@ -402,7 +402,7 @@
         }
       },
       "constraint_ranges": {
-        "redeem(uint256,uint256,uint256,uint256)": {
+        "redeem(uint256,uint256,uint256,uint8)": {
           "0": {
             "type": "uint256",
             "safe_threshold": "5951614269374999822336",
@@ -485,7 +485,9 @@
         "random_within_range_ratio": 0.3
       }
     },
-    "record_full_trace": true
+    "record_full_trace": true,
+    "strict_prestate": true,
+    "attack_state_code_only": true
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

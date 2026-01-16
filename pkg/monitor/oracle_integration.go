@@ -74,7 +74,7 @@ func NewOracleIntegration(config *OracleConfig) (*OracleIntegration, error) {
 		RetryCount:      3,
 		RetryDelay:      5 * time.Second,
 		MinInterval:     1 * time.Hour,
-		GasLimit:        500000,
+		GasLimit:        0,
 		MaxRulesPerFunc: config.MaxRulesPerFunc,
 	}
 

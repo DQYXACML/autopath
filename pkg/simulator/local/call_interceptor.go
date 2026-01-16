@@ -190,6 +190,11 @@ func (i *CallInterceptor) EVMTracer() *tracing.Hooks {
 func (i *CallInterceptor) onEnter(depth int, typ byte, from, to common.Address,
 	input []byte, gas uint64, value *big.Int) {
 
+	// 委托给TraceCollector处理delegatecall追踪
+	if i.collector != nil {
+		i.collector.OnEnter(depth, typ, from, to, input, gas, value)
+	}
+
 	if !i.enabled {
 		return
 	}
@@ -221,6 +226,11 @@ func (i *CallInterceptor) onEnter(depth int, typ byte, from, to common.Address,
 
 // onExit 在CALL退出时触发
 func (i *CallInterceptor) onExit(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
+	// 委托给TraceCollector处理delegatecall追踪
+	if i.collector != nil {
+		i.collector.OnExit(depth, output, gasUsed, err, reverted)
+	}
+
 	// 清理该深度的pending override
 	i.mu.Lock()
 	delete(i.pendingOverrides, depth)

@@ -123,8 +123,11 @@ func (p *ABIParser) parseMethodParameters(method *abi.Method, data []byte) ([]Pa
 		}
 
 		// 设置额外属性
-		if strings.Contains(input.Type.String(), "[]") {
+		if input.Type.T == abi.ArrayTy || input.Type.T == abi.SliceTy {
 			params[i].IsArray = true
+		}
+		if input.Type.T == abi.ArrayTy && input.Type.Size > 0 {
+			params[i].ArrayLen = input.Type.Size
 		}
 		if strings.HasPrefix(input.Type.String(), "bytes") {
 			if size := strings.TrimPrefix(input.Type.String(), "bytes"); size != "" {

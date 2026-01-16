@@ -2,6 +2,7 @@ package fuzzer
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strings"
 )
@@ -32,7 +33,15 @@ func NewPathComparatorWithThreshold(minSimilarity float64) *PathComparator {
 func (p *PathComparator) CompareJumpDests(original, variant []uint64) float64 {
 	// 处理空序列情况
 	if len(original) == 0 && len(variant) == 0 {
-		return 1.0 // 两个空序列视为相同
+		// 【修复】两个空序列无法进行有效的路径相似度比较
+		// 这通常表示trace收集失败（例如本地执行模式下tracer未启用）
+		log.Printf("⚠ [PathComparator] 警告：原始路径和变种路径的JUMPDEST序列都为空")
+		log.Printf("   这可能导致相似度计算不准确，请检查trace收集是否正常工作")
+		log.Printf("   可能原因：")
+		log.Printf("   1. Fork模式下debug_traceTransaction调用失败")
+		log.Printf("   2. 本地EVM执行模式下Tracer未正确配置或启用")
+		log.Printf("   3. 合约字节码注入后trace收集失效")
+		return 0.0 // 返回0.0表示无法进行有效比较（而不是返回1.0表示完全相同）
 	}
 	if len(original) == 0 || len(variant) == 0 {
 		return 0.0 // 一个为空，另一个不为空，视为完全不同
@@ -379,7 +388,15 @@ func (p *PathComparator) CompareContractJumpDests(
 // Overlap = LCS / min(len1, len2)，更适合“候选路径包含基准路径片段”的场景
 func (p *PathComparator) OverlapContractJumpDests(seq1, seq2 []ContractJumpDest) float64 {
 	if len(seq1) == 0 && len(seq2) == 0 {
-		return 1.0
+		// 【修复】两个空序列无法进行有效的路径相似度比较
+		// 这通常表示trace收集失败（例如本地执行模式下tracer未启用）
+		log.Printf("⚠ [PathComparator] 警告：原始路径和变种路径的ContractJumpDest序列都为空")
+		log.Printf("   这可能导致相似度计算不准确，请检查trace收集是否正常工作")
+		log.Printf("   可能原因：")
+		log.Printf("   1. Fork模式下debug_traceTransaction调用失败")
+		log.Printf("   2. 本地EVM执行模式下Tracer未正确配置或启用")
+		log.Printf("   3. 合约字节码注入后trace收集失效")
+		return 0.0 // 返回0.0表示无法进行有效比较（而不是返回1.0表示完全相同）
 	}
 	if len(seq1) == 0 || len(seq2) == 0 {
 		return 0.0
@@ -397,7 +414,9 @@ func (p *PathComparator) OverlapContractJumpDests(seq1, seq2 []ContractJumpDest)
 // Jaccard = |A ∩ B| / |A ∪ B|
 func (p *PathComparator) jaccardContractJumpDests(seq1, seq2 []ContractJumpDest) float64 {
 	if len(seq1) == 0 && len(seq2) == 0 {
-		return 1.0
+		// 【修复】两个空序列无法进行有效的Jaccard相似度计算
+		log.Printf("⚠ [PathComparator] 警告：Jaccard计算时两个序列都为空")
+		return 0.0
 	}
 
 	// 使用 contract:pc 作为key

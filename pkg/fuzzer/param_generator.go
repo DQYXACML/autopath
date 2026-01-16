@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -91,6 +92,8 @@ func (g *ParamGenerator) GenerateCombinations(params []Parameter) <-chan []inter
 // GenerateVariations 为单个参数生成变体
 func (g *ParamGenerator) GenerateVariations(param Parameter) []interface{} {
 	switch {
+	case param.IsArray || isArrayType(param.Type):
+		return g.generateArrayVariations(param)
 	case strings.HasPrefix(param.Type, "uint"):
 		return g.generateIntegerVariations(param, false)
 	case strings.HasPrefix(param.Type, "int"):
@@ -103,8 +106,6 @@ func (g *ParamGenerator) GenerateVariations(param Parameter) []interface{} {
 		return g.generateBytesVariations(param)
 	case param.Type == "string":
 		return g.generateStringVariations(param)
-	case strings.HasSuffix(param.Type, "[]"):
-		return g.generateArrayVariations(param)
 	default:
 		// 未知类型，返回原值
 		return []interface{}{param.Value}
@@ -347,22 +348,46 @@ func (g *ParamGenerator) generateStringVariations(param Parameter) []interface{}
 
 // generateArrayVariations 生成数组变体
 func (g *ParamGenerator) generateArrayVariations(param Parameter) []interface{} {
-	// 获取元素类型
-	elementType := strings.TrimSuffix(param.Type, "[]")
+	// 获取元素类型与固定长度
+	elementType, fixedLen, _ := parseArrayType(param.Type)
+	if elementType == "" {
+		return []interface{}{param.Value}
+	}
+	baseElementType := stripArrayDimensions(elementType)
+	if strings.Contains(elementType, "[") {
+		// 暂不处理嵌套数组，保留原值
+		return []interface{}{param.Value}
+	}
+	if param.ArrayLen > 0 {
+		fixedLen = param.ArrayLen
+	}
 
 	// 创建不同长度的数组
 	variations := make([]interface{}, 0)
 
 	// 地址数组禁止随机化：仅保留原始数组
-	if elementType == "address" {
+	if baseElementType == "address" {
 		addrPool := g.buildAddressPool(common.Address{})
 		base := g.convertAddressArray(param.Value)
+		if fixedLen > 0 {
+			base = g.fitInterfaceArrayLength(base, fixedLen, common.Address{})
+		}
 		if len(base) == 0 {
-			base = g.pickAddressArray(addrPool, 1)
+			targetLen := 1
+			if fixedLen > 0 {
+				targetLen = fixedLen
+			}
+			base = g.pickAddressArray(addrPool, targetLen)
 		}
 
 		// 保留原值/基础数组
 		variations = append(variations, base)
+
+		// 固定长度数组仅生成同长度变体
+		if fixedLen > 0 {
+			variations = append(variations, g.pickAddressArray(addrPool, fixedLen))
+			return variations
+		}
 
 		// 空数组
 		variations = append(variations, []interface{}{})
@@ -381,19 +406,31 @@ func (g *ParamGenerator) generateArrayVariations(param Parameter) []interface{} 
 		return variations
 	}
 
+	// 固定长度数组仅生成固定长度变体
+	if fixedLen > 0 {
+		variations = append(variations, g.generateArrayOfLength(baseElementType, fixedLen))
+		if baseElementType == "uint256" || strings.HasPrefix(baseElementType, "uint") {
+			variations = append(variations, g.generateUniformArray(big.NewInt(0), fixedLen))
+			maxVal := g.getMaxValue(256, false)
+			variations = append(variations, g.generateUniformArray(maxVal, fixedLen))
+			variations = append(variations, g.generateSequentialArray(fixedLen))
+		}
+		return variations
+	}
+
 	// 空数组
 	variations = append(variations, []interface{}{})
 
 	// 不同长度的数组
 	for _, length := range g.strategy.Arrays.TestLengths {
 		if length <= g.strategy.Arrays.MaxElements {
-			arr := g.generateArrayOfLength(elementType, length)
+			arr := g.generateArrayOfLength(baseElementType, length)
 			variations = append(variations, arr)
 		}
 	}
 
 	// 包含特殊值的数组
-	if elementType == "uint256" || strings.HasPrefix(elementType, "uint") {
+	if baseElementType == "uint256" || strings.HasPrefix(baseElementType, "uint") {
 		// 全零数组
 		variations = append(variations, g.generateUniformArray(big.NewInt(0), 10))
 		// 全最大值数组
@@ -757,8 +794,31 @@ func (g *ParamGenerator) convertAddressArray(val interface{}) []interface{} {
 		}
 		return arr
 	default:
+		rv := reflect.ValueOf(val)
+		if rv.IsValid() && (rv.Kind() == reflect.Array || rv.Kind() == reflect.Slice) {
+			arr := make([]interface{}, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				arr[i] = rv.Index(i).Interface()
+			}
+			return arr
+		}
 		return []interface{}{}
 	}
+}
+
+func (g *ParamGenerator) fitInterfaceArrayLength(arr []interface{}, length int, padValue interface{}) []interface{} {
+	if length <= 0 {
+		return arr
+	}
+	if len(arr) >= length {
+		return arr[:length]
+	}
+	out := make([]interface{}, length)
+	copy(out, arr)
+	for i := len(arr); i < length; i++ {
+		out[i] = padValue
+	}
+	return out
 }
 
 // pickAddressArray 使用地址池构造指定长度的数组（循环取值）

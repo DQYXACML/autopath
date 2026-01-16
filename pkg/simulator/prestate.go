@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -44,15 +45,28 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		return nil, fmt.Errorf("failed to unmarshal prestate: %w", err)
 	}
 
-	// 【调试】检查Router是否在prestate中
-	routerAddr := "0xe03811dd501fb48751f44c1bc8801b7ffcf7c2ad"
-	attackExecutorAddr := "0xfcf88e5e1314ca3b6be7eed851568834233f8b49"
+	// 【调试】可选检查：通过环境变量配置需要强制检查的地址
+	// AUTOPATH_PRESTATE_ROUTER / AUTOPATH_PRESTATE_ATTACK_EXECUTOR
+	normalizeEnvAddress := func(name string) string {
+		raw := strings.TrimSpace(os.Getenv(name))
+		if raw == "" {
+			return ""
+		}
+		if !common.IsHexAddress(raw) {
+			log.Printf("[Prestate] ⚠️  环境变量%s不是合法地址: %s", name, raw)
+			return ""
+		}
+		return strings.ToLower(raw)
+	}
+
+	routerAddr := normalizeEnvAddress("AUTOPATH_PRESTATE_ROUTER")
+	attackExecutorAddr := normalizeEnvAddress("AUTOPATH_PRESTATE_ATTACK_EXECUTOR")
 
 	foundRouter := false
 	foundExecutor := false
 
 	for addr := range prestate {
-		if strings.EqualFold(addr, routerAddr) {
+		if routerAddr != "" && strings.EqualFold(addr, routerAddr) {
 			foundRouter = true
 			account := prestate[addr]
 			hasCode := account.Code != "" && account.Code != "0x"
@@ -60,7 +74,7 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 			log.Printf("[Prestate] ✅ Router在prestate中: %s (code=%v, codeSize=%d, storage=%d slots)",
 				addr, hasCode, len(account.Code), storageCount)
 		}
-		if strings.EqualFold(addr, attackExecutorAddr) {
+		if attackExecutorAddr != "" && strings.EqualFold(addr, attackExecutorAddr) {
 			foundExecutor = true
 			account := prestate[addr]
 			hasCode := account.Code != "" && account.Code != "0x"
@@ -70,12 +84,12 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		}
 	}
 
-	if !foundRouter {
-		log.Printf("[Prestate] ❌ Router不在prestate中（共%d个账户）", len(prestate))
+	if routerAddr != "" && !foundRouter {
+		log.Printf("[Prestate] ⚠️  Router不在prestate中（共%d个账户）", len(prestate))
 	}
-	if !foundExecutor {
-		log.Printf("[Prestate] ❌ AttackExecutor不在prestate中（共%d个账户）", len(prestate))
-		log.Printf("[Prestate]    这会导致本地EVM执行失败！")
+	if attackExecutorAddr != "" && !foundExecutor {
+		log.Printf("[Prestate] ⚠️  AttackExecutor不在prestate中（共%d个账户）", len(prestate))
+		log.Printf("[Prestate]    若该交易未涉及该地址可忽略；涉及时请确认prestateTracer输出")
 		// 列出前10个地址供参考
 		count := 0
 		for addr := range prestate {
@@ -125,7 +139,7 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 	// 处理场景：攻击合约通过 anvil_setCode 注入但 prestateTracer 未包含
 	for addr, override := range overrides {
 		isCitadelRedeem := strings.ToLower(addr) == "0x34b666992fcce34669940ab6b017fe11e5750799"
-		isAttackExecutor := strings.ToLower(addr) == "0xfcf88e5e1314ca3b6be7eed851568834233f8b49"
+		isAttackExecutor := attackExecutorAddr != "" && strings.EqualFold(addr, attackExecutorAddr)
 
 		if isCitadelRedeem {
 			codePreview := override.Code

@@ -612,6 +612,7 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
 
 		var minVal, maxVal *big.Int
+		numericValues := make(map[string]struct{})
 		valueSet := make(map[string]struct{})
 
 		// 收集观察到的参数值
@@ -622,6 +623,7 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			val := s.params[i].Value
 			if isNumeric {
 				if bi := normalizeBigIntValue(val); bi != nil {
+					numericValues[bi.String()] = struct{}{}
 					if minVal == nil || bi.Cmp(minVal) < 0 {
 						minVal = new(big.Int).Set(bi)
 					}
@@ -637,6 +639,10 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 		if isNumeric && minVal != nil && maxVal != nil {
 			// 查找参数的约束规则
 			paramConstraint := pickParamConstraint(funcConstraints, i)
+			if len(numericValues) <= 1 && (paramConstraint == nil || paramConstraint.ConstraintType == "discrete_numeric") {
+				log.Printf("[ConstraintCollector] 跳过单值数值规则: param#%d value=%s", i, minVal.String())
+				continue
+			}
 
 			// 默认使用攻击样本范围作为黑名单区间
 			rangeMinHex := "0x" + minVal.Text(16)
@@ -730,6 +736,7 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
 
 		var minVal, maxVal *big.Int
+		numericValues := make(map[string]struct{})
 		valueSet := make(map[string]struct{})
 
 		for _, s := range samples {
@@ -739,6 +746,7 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 			val := s.params[i].Value
 			if isNumeric {
 				if bi := normalizeBigIntValue(val); bi != nil {
+					numericValues[bi.String()] = struct{}{}
 					if minVal == nil || bi.Cmp(minVal) < 0 {
 						minVal = new(big.Int).Set(bi)
 					}
@@ -752,6 +760,10 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 		}
 
 		if isNumeric && minVal != nil && maxVal != nil {
+			if len(numericValues) <= 1 {
+				log.Printf("[ConstraintCollector] 跳过单值数值规则: param#%d value=%s", i, minVal.String())
+				continue
+			}
 			pc.IsRange = true
 			pc.RangeMin = "0x" + minVal.Text(16)
 			pc.RangeMax = "0x" + maxVal.Text(16)

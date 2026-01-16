@@ -244,20 +244,16 @@ func (sg *SeedGenerator) seedDrivenMutation(seeds []interface{}, param Parameter
 	// 始终包含原始种子值
 	variations = append(variations, seeds...)
 
+	if param.IsArray || isArrayType(param.Type) {
+		return sg.generateArraySeedVariations(seeds, param, count)
+	}
+
 	perSeed := count / len(seeds)
 	if perSeed < 1 {
 		perSeed = 1
 	}
 
 	for _, seed := range seeds {
-		// 数组类型：直接使用种子，不包装
-		//  策略：约束种子已经是正确类型（*big.Int, string），让normalizeXXXSlice()去处理
-		if strings.HasSuffix(param.Type, "[]") {
-			// 直接添加种子值，不调用generateArraySeedVariations()
-			variations = append(variations, seed)
-			continue
-		}
-
 		switch param.Type {
 		case "uint256", "uint128", "uint64", "uint32", "uint16", "uint8":
 			seedVars := sg.generateNumericSeedVariations(seed, perSeed)
@@ -285,7 +281,10 @@ func (sg *SeedGenerator) seedDrivenMutation(seeds []interface{}, param Parameter
 
 // generateArraySeedVariations 为数组类型生成变异（兼容标量种子写法）
 func (sg *SeedGenerator) generateArraySeedVariations(seeds []interface{}, param Parameter, count int) []interface{} {
-	elementType := strings.TrimSuffix(param.Type, "[]")
+	elementType, fixedLen, _ := parseArrayType(param.Type)
+	if param.ArrayLen > 0 {
+		fixedLen = param.ArrayLen
+	}
 	var variations []interface{}
 
 	for _, seed := range seeds {
@@ -296,6 +295,9 @@ func (sg *SeedGenerator) generateArraySeedVariations(seeds []interface{}, param 
 
 	// 地址数组提供了种子时，保持原样不做随机/边界变异，避免地址被破坏
 	if elementType == "address" && len(variations) > 0 {
+		if fixedLen > 0 {
+			variations = sg.filterArrayVariationsByLength(variations, fixedLen)
+		}
 		if len(variations) > count && count > 0 {
 			return variations[:count]
 		}
@@ -305,6 +307,10 @@ func (sg *SeedGenerator) generateArraySeedVariations(seeds []interface{}, param 
 	// 补充基础生成器的数组变体，保证覆盖不同长度/元素
 	variations = append(variations, sg.baseGenerator.generateArrayVariations(param)...)
 
+	if fixedLen > 0 {
+		variations = sg.filterArrayVariationsByLength(variations, fixedLen)
+	}
+
 	if len(variations) > count && count > 0 {
 		return variations[:count]
 	}
@@ -313,6 +319,15 @@ func (sg *SeedGenerator) generateArraySeedVariations(seeds []interface{}, param 
 
 // normalizeArraySeed 将种子转换为 []interface{}，以便后续 ABI 归一化处理
 func (sg *SeedGenerator) normalizeArraySeed(seed interface{}, elementType string) []interface{} {
+	rv := reflect.ValueOf(seed)
+	if rv.IsValid() && (rv.Kind() == reflect.Array || rv.Kind() == reflect.Slice) {
+		arr := make([]interface{}, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			arr[i] = rv.Index(i).Interface()
+		}
+		return arr
+	}
+
 	switch v := seed.(type) {
 	case []interface{}:
 		return v
@@ -639,9 +654,10 @@ func (sg *SeedGenerator) generateWithBaseGenerator(param Parameter) []interface{
 	case "bytes", "bytes32", "bytes4":
 		return sg.baseGenerator.generateBytesVariations(param)
 	default:
-		if strings.HasSuffix(param.Type, "[]") {
+		if param.IsArray || isArrayType(param.Type) {
 			// 数组类型，若是地址数组同样保持原值
-			if strings.TrimSuffix(param.Type, "[]") == "address" {
+			elementType, _, _ := parseArrayType(param.Type)
+			if stripArrayDimensions(elementType) == "address" {
 				return []interface{}{param.Value}
 			}
 			return sg.baseGenerator.generateArrayVariations(param)
@@ -649,6 +665,28 @@ func (sg *SeedGenerator) generateWithBaseGenerator(param Parameter) []interface{
 		log.Printf("[SeedGen] Unsupported parameter type: %s", param.Type)
 		return []interface{}{}
 	}
+}
+
+func (sg *SeedGenerator) filterArrayVariationsByLength(variations []interface{}, length int) []interface{} {
+	if length <= 0 {
+		return variations
+	}
+	filtered := make([]interface{}, 0, len(variations))
+	for _, v := range variations {
+		rv := reflect.ValueOf(v)
+		if !rv.IsValid() {
+			continue
+		}
+		if rv.Kind() == reflect.Array || rv.Kind() == reflect.Slice {
+			if rv.Len() == length {
+				filtered = append(filtered, v)
+			}
+		}
+	}
+	if len(filtered) == 0 {
+		return variations
+	}
+	return filtered
 }
 
 // deduplicateVariations 去重
@@ -1416,7 +1454,7 @@ func (sg *SeedGenerator) MergeConstraintSeeds(funcName string) {
 			log.Printf("[ConstraintRange] Added %d address seeds for %s param#%d",
 				len(constraintRange.AttackValues), funcName, paramIdx)
 
-		case paramType == "uint8[]" || paramType == "bytes" || strings.HasSuffix(paramType, "[]"):
+		case paramType == "uint8[]" || paramType == "bytes" || isArrayType(paramType):
 			// 数组/bytes类型：特殊处理
 			//  策略：保持原始格式（字符串或*big.Int），让normalizeXXXSlice()去处理
 			for _, attackVal := range constraintRange.AttackValues {

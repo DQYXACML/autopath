@@ -393,18 +393,30 @@ func (re *RuleExporter) buildRuleExport(
 	params []fuzzer.ParameterSummary,
 	threshold float64,
 ) *FirewallRuleExport {
+	filtered := make([]fuzzer.ParameterSummary, 0, len(params))
+	for _, p := range params {
+		if p.IsRange {
+			if strings.TrimSpace(p.RangeMin) == "" && strings.TrimSpace(p.RangeMax) == "" {
+				continue
+			}
+		} else if len(p.SingleValues) == 0 {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+
 	rule := &FirewallRuleExport{
 		Project:     project.Hex(),
 		FunctionSig: funcSigToString(funcSig),
 		Threshold:   uint64(threshold * 1e18), // 转换为wei
-		RuleCount:   len(params),
-		Parameters:  make([]RuleParameter, 0, len(params)),
+		RuleCount:   len(filtered),
+		Parameters:  make([]RuleParameter, 0, len(filtered)),
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Source:      "autopath_monitor",
 	}
 
 	// 转换参数
-	for _, p := range params {
+	for _, p := range filtered {
 		ruleParam := RuleParameter{
 			ParamIndex:      p.ParamIndex,
 			ParamType:       re.convertParamType(p.ParamType),

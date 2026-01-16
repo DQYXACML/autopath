@@ -618,8 +618,17 @@ func (m *BlockchainMonitor) processTransaction(ctx context.Context, job transact
 				// 使用交易所在区块的状态进行模拟；状态覆盖已由 prestateTracer/snapshot/attack_state 补齐
 				fuzzBlockNumber := block.Number().Uint64()
 				log.Printf("    [状态对齐] 使用区块 %d 的状态进行Fuzz模拟", fuzzBlockNumber)
-				// 整个Fuzz+推送过程限定在20秒内（与fuzzer默认保持一致）
-				fuzzCtx, fuzzCancel := context.WithTimeout(ctx, 20*time.Second)
+				// 整个Fuzz+推送过程限定在配置超时内，设置下限避免过小导致兜底
+				timeoutSeconds := 20
+				if m.fuzzing != nil {
+					if cfg := m.fuzzing.GetConfig(); cfg != nil && cfg.TimeoutSeconds > 0 {
+						timeoutSeconds = cfg.TimeoutSeconds
+					}
+				}
+				if timeoutSeconds < 20 {
+					timeoutSeconds = 20
+				}
+				fuzzCtx, fuzzCancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 				defer fuzzCancel()
 
 				for _, contractAddr := range fuzzingTargets {

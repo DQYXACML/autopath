@@ -4,38 +4,22 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    
     "0x04c80bb477890f3021f03b068238836ee20aa0b8",
-    
     "0x7b3a6eff1c9925e509c2b01a389238c1fcc462b6",
-    
     "0x356e7481b957be0165d6751a49b4b7194aef18d5",
-    
     "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-    
     "0x3e2324342bF5B8A1Dca42915f0489497203d640E",
-    
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    
     "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-    
     "0x176d14b5D3D1504F3286F12d28113BC1646723E3",
-    
     "0x4eb37415B8077e1bfbeE5556A3073592d18F9F4c",
-    
     "0x60594a405d53811d3BC4766596EFD80fd545A270",
-    
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    
     "0x6e10ff27cae71a13525bd61167857e5c982b4674",
-    
     "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f",
-    
     "0xD719345fe7030AEaE8e2E9Eb0E00E299F3a1Ce15"
-    
   ],
   "invariants": [
-    
     {
       "id": "PATTERN_flash_change_001",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -43,30 +27,30 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 5.0,
-        "contracts": ["0x04c80bb477890f3021f03b068238836ee20aa0b8"],
-        "slots": {"slot_0": {"index": "27345345294061825628103022900114978450352795135033401968609844108243198926249", "severity": "critical", "threshold": 5.0}},
+        "contracts": [
+          "0x04c80bb477890f3021f03b068238836ee20aa0b8"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "2",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "27345345294061825628103022900114978450352795135033401968609844108243198926249",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
-        
       },
-      "monitored_functions": ["bond", "debond", "flash"]
+      "monitored_functions": [
+        "bond",
+        "debond",
+        "flash"
+      ]
     },
-    
     {
       "id": "PATTERN_flash_change_002",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -74,30 +58,25 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.15,
-        "contracts": ["0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"],
-        "slots": {"slot_0": {"index": "55545668936593890278368496263017482596694883040524289805212668589583603461261", "severity": "critical", "threshold": 0.15}},
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "55545668936593890278368496263017482596694883040524289805212668589583603461261",
+            "severity": "critical",
+            "threshold": 0.15
+          }
+        },
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
-        
       },
-      "monitored_functions": ["bond", "debond", "flash"]
+      "monitored_functions": [
+        "bond",
+        "debond",
+        "flash"
+      ]
     },
-    
     {
       "id": "PATTERN_ratio_break_001",
       "name": "Ensure ratio stability between related values",
@@ -105,30 +84,28 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.18,
-        "contracts": ["0x04c80bb477890f3021f03b068238836ee20aa0b8", "0x3e2324342bF5B8A1Dca42915f0489497203d640E", "0x6B175474E89094C44Da98b954EedeAC495271d0F", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"],
-        "slots": {"slot_2": {"index": "2", "severity": "high", "threshold": 0.18}},
+        "contracts": [
+          "0x04c80bb477890f3021f03b068238836ee20aa0b8",
+          "0x3e2324342bF5B8A1Dca42915f0489497203d640E",
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "slots": {
+          "slot_2": {
+            "index": "2",
+            "severity": "high",
+            "threshold": 0.18
+          }
+        },
         "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.18"
-        
       },
-      "monitored_functions": ["bond", "debond", "flash"]
+      "monitored_functions": [
+        "bond",
+        "debond",
+        "flash"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_001",
       "name": "Limit abnormal value growth rate",
@@ -136,30 +113,25 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 5.0,
-        "contracts": ["0x04c80bb477890f3021f03b068238836ee20aa0b8"],
-        "slots": {"slot_2": {"index": "2", "severity": "high", "threshold": 5.0}},
+        "contracts": [
+          "0x04c80bb477890f3021f03b068238836ee20aa0b8"
+        ],
+        "slots": {
+          "slot_2": {
+            "index": "2",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
         "formula": "(value_after - value_before) / value_before <= 5.0"
-        
       },
-      "monitored_functions": ["bond", "debond", "flash"]
+      "monitored_functions": [
+        "bond",
+        "debond",
+        "flash"
+      ]
     },
-    
     {
       "id": "PATTERN_reentrancy_balance_001",
       "name": "Limit balance changes to prevent reentrancy attacks",
@@ -167,53 +139,38 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.15,
-        "contracts": ["0x7b3a6eff1c9925e509c2b01a389238c1fcc462b6"],
+        "contracts": [
+          "0x7b3a6eff1c9925e509c2b01a389238c1fcc462b6"
+        ],
         "slots": {},
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.15"
-        
       },
-      "monitored_functions": ["bond", "debond", "flash"]
+      "monitored_functions": [
+        "bond",
+        "debond",
+        "flash"
+      ]
     }
-    
   ],
   "fuzzing_config": {
     "enabled": true,
     "target_functions": [
-      
       {
         "contract": "0x04c80bb477890f3021f03b068238836ee20aa0b8",
         "function": "bond",
         "signature": "bond(address,uint256)"
       },
-      
       {
         "contract": "0x04c80bb477890f3021f03b068238836ee20aa0b8",
         "function": "debond",
         "signature": "debond(uint256,address[],uint8[])"
       },
-      
       {
         "contract": "0x04c80bb477890f3021f03b068238836ee20aa0b8",
         "function": "flash",
         "signature": "flash(address,address,uint256,bytes)"
       }
-      
     ],
     "threshold": 0.7,
     "max_variations": 5000,
@@ -233,7 +190,38 @@
     "target_similarity": 0.95,
     "max_high_sim_results": 10,
     "unlimited_mode": true,
-    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

@@ -93,9 +93,9 @@ func (dc *DataConverter) parseParamType(paramType string) uint8 {
 
 	paramType = strings.ToLower(strings.TrimSpace(paramType))
 
-	// 处理数组类型
-	if strings.HasSuffix(paramType, "[]") {
-		baseType := strings.TrimSuffix(paramType, "[]")
+	// 处理数组类型（含固定长度）
+	if idx := strings.Index(paramType, "["); idx != -1 && strings.HasSuffix(paramType, "]") {
+		baseType := paramType[:idx]
 		if val, ok := typeMap[baseType]; ok {
 			return val // 简化处理，使用基础类型
 		}

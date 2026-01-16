@@ -244,6 +244,9 @@ func (m *ResultMerger) shouldMergeAsRange(paramType string, values []ParameterVa
 
 // isNumericType 判断是否为数值类型
 func (m *ResultMerger) isNumericType(paramType string) bool {
+	if isArrayType(paramType) {
+		return false
+	}
 	return strings.HasPrefix(paramType, "uint") ||
 		strings.HasPrefix(paramType, "int") ||
 		paramType == "uint" ||
