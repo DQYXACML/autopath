@@ -417,11 +417,6 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 		avgSim := report.AverageSimilarity
 		maxSim := report.MaxSimilarity
 		minSim := report.MinSimilarity
-		if report.RawStatsAvailable {
-			avgSim = report.RawAverageSimilarity
-			maxSim = report.RawMaxSimilarity
-			minSim = report.RawMinSimilarity
-		}
 
 		fmt.Printf("\n 统计信息:\n")
 		fmt.Printf("   总测试组合数: %d\n", report.TotalCombinations)
@@ -429,6 +424,11 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 		fmt.Printf("   平均相似度: %.4f\n", avgSim)
 		fmt.Printf("   最高相似度: %.4f\n", maxSim)
 		fmt.Printf("   最低相似度: %.4f\n", minSim)
+		if report.RawStatsAvailable {
+			fmt.Printf("   校正平均相似度: %.4f\n", report.RawAverageSimilarity)
+			fmt.Printf("   校正最高相似度: %.4f\n", report.RawMaxSimilarity)
+			fmt.Printf("   校正最低相似度: %.4f\n", report.RawMinSimilarity)
+		}
 		fmt.Printf("   执行时间: %v\n", duration)
 
 		if len(report.ValidParameters) > 0 {
@@ -468,7 +468,7 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 			}
 		}
 		if highSimCount > 0 {
-			fmt.Printf("\n 高相似度路径 (>= %.2f): %d 个\n", saveThreshold, highSimCount)
+			fmt.Printf("\n 高相似度路径 (>= %.2f, 按重叠相似度): %d 个\n", saveThreshold, highSimCount)
 		}
 
 		fmt.Println("\n" + strings.Repeat("=", 80))

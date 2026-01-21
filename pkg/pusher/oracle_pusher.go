@@ -154,10 +154,6 @@ func (p *OraclePusher) ProcessFuzzingReport(
 ) error {
 	hasExpr := len(report.ExpressionRules) > 0
 	hasParams := len(report.ValidParameters) > 0
-	// 优先使用参数黑名单；仅当没有参数规则时才推送表达式，避免过度拦截
-	if hasParams {
-		hasExpr = false
-	}
 
 	// 没有表达式也没有范围/离散值时跳过
 	if !hasExpr && !hasParams {
@@ -196,26 +192,30 @@ func (p *OraclePusher) ProcessFuzzingReport(
 		return nil
 	}
 
-	if hasExpr {
-		// 有表达式规则时仅推送表达式，避免范围规则覆盖
-		if err := p.pushExpressionRules(ctx, project, funcSig, report.ExpressionRules); err != nil {
-			return err
-		}
-		log.Printf("[OraclePusher] Expression rules pushed for %s-%x", project.Hex(), funcSig)
-	} else {
-		// 无表达式时回退推送范围/离散值规则
+	if hasParams {
+		// 先推送范围/离散值规则（作为基础防线）
 		paramSummaries, err := p.convertToChainFormat(report.ValidParameters)
 		if err != nil {
 			return err
 		}
 		if len(paramSummaries) == 0 {
 			log.Printf("[OraclePusher] Skip push: empty param summaries for %s-%x", project.Hex(), funcSig)
-			return nil
+			if !hasExpr {
+				return nil
+			}
+		} else {
+			if err := p.pushParamRules(ctx, project, funcSig, paramSummaries, report.MaxSimilarity); err != nil {
+				return err
+			}
+			log.Printf("[OraclePusher] Param rules pushed for %s-%x", project.Hex(), funcSig)
 		}
-		if err := p.pushParamRules(ctx, project, funcSig, paramSummaries, report.MaxSimilarity); err != nil {
+	}
+	if hasExpr {
+		// 在参数规则基础上追加表达式规则（ratio/linear）
+		if err := p.pushExpressionRules(ctx, project, funcSig, report.ExpressionRules); err != nil {
 			return err
 		}
-		log.Printf("[OraclePusher] Param rules pushed for %s-%x", project.Hex(), funcSig)
+		log.Printf("[OraclePusher] Expression rules pushed for %s-%x", project.Hex(), funcSig)
 	}
 
 	p.mutex.Lock()

@@ -2,8 +2,11 @@ package fuzzer
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"math/big"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -29,6 +32,8 @@ type ConstraintCollector struct {
 	exprCost        map[string]int64 // 表达式生成耗时(ms)
 	lastGenSample   map[string]int   // 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
 	constraintRules *ConstraintRulesV2
+	selectorToFunc  map[string]string
+	selectorToSig   map[string]string
 	basePath        string
 	projectID       string
 }
@@ -58,6 +63,7 @@ func NewConstraintCollectorWithBasePath(threshold int, basePath string) *Constra
 func NewConstraintCollectorWithProject(threshold int, basePath, projectID string) *ConstraintCollector {
 	cc := NewConstraintCollectorWithBasePath(threshold, basePath)
 	cc.projectID = projectID
+	cc.loadTargetFunctionMap()
 	return cc
 }
 
@@ -166,10 +172,7 @@ func (cc *ConstraintCollector) buildRule(contract common.Address, selector []byt
 	selectorHex := "0x" + hex.EncodeToString(selector)
 	var funcConstraints []FunctionConstraint
 	if cc.constraintRules != nil {
-		funcConstraints = cc.constraintRules.GetConstraintForFunction(selectorHex)
-		if len(funcConstraints) > 0 {
-			log.Printf("[ConstraintCollector] Found %d constraint(s) for function %s", len(funcConstraints), selectorHex)
-		}
+		funcConstraints = cc.lookupConstraints(selectorHex)
 	}
 
 	paramRanges := cc.aggregateParamConstraintsWithRules(samples, funcConstraints)
@@ -184,6 +187,94 @@ func (cc *ConstraintCollector) buildRule(contract common.Address, selector []byt
 		SimilarityTrigger: averageSimilarity(samples),
 		GeneratedAt:       time.Now(),
 	}
+}
+
+type targetFunctionConfig struct {
+	ProjectID     string `json:"project_id"`
+	FuzzingConfig *struct {
+		TargetFunctions []struct {
+			Signature string `json:"signature"`
+			Function  string `json:"function"`
+		} `json:"target_functions"`
+	} `json:"fuzzing_config"`
+}
+
+func (cc *ConstraintCollector) loadTargetFunctionMap() {
+	if cc.basePath == "" || cc.projectID == "" {
+		return
+	}
+
+	configDirs := []string{
+		filepath.Join(cc.basePath, "autopath", "pkg", "invariants", "configs"),
+		filepath.Join(cc.basePath, "pkg", "invariants", "configs"),
+	}
+
+	selectorToFunc := make(map[string]string)
+	selectorToSig := make(map[string]string)
+
+	for _, dir := range configDirs {
+		matches, err := filepath.Glob(filepath.Join(dir, "*.json"))
+		if err != nil || len(matches) == 0 {
+			continue
+		}
+		for _, path := range matches {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			var cfg targetFunctionConfig
+			if err := json.Unmarshal(data, &cfg); err != nil {
+				continue
+			}
+			if !strings.EqualFold(cfg.ProjectID, cc.projectID) || cfg.FuzzingConfig == nil {
+				continue
+			}
+			for _, tf := range cfg.FuzzingConfig.TargetFunctions {
+				selector, err := signatureToSelector(tf.Signature)
+				if err != nil || selector == "" {
+					continue
+				}
+				selKey := strings.ToLower(selector)
+				if tf.Function != "" {
+					selectorToFunc[selKey] = tf.Function
+				}
+				if tf.Signature != "" {
+					selectorToSig[selKey] = tf.Signature
+				}
+			}
+		}
+	}
+
+	cc.selectorToFunc = selectorToFunc
+	cc.selectorToSig = selectorToSig
+}
+
+func (cc *ConstraintCollector) lookupConstraints(selectorHex string) []FunctionConstraint {
+	if cc.constraintRules == nil {
+		return nil
+	}
+
+	if funcConstraints := cc.constraintRules.GetConstraintForFunction(selectorHex); len(funcConstraints) > 0 {
+		log.Printf("[ConstraintCollector] Found %d constraint(s) for selector %s", len(funcConstraints), selectorHex)
+		return funcConstraints
+	}
+
+	selectorKey := strings.ToLower(selectorHex)
+	if sig := cc.selectorToSig[selectorKey]; sig != "" {
+		if funcConstraints := cc.constraintRules.GetConstraintForFunction(sig); len(funcConstraints) > 0 {
+			log.Printf("[ConstraintCollector] Found %d constraint(s) for signature %s", len(funcConstraints), sig)
+			return funcConstraints
+		}
+	}
+
+	if name := cc.selectorToFunc[selectorKey]; name != "" {
+		if funcConstraints := cc.constraintRules.GetConstraintForFunction(name); len(funcConstraints) > 0 {
+			log.Printf("[ConstraintCollector] Found %d constraint(s) for function %s", len(funcConstraints), name)
+			return funcConstraints
+		}
+	}
+
+	return nil
 }
 
 // buildExpressionRule 基于样本生成 ratio 或 linear 约束
@@ -282,15 +373,15 @@ func buildRatioRule(contract common.Address, selector string, samples []constrai
 				Kind:       "param",
 				ParamIndex: best.paramIdx,
 				ParamType:  paramTypes[best.paramIdx],
-				Coeff:      "0x" + paramCoeff.Text(16),
+				Coeff:      formatSignedHex(paramCoeff),
 			},
-			{Kind: "state", Slot: best.slot, Coeff: "0x" + stateCoeff.Text(16)},
+			{Kind: "state", Slot: best.slot, Coeff: formatSignedHex(stateCoeff)},
 		},
-		Threshold:    "0x0",
-		Scale:        "0x" + scale.Text(16),
+		Threshold:    formatSignedHex(big.NewInt(0)),
+		Scale:        formatUnsignedHex(scale),
 		Confidence:   1.0, // 正样本全部覆盖
 		SampleCount:  len(samples),
-		MinMarginHex: "0x" + minMargin.Text(16),
+		MinMarginHex: formatSignedHex(minMargin),
 		Strategy:     "ratio_param_over_state",
 	}
 }
@@ -370,7 +461,7 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 		}
 		coeffInts[i] = coeffInt
 
-		term := LinearTerm{Kind: feat.kind, Coeff: "0x" + coeffInt.Text(16)}
+		term := LinearTerm{Kind: feat.kind, Coeff: formatSignedHex(coeffInt)}
 		if feat.kind == "param" {
 			term.ParamIndex = feat.paramIndex
 			term.ParamType = paramTypes[feat.paramIndex]
@@ -381,7 +472,7 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 	}
 
 	thresholdInt := ratToInt(new(big.Rat).Mul(thresholdRat, scaleRat))
-	if thresholdInt == nil || thresholdInt.Sign() <= 0 {
+	if thresholdInt == nil || thresholdInt.Sign() == 0 {
 		return nil
 	}
 
@@ -392,11 +483,11 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 		Contract:     contract,
 		Selector:     selector,
 		Terms:        terms,
-		Threshold:    "0x" + thresholdInt.Text(16),
-		Scale:        "0x" + scale.Text(16),
+		Threshold:    formatSignedHex(thresholdInt),
+		Scale:        formatUnsignedHex(scale),
 		Confidence:   1.0,
 		SampleCount:  len(samples),
-		MinMarginHex: "0x" + minMargin.Text(16),
+		MinMarginHex: formatSignedHex(minMargin),
 		Strategy:     "sparse_hyperplane_origin_margin",
 	}
 }
@@ -954,4 +1045,26 @@ func calcMinMarginLinear(vectors [][]*big.Int, coeffs []*big.Int, threshold *big
 		return big.NewInt(0)
 	}
 	return minMargin
+}
+
+func formatSignedHex(value *big.Int) string {
+	if value == nil {
+		return "0x0"
+	}
+	if value.Sign() < 0 {
+		abs := new(big.Int).Abs(value)
+		return "-0x" + abs.Text(16)
+	}
+	return "0x" + value.Text(16)
+}
+
+func formatUnsignedHex(value *big.Int) string {
+	if value == nil {
+		return "0x0"
+	}
+	if value.Sign() < 0 {
+		abs := new(big.Int).Abs(value)
+		return "0x" + abs.Text(16)
+	}
+	return "0x" + value.Text(16)
 }

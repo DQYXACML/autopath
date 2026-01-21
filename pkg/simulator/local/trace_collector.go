@@ -34,6 +34,7 @@ type TraceCollector struct {
 	stateDB          vm.StateDB                        // 访问状态数据库（读取storage）
 	implCache        map[common.Address]common.Address // 代理→实现地址缓存
 	lastImplReported map[common.Address]common.Address // 仅在实现地址变化时输出日志
+	delegateLogCache map[common.Address]common.Address // 仅在delegatecall实现变化时输出日志
 }
 
 // NewTraceCollector 创建新的TraceCollector
@@ -44,6 +45,7 @@ func NewTraceCollector() *TraceCollector {
 		delegateStack:    make([]DelegateContext, 0, 10), // 预分配delegatecall栈
 		implCache:        make(map[common.Address]common.Address),
 		lastImplReported: make(map[common.Address]common.Address),
+		delegateLogCache: make(map[common.Address]common.Address),
 	}
 	tc.ResetWithProtected(nil)
 	return tc
@@ -75,6 +77,7 @@ func (t *TraceCollector) ResetWithProtected(addrs []common.Address) {
 
 	t.jumpDests = t.jumpDests[:0]
 	t.lastImplReported = make(map[common.Address]common.Address)
+	t.delegateLogCache = make(map[common.Address]common.Address)
 	if len(addrs) == 0 {
 		t.protected = nil
 		t.recording = true // 无过滤时立即记录
@@ -285,8 +288,13 @@ func (t *TraceCollector) OnEnter(depth int, typ byte, from common.Address,
 	// - from: 代理合约地址（当前执行环境）
 	// - to: 实现合约地址（目标代码地址）
 	// 无需解析，直接记录映射关系
+	if prevImpl, ok := t.delegateLogCache[from]; ok && prevImpl == to {
+		t.PushDelegateContext(from, to, depth)
+		return
+	}
 	log.Printf("[TraceCollector] OnEnter DELEGATECALL: 代理=%s -> 实现=%s (depth=%d)", from.Hex(), to.Hex(), depth)
 	t.PushDelegateContext(from, to, depth)
+	t.delegateLogCache[from] = to
 }
 
 // OnExit 实现tracing.Hooks.OnExit回调
