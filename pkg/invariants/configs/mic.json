@@ -458,6 +458,9 @@
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/mic",
+    
+    "record_full_trace": true,
+    
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {

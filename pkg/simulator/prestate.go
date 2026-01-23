@@ -157,6 +157,16 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 		}
 
 		if override.Code == "" || override.Code == "0x" {
+			// 避免将“本次交易新建合约”的运行时字节码注入到prestate，防止地址碰撞
+			emptyBalance := isZeroQuantity(override.Balance)
+			emptyNonce := isZeroQuantity(override.Nonce)
+			emptyStorage := len(override.State) == 0
+			if emptyBalance && emptyNonce && emptyStorage {
+				if isCitadelRedeem || isAttackExecutor {
+					log.Printf("[StateOverride] ⚠️  prestate为空，跳过本地代码补齐: %s", addr)
+				}
+				continue
+			}
 			// 查询本地节点上的合约代码
 			var localCode string
 			if err := s.rpcClient.CallContext(ctx, &localCode, "eth_getCode", addr, "latest"); err == nil {
@@ -197,6 +207,31 @@ func (s *EVMSimulator) BuildStateOverride(ctx context.Context, txHash common.Has
 	}
 
 	return overrides, nil
+}
+
+func isZeroQuantity(value string) bool {
+	if value == "" {
+		return true
+	}
+	lowered := strings.ToLower(value)
+	if strings.HasPrefix(lowered, "0x") {
+		trimmed := strings.TrimPrefix(lowered, "0x")
+		if trimmed == "" {
+			return true
+		}
+		for _, ch := range trimmed {
+			if ch != '0' {
+				return false
+			}
+		}
+		return true
+	}
+	for _, ch := range lowered {
+		if ch != '0' {
+			return false
+		}
+	}
+	return true
 }
 
 func parseNonceHex(raw json.RawMessage) (string, error) {

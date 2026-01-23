@@ -1513,6 +1513,32 @@ func (f *CallDataFuzzer) loadBaselineState() (*baselineStateFile, string) {
 	return &parsed, path
 }
 
+// resolveLocalExecutionBlockNumber 为本地EVM执行选择更接近prestate的基准区块
+func (f *CallDataFuzzer) resolveLocalExecutionBlockNumber(blockNumber uint64) uint64 {
+	if !f.localExecution || blockNumber == 0 {
+		return blockNumber
+	}
+
+	baseline, path := f.loadBaselineState()
+	if baseline != nil && baseline.BlockNumber > 0 {
+		if baseline.BlockNumber <= blockNumber {
+			if baseline.BlockNumber != blockNumber {
+				log.Printf("[BaselineState]  本地EVM基准区块调整: tx=%d -> baseline=%d (source=%s)", blockNumber, baseline.BlockNumber, path)
+			}
+			return baseline.BlockNumber
+		}
+		log.Printf("[BaselineState]  baseline区块高于交易区块 (baseline=%d, tx=%d)，忽略baseline", baseline.BlockNumber, blockNumber)
+	}
+
+	if blockNumber > 0 {
+		prev := blockNumber - 1
+		log.Printf("[BaselineState]  baseline缺失，使用前一区块作为本地EVM基线: tx=%d -> %d", blockNumber, prev)
+		return prev
+	}
+
+	return blockNumber
+}
+
 // mergeBaselineStateIntoOverride 将baseline_state中的余额/代码/存储注入StateOverride
 func mergeBaselineStateIntoOverride(base simulator.StateOverride, baseline *baselineStateFile, path string) simulator.StateOverride {
 	if baseline == nil || len(baseline.Contracts) == 0 {
@@ -1906,6 +1932,11 @@ func (f *CallDataFuzzer) FuzzTransaction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get original execution: %w", err)
 	}
+	// 计算本地EVM执行所需的基准区块高度（避免Fork场景使用交易后状态导致CREATE碰撞）
+	simBlockNumber := blockNumber
+	if f.localExecution {
+		simBlockNumber = f.resolveLocalExecutionBlockNumber(blockNumber)
+	}
 	pathContractAddr := resolvePathContractAddr(originalPath, contractAddr)
 	if pathContractAddr != contractAddr {
 		log.Printf("[Fuzzer]  路径对齐使用实现地址: %s (原目标=%s)", pathContractAddr.Hex(), contractAddr.Hex())
@@ -1965,6 +1996,24 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		log.Printf("[Fuzzer]  伪调用帧: from=%s, to=%s, inputLen=%d", trace.From, trace.To, len(trace.Input))
 	}
 
+	// 步骤2: 从调用树中提取调用受保护合约的call
+	log.Printf("[Fuzzer] Extracting calls to protected contract %s", contractAddr.Hex())
+	protectedCalls := f.extractProtectedContractCalls(trace, contractAddr)
+	if len(protectedCalls) == 0 && f.tracer != nil {
+		log.Printf("[Fuzzer]  未在调用树中找到受保护合约 %s，尝试使用链上traceTransaction重新提取", contractAddr.Hex())
+		if traceFallback, err := f.tracer.TraceTransaction(txHash); err != nil {
+			log.Printf("[Fuzzer]  traceTransaction 失败，保持原调用树: %v", err)
+		} else if traceFallback != nil {
+			trace = traceFallback
+			protectedCalls = f.extractProtectedContractCalls(trace, contractAddr)
+			if len(protectedCalls) > 0 {
+				log.Printf("[Fuzzer]  使用traceTransaction成功匹配受保护合约: %d 个调用", len(protectedCalls))
+			} else {
+				log.Printf("[Fuzzer]  traceTransaction 仍未命中受保护合约，继续使用fallback入口")
+			}
+		}
+	}
+
 	// 在重放过程中hook外部调用，捕获首个命中的受保护合约
 	hookTarget, hookVisited := f.hookFirstProtectedCall(trace, contractAddr)
 	if hookTarget != nil {
@@ -1975,9 +2024,6 @@ func (f *CallDataFuzzer) FuzzTransaction(
 		log.Printf("[Fuzzer]  首次命中受保护合约: to=%s selector=%s (hook顺序=%d)", hookTarget.To, selector, hookVisited)
 	}
 
-	// 步骤2: 从调用树中提取调用受保护合约的call
-	log.Printf("[Fuzzer] Extracting calls to protected contract %s", contractAddr.Hex())
-	protectedCalls := f.extractProtectedContractCalls(trace, contractAddr)
 	if len(protectedCalls) == 0 {
 		log.Printf("[Fuzzer]  未在调用树中找到受保护合约 %s，回退到入口调用", contractAddr.Hex())
 		// 尝试使用交易本身的调用作为fallback
@@ -2063,7 +2109,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 
 	var chainedCalls []*CallFrame
 	if len(targetCalls) > 1 {
-		chainableSelectors, detectErr := f.detectChainedSampleChanges(ctx, contractAddr, targetCalls, blockNumber, stateOverride, trace)
+		chainableSelectors, detectErr := f.detectChainedSampleChanges(ctx, contractAddr, targetCalls, simBlockNumber, stateOverride, trace)
 		if detectErr != nil {
 			log.Printf("[Fuzzer]  连锁样本试探失败，退化为逐个变异: %v", detectErr)
 		}
@@ -2161,7 +2207,7 @@ func (f *CallDataFuzzer) FuzzTransaction(
 			}
 		}
 
-		report, err := f.fuzzSingleTargetCall(targetCtx, txHash, contractAddr, blockNumber, targetCall, originalPath, stateOverride, trace)
+		report, err := f.fuzzSingleTargetCall(targetCtx, txHash, contractAddr, blockNumber, simBlockNumber, targetCall, originalPath, stateOverride, trace)
 		if targetCancel != nil {
 			targetCancel()
 		}
@@ -2191,6 +2237,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	txHash common.Hash,
 	contractAddr common.Address,
 	blockNumber uint64,
+	simBlockNumber uint64,
 	targetCall *CallFrame,
 	originalPath *simulator.ReplayResult,
 	stateOverride simulator.StateOverride,
@@ -2402,7 +2449,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	if targetSeedCfg != nil && targetSeedCfg.Enabled &&
 		targetSeedCfg.AdaptiveConfig != nil && targetSeedCfg.AdaptiveConfig.Enabled {
 		log.Printf("[Fuzzer]  Adaptive iteration mode enabled (max_iterations=%d)", targetSeedCfg.AdaptiveConfig.MaxIterations)
-		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, blockNumber, stateOverride, symbolicSeeds, trace, targetSeedCfg, baseSeedCfg, useLoopBaseline, preparedMutations)
+		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, symbolicSeeds, trace, targetSeedCfg, baseSeedCfg, useLoopBaseline, preparedMutations)
 	} else {
 		var combinations <-chan []interface{}
 		if targetSeedCfg != nil && targetSeedCfg.Enabled {
@@ -2438,7 +2485,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		}
 
 		log.Printf("[Fuzzer] Starting fuzzing with %d workers, threshold: %.2f", f.maxWorkers, f.threshold)
-		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, blockNumber, stateOverride, trace, baseSeedCfg, useLoopBaseline, preparedMutations)
+		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, trace, baseSeedCfg, useLoopBaseline, preparedMutations)
 		log.Printf("[Fuzzer] Found %d valid combinations", len(results))
 	}
 
@@ -3024,7 +3071,7 @@ func (f *CallDataFuzzer) executeFuzzing(
 	targetCall *CallFrame,
 	contractAddr common.Address,
 	pathContractAddr common.Address,
-	blockNumber uint64,
+	simBlockNumber uint64,
 	stateOverride simulator.StateOverride,
 	callTree *CallFrame,
 	seedCfg *SeedConfig,
@@ -3080,11 +3127,11 @@ func (f *CallDataFuzzer) executeFuzzing(
 	// 预计算函数级基准路径，避免循环场景误用非目标函数起点
 	var functionBaseline []ContractJumpDest
 	if loopBaseline {
-		functionBaseline = f.buildFunctionBaseline(ctx, targetCall, pathContractAddr, blockNumber, stateOverride)
+		functionBaseline = f.buildFunctionBaseline(ctx, targetCall, pathContractAddr, simBlockNumber, stateOverride)
 		if len(functionBaseline) == 0 && pathContractAddr != contractAddr {
 			log.Printf("[Fuzzer]  函数级基准为空，回退使用目标合约地址构建 (path=%s, target=%s)",
 				pathContractAddr.Hex(), contractAddr.Hex())
-			functionBaseline = f.buildFunctionBaseline(ctx, targetCall, contractAddr, blockNumber, stateOverride)
+			functionBaseline = f.buildFunctionBaseline(ctx, targetCall, contractAddr, simBlockNumber, stateOverride)
 		}
 	}
 
@@ -3111,11 +3158,11 @@ func (f *CallDataFuzzer) executeFuzzing(
 
 		if tooShort {
 			if len(functionBaseline) == 0 {
-				functionBaseline = f.buildFunctionBaseline(ctx, targetCall, pathContractAddr, blockNumber, stateOverride)
+				functionBaseline = f.buildFunctionBaseline(ctx, targetCall, pathContractAddr, simBlockNumber, stateOverride)
 				if len(functionBaseline) == 0 && pathContractAddr != contractAddr {
 					log.Printf("[Fuzzer]  函数级基准为空，回退使用目标合约地址构建 (path=%s, target=%s)",
 						pathContractAddr.Hex(), contractAddr.Hex())
-					functionBaseline = f.buildFunctionBaseline(ctx, targetCall, contractAddr, blockNumber, stateOverride)
+					functionBaseline = f.buildFunctionBaseline(ctx, targetCall, contractAddr, simBlockNumber, stateOverride)
 				}
 			}
 			if len(functionBaseline) > 0 {
@@ -3153,7 +3200,7 @@ func (f *CallDataFuzzer) executeFuzzing(
 				targetCall,
 				contractAddr,
 				pathContractAddr,
-				blockNumber,
+				simBlockNumber,
 				stateOverride,
 				callTree,
 				preparedMutations,
@@ -3206,7 +3253,7 @@ func (f *CallDataFuzzer) buildFunctionBaseline(
 	ctx context.Context,
 	targetCall *CallFrame,
 	pathContractAddr common.Address,
-	blockNumber uint64,
+	simBlockNumber uint64,
 	stateOverride simulator.StateOverride,
 ) []ContractJumpDest {
 	if targetCall == nil {
@@ -3231,7 +3278,7 @@ func (f *CallDataFuzzer) buildFunctionBaseline(
 		To:            common.HexToAddress(targetCall.To),
 		CallData:      callData,
 		Value:         value,
-		BlockNumber:   blockNumber,
+		BlockNumber:   simBlockNumber,
 		Timeout:       f.timeout,
 		StateOverride: stateOverride,
 	}
@@ -3738,7 +3785,7 @@ func (f *CallDataFuzzer) detectChainedSampleChanges(
 	ctx context.Context,
 	contractAddr common.Address,
 	targetCalls []*CallFrame,
-	blockNumber uint64,
+	simBlockNumber uint64,
 	stateOverride simulator.StateOverride,
 	trace *CallFrame,
 ) (map[string]bool, error) {
@@ -3840,7 +3887,7 @@ func (f *CallDataFuzzer) detectChainedSampleChanges(
 				entryTo,
 				entryData,
 				entryValue,
-				blockNumber,
+				simBlockNumber,
 				stateOverride,
 				map[common.Address]local.CallMutatorV2{
 					contractAddr: simulator.AdaptCallMutator(hookMutator),
@@ -3853,7 +3900,7 @@ func (f *CallDataFuzzer) detectChainedSampleChanges(
 			_, simErr := f.simulator.ExecuteWithHooks(
 				ctx,
 				trace,
-				blockNumber,
+				simBlockNumber,
 				stateOverride,
 				map[string]simulator.CallMutator{strings.ToLower(contractAddr.Hex()): hookMutator},
 			)
@@ -3893,7 +3940,7 @@ func (f *CallDataFuzzer) worker(
 	targetCall *CallFrame,
 	contractAddr common.Address,
 	pathContractAddr common.Address,
-	blockNumber uint64,
+	simBlockNumber uint64,
 	stateOverride simulator.StateOverride,
 	callTree *CallFrame,
 	preparedMutations map[string]*PreparedMutation,
@@ -4051,7 +4098,7 @@ func (f *CallDataFuzzer) worker(
 				entryTo,
 				entryData,
 				entryValue,
-				blockNumber,
+				simBlockNumber,
 				stateOverride,
 				mutators,
 			)
@@ -4110,7 +4157,7 @@ func (f *CallDataFuzzer) worker(
 			hookRes, simErr := f.simulator.ExecuteWithHooks(
 				ctx,
 				callTree,
-				blockNumber,
+				simBlockNumber,
 				stateOverride,
 				map[string]simulator.CallMutator{strings.ToLower(contractAddr.Hex()): hookMutator},
 			)
@@ -4501,7 +4548,7 @@ func (f *CallDataFuzzer) worker(
 				// 转换状态为ChainState格式
 				chainState := ConvertToChainStateFromSimResult(
 					simResult,
-					blockNumber,
+					simBlockNumber,
 					common.Hash{}, // worker中使用零哈希,因为是模拟交易
 				)
 
@@ -5324,7 +5371,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	targetCall *CallFrame,
 	contractAddr common.Address,
 	pathContractAddr common.Address,
-	blockNumber uint64,
+	simBlockNumber uint64,
 	stateOverride simulator.StateOverride,
 	symbolicSeeds []symbolic.SymbolicSeed,
 	callTree *CallFrame,
@@ -5369,7 +5416,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	log.Printf("[Adaptive] Using fixed seed-based ranges")
 
 	initialCombos := seedGen.GenerateSeedBasedCombinations(parsedData.Parameters)
-	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, blockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
+	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
 	allResults = append(allResults, initialResults...)
 
 	log.Printf("[Adaptive] Iteration 0 completed: %d valid results, total: %d",
@@ -5404,7 +5451,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 
 		// 4. 执行新一轮模糊测试
 		log.Printf("[Adaptive] Executing fuzzing with adaptive ranges...")
-		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, blockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
+		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
 
 		// 5. 累积结果
 		allResults = append(allResults, iterResults...)
