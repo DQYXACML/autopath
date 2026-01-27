@@ -299,6 +299,8 @@ type CallDataFuzzer struct {
 
 	// Entry Call 限制
 	entryCallProtectedOnly bool // 仅允许对受保护合约进行Entry模式
+	// 目标函数未命中时是否回退到受保护调用
+	targetFunctionFallback bool
 
 	// 循环场景下使用受保护合约子路径作为基准
 	useLoopBodyBaseline bool
@@ -398,6 +400,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		maxHighSimResults:       config.MaxHighSimResults, //  无限制模式配置
 		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
+		targetFunctionFallback:  config.TargetFunctionFallback,
 		projectID:               config.ProjectID,
 		baselineStatePath:       config.BaselineStatePath,
 		strictPrestate:          config.StrictPrestate,
@@ -507,6 +510,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		maxHighSimResults:       config.MaxHighSimResults, //  无限制模式配置
 		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
 		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
+		targetFunctionFallback:  config.TargetFunctionFallback,
 		projectID:               config.ProjectID,
 		baselineStatePath:       config.BaselineStatePath,
 		strictPrestate:          config.StrictPrestate,
@@ -2045,9 +2049,20 @@ func (f *CallDataFuzzer) FuzzTransaction(
 
 	// 按项目配置的 target_functions 过滤调用
 	targetSelectors := loadTargetSelectors(f.projectID, contractAddr)
-	if len(targetSelectors) > 0 {
+	if len(targetSelectors) == 0 {
+		if !f.targetFunctionFallback {
+			log.Printf("[Fuzzer]  未加载到target_functions配置，跳过Fuzz (fallback已关闭) contract=%s", contractAddr.Hex())
+			return nil, nil
+		}
+	} else {
 		contractKey := strings.ToLower(contractAddr.Hex())
-		if allowed, ok := targetSelectors[contractKey]; ok && len(allowed) > 0 {
+		allowed, ok := targetSelectors[contractKey]
+		if !ok || len(allowed) == 0 {
+			if !f.targetFunctionFallback {
+				log.Printf("[Fuzzer]  配置未包含该合约的target_functions，跳过Fuzz (fallback已关闭) contract=%s", contractAddr.Hex())
+				return nil, nil
+			}
+		} else {
 			log.Printf("[Fuzzer]  发现配置的 target_functions (projectID=%s, contract=%s, selectors=%v)",
 				f.projectID, contractAddr.Hex(), mapKeys(allowed))
 			filtered := make([]*CallFrame, 0, len(protectedCalls))
@@ -2063,8 +2078,11 @@ func (f *CallDataFuzzer) FuzzTransaction(
 			if len(filtered) > 0 {
 				protectedCalls = filtered
 				log.Printf("[Fuzzer]  依据配置的 target_functions 过滤后，剩余 %d 个调用 (contract=%s)", len(protectedCalls), contractAddr.Hex())
-			} else {
+			} else if f.targetFunctionFallback {
 				log.Printf("[Fuzzer]  配置的 target_functions 未在调用树中命中，回退使用全部受保护调用 (contract=%s)", contractAddr.Hex())
+			} else {
+				log.Printf("[Fuzzer]  配置的 target_functions 未在调用树中命中，跳过Fuzz (fallback已关闭) contract=%s", contractAddr.Hex())
+				return nil, nil
 			}
 		}
 	}
@@ -5425,6 +5443,11 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	// 初始探索无结果时直接退出，避免无效的空循环
 	if len(allResults) == 0 {
 		log.Printf("[Adaptive]  初始探索未找到有效结果，停止自适应迭代")
+		return allResults
+	}
+	if len(parsedData.Parameters) == 0 {
+		log.Printf("[Adaptive]  无参数函数 %s，跳过自适应迭代以避免重复组合",
+			hexutil.Encode(parsedData.Selector))
 		return allResults
 	}
 

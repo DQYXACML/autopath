@@ -55,20 +55,21 @@ type ProtectedContractConfig struct {
 
 // FuzzingConfig Fuzzing配置
 type FuzzingConfig struct {
-	Enabled              bool                  `json:"enabled"`
-	Threshold            float64               `json:"threshold"`
-	MaxVariations        int                   `json:"max_variations"`
-	Workers              int                   `json:"workers"`
-	TimeoutSeconds       int                   `json:"timeout_seconds"`
-	OutputPath           string                `json:"output_path"`
-	AutoTrigger          bool                  `json:"auto_trigger"`
-	TriggerContractTypes []string              `json:"trigger_contract_types"`
-	MinSimilarity        float64               `json:"min_similarity"`
-	SaveHighSimilarity   bool                  `json:"save_high_similarity"`
-	PrintRealtime        bool                  `json:"print_realtime"`
-	InvariantCheck       *InvariantCheckConfig `json:"invariant_check"`
-	ProjectID            string                `json:"project_id"`
-	BaselineStatePath    string                `json:"baseline_state_path"`
+	Enabled                bool                  `json:"enabled"`
+	TargetFunctionFallback bool                  `json:"target_function_fallback"`
+	Threshold              float64               `json:"threshold"`
+	MaxVariations          int                   `json:"max_variations"`
+	Workers                int                   `json:"workers"`
+	TimeoutSeconds         int                   `json:"timeout_seconds"`
+	OutputPath             string                `json:"output_path"`
+	AutoTrigger            bool                  `json:"auto_trigger"`
+	TriggerContractTypes   []string              `json:"trigger_contract_types"`
+	MinSimilarity          float64               `json:"min_similarity"`
+	SaveHighSimilarity     bool                  `json:"save_high_similarity"`
+	PrintRealtime          bool                  `json:"print_realtime"`
+	InvariantCheck         *InvariantCheckConfig `json:"invariant_check"`
+	ProjectID              string                `json:"project_id"`
+	BaselineStatePath      string                `json:"baseline_state_path"`
 
 	//  Unlimited fuzzing模式配置
 	UnlimitedMode     bool    `json:"unlimited_mode"`       // 无限制fuzzing模式
@@ -144,13 +145,14 @@ func NewFuzzingIntegration(rpcURL string, config *FuzzingConfig) (*FuzzingIntegr
 	}
 
 	fuzzerConfig := &fuzzer.Config{
-		RPCURL:            rpcURL,
-		Threshold:         config.Threshold,
-		MaxVariations:     config.MaxVariations,
-		Workers:           config.Workers,
-		Timeout:           time.Duration(config.TimeoutSeconds) * time.Second,
-		ProjectID:         config.ProjectID,
-		BaselineStatePath: config.BaselineStatePath,
+		RPCURL:                 rpcURL,
+		TargetFunctionFallback: config.TargetFunctionFallback,
+		Threshold:              config.Threshold,
+		MaxVariations:          config.MaxVariations,
+		Workers:                config.Workers,
+		Timeout:                time.Duration(config.TimeoutSeconds) * time.Second,
+		ProjectID:              config.ProjectID,
+		BaselineStatePath:      config.BaselineStatePath,
 		Output: fuzzer.OutputConfig{
 			Format: "json",
 			Path:   config.OutputPath,
@@ -239,13 +241,14 @@ func NewFuzzingIntegrationWithClients(rpcClient *rpc.Client, client *ethclient.C
 	}
 
 	fuzzerConfig := &fuzzer.Config{
-		RPCURL:            "", // 不使用URL，因为我们传入了客户端
-		Threshold:         config.Threshold,
-		MaxVariations:     config.MaxVariations,
-		Workers:           config.Workers,
-		Timeout:           time.Duration(config.TimeoutSeconds) * time.Second,
-		ProjectID:         config.ProjectID,
-		BaselineStatePath: config.BaselineStatePath,
+		RPCURL:                 "", // 不使用URL，因为我们传入了客户端
+		TargetFunctionFallback: config.TargetFunctionFallback,
+		Threshold:              config.Threshold,
+		MaxVariations:          config.MaxVariations,
+		Workers:                config.Workers,
+		Timeout:                time.Duration(config.TimeoutSeconds) * time.Second,
+		ProjectID:              config.ProjectID,
+		BaselineStatePath:      config.BaselineStatePath,
 		Output: fuzzer.OutputConfig{
 			Format: "json",
 			Path:   config.OutputPath,

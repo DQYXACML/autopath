@@ -272,6 +272,9 @@ type Config struct {
 	// RPC配置
 	RPCURL string `yaml:"rpc_url"`
 
+	// 仅当 target_functions 未命中时是否回退到受保护调用
+	TargetFunctionFallback bool `yaml:"target_function_fallback" json:"target_function_fallback"`
+
 	// 项目标识（用于定位attack_state.json等外部资料）
 	ProjectID string `yaml:"project_id"`
 

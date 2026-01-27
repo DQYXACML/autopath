@@ -14,20 +14,21 @@ type ProjectConfig struct {
 
 // FuzzingConfigJSON 表示 fuzzer 相关的 JSON 配置
 type FuzzingConfigJSON struct {
-	Enabled              bool                `json:"enabled"`
-	Threshold            float64             `json:"threshold"`
-	MaxVariations        int                 `json:"max_variations"`
-	Workers              int                 `json:"workers"`
-	TimeoutSeconds       int                 `json:"timeout_seconds"`
-	OutputPath           string              `json:"output_path"`
-	AutoTrigger          bool                `json:"auto_trigger"`
-	TriggerContractTypes []string            `json:"trigger_contract_types"`
-	MinSimilarity        float64             `json:"min_similarity"`
-	SaveHighSimilarity   bool                `json:"save_high_similarity"`
-	PrintRealtime        bool                `json:"print_realtime"`
-	ProjectID            string              `json:"project_id"`
-	BaselineStatePath    string              `json:"baseline_state_path"`
-	InvariantCheck       *InvariantCheckJSON `json:"invariant_check"`
+	Enabled                bool                `json:"enabled"`
+	TargetFunctionFallback bool                `json:"target_function_fallback"`
+	Threshold              float64             `json:"threshold"`
+	MaxVariations          int                 `json:"max_variations"`
+	Workers                int                 `json:"workers"`
+	TimeoutSeconds         int                 `json:"timeout_seconds"`
+	OutputPath             string              `json:"output_path"`
+	AutoTrigger            bool                `json:"auto_trigger"`
+	TriggerContractTypes   []string            `json:"trigger_contract_types"`
+	MinSimilarity          float64             `json:"min_similarity"`
+	SaveHighSimilarity     bool                `json:"save_high_similarity"`
+	PrintRealtime          bool                `json:"print_realtime"`
+	ProjectID              string              `json:"project_id"`
+	BaselineStatePath      string              `json:"baseline_state_path"`
+	InvariantCheck         *InvariantCheckJSON `json:"invariant_check"`
 
 	//  Unlimited fuzzing模式配置
 	UnlimitedMode     bool    `json:"unlimited_mode"`       // 无限制fuzzing模式

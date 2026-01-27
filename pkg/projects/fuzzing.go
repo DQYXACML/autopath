@@ -38,19 +38,20 @@ func ConvertFuzzingConfig(jsonConfig *FuzzingConfigJSON, projectID string) *moni
 	}
 
 	return &monitor.FuzzingConfig{
-		Enabled:              jsonConfig.Enabled,
-		Threshold:            jsonConfig.Threshold,
-		MaxVariations:        jsonConfig.MaxVariations,
-		Workers:              jsonConfig.Workers,
-		TimeoutSeconds:       jsonConfig.TimeoutSeconds,
-		OutputPath:           jsonConfig.OutputPath,
-		AutoTrigger:          jsonConfig.AutoTrigger,
-		TriggerContractTypes: jsonConfig.TriggerContractTypes,
-		MinSimilarity:        jsonConfig.MinSimilarity,
-		SaveHighSimilarity:   jsonConfig.SaveHighSimilarity,
-		PrintRealtime:        jsonConfig.PrintRealtime,
-		InvariantCheck:       invariantCfg,
-		BaselineStatePath:    jsonConfig.BaselineStatePath,
+		Enabled:                jsonConfig.Enabled,
+		TargetFunctionFallback: jsonConfig.TargetFunctionFallback,
+		Threshold:              jsonConfig.Threshold,
+		MaxVariations:          jsonConfig.MaxVariations,
+		Workers:                jsonConfig.Workers,
+		TimeoutSeconds:         jsonConfig.TimeoutSeconds,
+		OutputPath:             jsonConfig.OutputPath,
+		AutoTrigger:            jsonConfig.AutoTrigger,
+		TriggerContractTypes:   jsonConfig.TriggerContractTypes,
+		MinSimilarity:          jsonConfig.MinSimilarity,
+		SaveHighSimilarity:     jsonConfig.SaveHighSimilarity,
+		PrintRealtime:          jsonConfig.PrintRealtime,
+		InvariantCheck:         invariantCfg,
+		BaselineStatePath:      jsonConfig.BaselineStatePath,
 
 		//  Unlimited fuzzing配置
 		UnlimitedMode:     jsonConfig.UnlimitedMode,

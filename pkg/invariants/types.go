@@ -64,6 +64,7 @@ type ProjectConfig struct {
 type FuzzingConfig struct {
 	Enabled                bool             `json:"enabled"`
 	TargetFunctions        []TargetFunction `json:"target_functions"` // 目标函数列表
+	TargetFunctionFallback bool             `json:"target_function_fallback"`
 	Threshold              float64          `json:"threshold"`
 	MaxVariations          int              `json:"max_variations"`
 	Workers                int              `json:"workers"`

@@ -68,6 +68,12 @@ func (g *ParamGenerator) GenerateCombinations(params []Parameter) <-chan []inter
 	go func() {
 		defer close(ch)
 
+		if len(params) == 0 {
+			// No parameters: emit a single empty combination to avoid duplicates.
+			ch <- []interface{}{}
+			return
+		}
+
 		// 策略1: 单参数变异
 		g.singleParamMutation(params, ch)
 

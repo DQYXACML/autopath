@@ -49,11 +49,11 @@ type BlockchainMonitor struct {
 	baselineRecorded  map[string]bool
 
 	// 【新增】预加载的基线状态（用于 Fork 测试场景）
-	baselineStateFile string
-	baselineStates    map[common.Address]*invariants.ContractState
-	baselineLoaded    bool
+	baselineStateFile  string
+	baselineStates     map[common.Address]*invariants.ContractState
+	baselineLoaded     bool
 	baselineStateMutex sync.RWMutex
-	forkBlockNumber   uint64 // Fork 区块号（用于检测是否是新交易）
+	forkBlockNumber    uint64 // Fork 区块号（用于检测是否是新交易）
 
 	// 【新增】StateOverride控制（用于Fork测试优化）
 	enableStateOverride bool // 默认true，可通过ConfigureStateOverride(false)禁用
@@ -1099,6 +1099,11 @@ func (m *BlockchainMonitor) exportBaselineRules(tx *types.Transaction, trace *Ca
 			continue
 		}
 
+		if m.registry != nil && !m.registry.IsTargetFunction(contract, funcSig) {
+			log.Printf("[BaselineRule] Skip non-target function rule export: %s %s", contract.Hex(), funcSigHex)
+			continue
+		}
+
 		if err := m.ruleExporter.ExportRules(contract, funcSig, paramSummaries, 1.0); err != nil {
 			log.Printf("[BaselineRule] Failed to export rule for %s %s: %v", contract.Hex(), funcSigHex, err)
 		} else {
@@ -1260,8 +1265,8 @@ func (m *BlockchainMonitor) loadBaselineState(protectedList []common.Address) ma
 	}
 
 	type BaselineState struct {
-		BlockNumber uint64                       `json:"block_number"`
-		Contracts   map[string]BaselineContract  `json:"contracts"`
+		BlockNumber uint64                      `json:"block_number"`
+		Contracts   map[string]BaselineContract `json:"contracts"`
 	}
 
 	// 读取文件

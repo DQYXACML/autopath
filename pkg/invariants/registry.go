@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Registry 不变量注册中心
@@ -16,6 +17,7 @@ type Registry struct {
 	contractToProject map[common.Address]string        // contract -> projectID
 	invariants        map[string]map[string]*Invariant // projectID -> invariantID -> Invariant
 	evaluators        map[string]EvaluatorFunc         // invariantID -> evaluator
+	targetFuncSigs    map[common.Address]map[[4]byte]struct{}
 }
 
 // NewRegistry 创建新的注册中心
@@ -25,6 +27,7 @@ func NewRegistry() *Registry {
 		contractToProject: make(map[common.Address]string),
 		invariants:        make(map[string]map[string]*Invariant),
 		evaluators:        make(map[string]EvaluatorFunc),
+		targetFuncSigs:    make(map[common.Address]map[[4]byte]struct{}),
 	}
 }
 
@@ -50,6 +53,21 @@ func (r *Registry) LoadProjectConfig(configPath string) error {
 	for _, contractAddr := range config.Contracts {
 		addr := common.HexToAddress(contractAddr)
 		r.contractToProject[addr] = config.ProjectID
+	}
+
+	// 建立目标函数签名映射（用于限制规则导出）
+	if config.FuzzingConfig != nil {
+		for _, tf := range config.FuzzingConfig.TargetFunctions {
+			if tf.Contract == "" || tf.Signature == "" {
+				continue
+			}
+			selector := functionSelector(tf.Signature)
+			addr := common.HexToAddress(tf.Contract)
+			if r.targetFuncSigs[addr] == nil {
+				r.targetFuncSigs[addr] = make(map[[4]byte]struct{})
+			}
+			r.targetFuncSigs[addr][selector] = struct{}{}
+		}
 	}
 
 	// 注册不变量
@@ -99,6 +117,28 @@ func (r *Registry) LoadProjectConfig(configPath string) error {
 	}
 
 	return nil
+}
+
+// IsTargetFunction 检查合约+函数签名是否属于注入目标函数
+func (r *Registry) IsTargetFunction(addr common.Address, funcSig [4]byte) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	funcs := r.targetFuncSigs[addr]
+	if len(funcs) == 0 {
+		return false
+	}
+	_, exists := funcs[funcSig]
+	return exists
+}
+
+func functionSelector(signature string) [4]byte {
+	hash := crypto.Keccak256([]byte(signature))
+	var selector [4]byte
+	if len(hash) >= 4 {
+		copy(selector[:], hash[:4])
+	}
+	return selector
 }
 
 // RegisterEvaluator 注册不变量评估器
