@@ -2296,6 +2296,8 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	if f.sampleRecorder != nil {
 		f.sampleRecorder.Reset()
 	}
+	bestSimilarity := -1.0
+	recordedSelectors := make(map[string]struct{})
 
 	// 固定为函数级Fuzz，不做循环/入口模式切换
 	useLoopBaseline := false
@@ -2467,7 +2469,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	if targetSeedCfg != nil && targetSeedCfg.Enabled &&
 		targetSeedCfg.AdaptiveConfig != nil && targetSeedCfg.AdaptiveConfig.Enabled {
 		log.Printf("[Fuzzer]  Adaptive iteration mode enabled (max_iterations=%d)", targetSeedCfg.AdaptiveConfig.MaxIterations)
-		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, symbolicSeeds, trace, targetSeedCfg, baseSeedCfg, useLoopBaseline, preparedMutations)
+		results = f.executeAdaptiveFuzzing(ctx, parsedData, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, symbolicSeeds, trace, targetSeedCfg, baseSeedCfg, useLoopBaseline, preparedMutations, &bestSimilarity, recordedSelectors)
 	} else {
 		var combinations <-chan []interface{}
 		if targetSeedCfg != nil && targetSeedCfg.Enabled {
@@ -2503,8 +2505,24 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		}
 
 		log.Printf("[Fuzzer] Starting fuzzing with %d workers, threshold: %.2f", f.maxWorkers, f.threshold)
-		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, trace, baseSeedCfg, useLoopBaseline, preparedMutations)
+		results = f.executeFuzzing(ctx, combinations, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, trace, baseSeedCfg, useLoopBaseline, preparedMutations, &bestSimilarity, recordedSelectors)
 		log.Printf("[Fuzzer] Found %d valid combinations", len(results))
+	}
+
+	// 仅保留最高相似度组合进入规则生成路径
+	if bestSimilarity >= 0 && len(results) > 0 {
+		lower := bestSimilarity - similarityEpsilon
+		upper := bestSimilarity + similarityEpsilon
+		filtered := results[:0]
+		for _, r := range results {
+			if r.Similarity >= lower && r.Similarity <= upper {
+				filtered = append(filtered, r)
+			}
+		}
+		results = filtered
+	}
+	if bestSimilarity >= 0 {
+		log.Printf("[Fuzzer] Selected %d max-sim combinations (max=%.4f)", len(results), bestSimilarity)
 	}
 
 	// 步骤5: 生成报告
@@ -2564,24 +2582,6 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	// 应用约束规则（若已生成）
 	f.applyConstraintRule(report, contractAddr, parsedData.Selector)
 
-	// 兜底：若未生成表达式/范围规则，回退使用原始调用参数生成黑名单范围
-	if len(report.ExpressionRules) == 0 && len(report.ValidParameters) == 0 {
-		fallback := f.deriveParamSummariesFromSamples(nil, contractAddr, targetCall)
-		if len(fallback) > 0 {
-			report.ValidParameters = fallback
-			if report.MaxSimilarity < f.threshold {
-				report.MaxSimilarity = f.threshold
-			}
-			if report.AverageSimilarity < report.MaxSimilarity {
-				report.AverageSimilarity = report.MaxSimilarity
-			}
-			if report.MinSimilarity == 0 || report.MinSimilarity > report.MaxSimilarity {
-				report.MinSimilarity = report.MaxSimilarity
-			}
-			log.Printf("[Fuzzer]  使用原始调用参数生成兜底拦截范围 (selector=%s)", hexutil.Encode(parsedData.Selector))
-		}
-	}
-
 	// 输出时间轴统计
 	if report.FirstHitSeconds > 0 {
 		log.Printf("[Fuzzer] 计时 首个达标样本出现在 %.2f 秒", report.FirstHitSeconds)
@@ -2610,7 +2610,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	return report, nil
 }
 
-// buildFallbackReportForCall 在预算不足或fuzz失败时使用原始参数生成兜底报告
+// buildFallbackReportForCall 兜底报告已禁用，保留入口以便记录原因
 func (f *CallDataFuzzer) buildFallbackReportForCall(
 	contractAddr common.Address,
 	call *CallFrame,
@@ -2626,50 +2626,15 @@ func (f *CallDataFuzzer) buildFallbackReportForCall(
 	if len(call.Input) >= 10 {
 		selector = ensureSelectorHex(call.Input[:10])
 	}
-
-	report := &AttackParameterReport{
-		ContractAddress:   contractAddr,
-		FunctionSig:       selector,
-		Timestamp:         time.Now(),
-		OriginalTxHash:    txHash,
-		BlockNumber:       blockNumber,
-		TotalCombinations: 1,
-		ValidCombinations: 1,
-		AverageSimilarity: 1.0,
-		MaxSimilarity:     1.0,
-		MinSimilarity:     1.0,
-	}
-
-	if parsed, method, err := f.decodeCallForSamples(contractAddr, call); err == nil && parsed != nil {
-		if len(parsed.Selector) >= 4 {
-			report.FunctionSig = hexutil.Encode(parsed.Selector[:4])
-		}
-		if method != nil {
-			report.FunctionSignature = method.Sig
-			report.FunctionName = method.Name
-		}
-	}
-
-	report.ValidParameters = f.deriveParamSummariesFromSamples(nil, contractAddr, call)
-	if len(report.ValidParameters) > 0 {
-		filtered := make([]ParameterSummary, 0, len(report.ValidParameters))
-		for _, ps := range report.ValidParameters {
-			// 兜底规则仅保留数值型参数，避免将常量地址/bytes加入黑名单导致正常交易被误拦截
-			if !isNumericTypeStr(ps.ParamType) {
-				continue
-			}
-			filtered = append(filtered, ps)
-		}
-		report.ValidParameters = filtered
-	}
-	if len(report.ValidParameters) == 0 {
-		log.Printf("[Fuzzer]  兜底报告未解析到参数，selector=%s", report.FunctionSig)
-	}
 	if reason != "" {
-		log.Printf("[Fuzzer]  生成兜底报告: %s selector=%s", reason, report.FunctionSig)
+		log.Printf("[Fuzzer]  兜底报告已禁用: %s selector=%s", reason, selector)
+	} else {
+		log.Printf("[Fuzzer]  兜底报告已禁用: selector=%s", selector)
 	}
-
-	return report
+	_ = contractAddr
+	_ = txHash
+	_ = blockNumber
+	return nil
 }
 
 // parseCallDataWithABI 优先使用ABI解析，失败则回退到启发式解析
@@ -3095,6 +3060,8 @@ func (f *CallDataFuzzer) executeFuzzing(
 	seedCfg *SeedConfig,
 	loopBaseline bool,
 	preparedMutations map[string]*PreparedMutation,
+	bestSimilarity *float64,
+	recordedSelectors map[string]struct{},
 ) []FuzzingResult {
 	if pathContractAddr == (common.Address{}) {
 		pathContractAddr = contractAddr
@@ -3224,6 +3191,8 @@ func (f *CallDataFuzzer) executeFuzzing(
 				preparedMutations,
 				&results,
 				resultMutex,
+				bestSimilarity,
+				recordedSelectors,
 				&testedCount,
 				&validCount,
 				&highSimCount, //  传递高相似度计数器
@@ -3964,6 +3933,8 @@ func (f *CallDataFuzzer) worker(
 	preparedMutations map[string]*PreparedMutation,
 	results *[]FuzzingResult,
 	resultMutex *sync.Mutex,
+	bestSimilarity *float64,
+	recordedSelectors map[string]struct{},
 	testedCount *int32,
 	validCount *int32,
 	highSimCount *int32, //  高相似度计数器
@@ -4287,7 +4258,6 @@ func (f *CallDataFuzzer) worker(
 		if len(baseline) == 0 || len(candidatePath) == 0 {
 			log.Printf("[Worker %d]  基准或候选路径为空，跳过比较 (baseline=%d, candidate=%d)", workerID, len(baseline), len(candidatePath))
 			f.recordAttempt(0, 0)
-			f.recordSamples(contractAddr, 0, observedCalls)
 			continue
 		}
 
@@ -4308,7 +4278,6 @@ func (f *CallDataFuzzer) worker(
 		if windowLen <= 0 {
 			log.Printf("[Worker %d]  固定窗口为空，跳过比较 (candidateLen=%d, baselineLen=%d, alignIndex=%d)", workerID, len(candidatePath), len(baseline), baselineAlignIndex)
 			f.recordAttempt(0, 0)
-			f.recordSamples(contractAddr, 0, observedCalls)
 			continue
 		}
 
@@ -4490,7 +4459,6 @@ func (f *CallDataFuzzer) worker(
 
 		// 记录全量尝试（包含低相似度样本）
 		f.recordAttempt(similarity, adjustedSim)
-		f.recordSamples(contractAddr, similarity, observedCalls)
 
 		// 记录批次最佳路径（每100个组合汇总一次）
 		if batchTracker != nil {
@@ -4506,9 +4474,10 @@ func (f *CallDataFuzzer) worker(
 			}
 		}
 
-		// 仅在达标时打印路径片段，避免日志爆炸；按测试计数采样
+		// 仅在高相似度时打印路径片段，避免日志爆炸；按测试计数采样
 		//  修复：打印实际比较的baseline和candidatePath，而非原始的origContractJumpDests
-		if similarity >= f.threshold && (currentCount <= 5 || currentCount%500 == 0) {
+		highSim := f.threshold > 0 && similarity >= f.threshold
+		if highSim && (currentCount <= 5 || currentCount%500 == 0) {
 			log.Printf("[Worker %d] 路径片段: 基准%s ; Fuzz%s (sim=%.4f)", workerID,
 				formatPathSnippet(compareBaseline, 0),
 				formatPathSnippet(compareCandidate, 0),
@@ -4522,9 +4491,10 @@ func (f *CallDataFuzzer) worker(
 				workerID, currentCount, similarity, f.threshold)
 		}
 
-		// 如果相似度超过阈值，进行后续检查
-		if similarity >= f.threshold {
-			log.Printf("[Worker %d]  相似度达标参数: sim=%.4f, selector=%s, params=%s, 窗口len=%d, baselineAlign=%d",
+		// 不再使用阈值过滤，记录任意相似度的结果
+		logDetails := highSim || currentCount <= 5 || currentCount%500 == 0
+		if logDetails {
+			log.Printf("[Worker %d]  记录参数: sim=%.4f, selector=%s, params=%s, 窗口len=%d, baselineAlign=%d",
 				workerID,
 				similarity,
 				formatSelectorForLog(newCallData),
@@ -4532,148 +4502,181 @@ func (f *CallDataFuzzer) worker(
 				windowLen,
 				baselineAlignIndex,
 			)
+		}
 
-			// 记录模拟执行概况，便于诊断“高相似度但无违规”的原因
-			stateChangeCount := len(simResult.StateChanges)
-			if stateChangeCount == 0 {
-				if currentCount <= 5 || currentCount%50 == 0 {
-					log.Printf("[Worker %d]  无状态变更详情: selector=%s, params=%s, fuzzPathLen=%d, baselineLen=%d, jumpDests=%d, override(accounts=%d,slots=%d,targetSlots=%d)",
-						workerID,
-						formatSelectorForLog(newCallData),
-						formatParamValuesForLog(combo),
-						len(compareCandidate),
-						len(compareBaseline),
-						len(simResult.ContractJumpDests),
-						overrideAccounts, overrideSlots, overrideTargetSlots)
+		// 记录模拟执行概况，便于诊断“高相似度但无违规”的原因
+		stateChangeCount := len(simResult.StateChanges)
+		if stateChangeCount == 0 {
+			if logDetails {
+				log.Printf("[Worker %d]  无状态变更详情: selector=%s, params=%s, fuzzPathLen=%d, baselineLen=%d, jumpDests=%d, override(accounts=%d,slots=%d,targetSlots=%d)",
+					workerID,
+					formatSelectorForLog(newCallData),
+					formatParamValuesForLog(combo),
+					len(compareCandidate),
+					len(compareBaseline),
+					len(simResult.ContractJumpDests),
+					overrideAccounts, overrideSlots, overrideTargetSlots)
+			}
+			if logDetails {
+				log.Printf("[Worker %d]  无状态变更 sim=%.4f (success=%v, gas=%d)，仍参与最高相似度筛选", workerID, similarity, simResult.Success, simResult.GasUsed)
+			}
+		} else {
+			// 打印前3个有变化的合约地址，避免日志爆炸
+			changedAddrs := make([]string, 0, 3)
+			for addr := range simResult.StateChanges {
+				changedAddrs = append(changedAddrs, addr)
+				if len(changedAddrs) >= 3 {
+					break
 				}
-				log.Printf("[Worker %d]  相似度达标 sim=%.4f，但无状态变更 (success=%v, gas=%d)，不会计入有效结果", workerID, similarity, simResult.Success, simResult.GasUsed)
-			} else {
-				// 打印前3个有变化的合约地址，避免日志爆炸
-				changedAddrs := make([]string, 0, 3)
-				for addr := range simResult.StateChanges {
-					changedAddrs = append(changedAddrs, addr)
-					if len(changedAddrs) >= 3 {
-						break
-					}
-				}
-				log.Printf("[Worker %d]  相似度达标 sim=%.4f, 状态变更=%d 个 (success=%v, gas=%d, 变更合约前3: %v)",
+			}
+			if logDetails {
+				log.Printf("[Worker %d]  状态变更 sim=%.4f, 变更=%d 个 (success=%v, gas=%d, 前3: %v)",
 					workerID, similarity, stateChangeCount, simResult.Success, simResult.GasUsed, changedAddrs)
 			}
+		}
 
-			// 如果启用了不变量检查,先进行不变量验证（可选跳过）
-			var violations []interface{}
-			if f.enableInvariantCheck && f.invariantEvaluator != nil && !(f.skipInvariantForHighSim && similarity >= f.threshold) {
-				// 转换状态为ChainState格式
-				chainState := ConvertToChainStateFromSimResult(
-					simResult,
-					simBlockNumber,
-					common.Hash{}, // worker中使用零哈希,因为是模拟交易
-				)
+		// 如果启用了不变量检查,先进行不变量验证（可选跳过）
+		var violations []interface{}
+		if f.enableInvariantCheck && f.invariantEvaluator != nil && !(f.skipInvariantForHighSim && highSim) {
+			// 转换状态为ChainState格式
+			chainState := ConvertToChainStateFromSimResult(
+				simResult,
+				simBlockNumber,
+				common.Hash{}, // worker中使用零哈希,因为是模拟交易
+			)
 
-				// 执行不变量评估
-				violations = f.invariantEvaluator.EvaluateTransaction(
-					[]common.Address{contractAddr},
-					chainState,
-				)
+			// 执行不变量评估
+			violations = f.invariantEvaluator.EvaluateTransaction(
+				[]common.Address{contractAddr},
+				chainState,
+			)
 
-				// 如果没有不变量违规,跳过此参数组合
-				if len(violations) == 0 {
-					// 路径相似但未打破不变量，不记录
-					continue
+			// 若无不变量违规，仍继续记录结果（不再以违规为筛选条件）
+			if len(violations) == 0 && logDetails {
+				log.Printf("[Worker %d]  未触发不变量违规，继续记录 (sim=%.4f)", workerID, similarity)
+			}
+		} else if f.skipInvariantForHighSim && highSim {
+			log.Printf("[Worker %d] 跳过 高相似度样本跳过不变量评估 (sim=%.4f >= %.4f)", workerID, similarity, f.threshold)
+		}
+
+		// 通过路径相似度检查(以及可选的不变量检查),记录结果
+		atomic.AddInt32(validCount, 1)
+
+		// 记录达标时间点与最高相似度时间
+		elapsed := time.Since(f.stats.StartTime)
+		if atomic.LoadInt64(&f.firstHitAt) == 0 {
+			atomic.CompareAndSwapInt64(&f.firstHitAt, 0, elapsed.Nanoseconds())
+		}
+		for {
+			oldBits := atomic.LoadUint64(&f.maxSimVal)
+			old := math.Float64frombits(oldBits)
+			if similarity <= old {
+				break
+			}
+			if atomic.CompareAndSwapUint64(&f.maxSimVal, oldBits, math.Float64bits(similarity)) {
+				atomic.StoreInt64(&f.maxSimAt, elapsed.Nanoseconds())
+				break
+			}
+		}
+
+		// 创建参数值列表
+		paramValues := f.extractParameterValues(combo, selector, targetMethod)
+
+		result := FuzzingResult{
+			CallData:            newCallData,
+			Parameters:          paramValues,
+			Similarity:          similarity,
+			JumpDests:           simResult.JumpDests,
+			GasUsed:             simResult.GasUsed,
+			Success:             simResult.Success,
+			InvariantViolations: violations, // 记录违规信息
+			StateChanges:        simResult.StateChanges,
+		}
+
+		// 线程安全地添加结果，并仅用最高相似度样本生成规则
+		resultMutex.Lock()
+		*results = append(*results, result)
+
+		best := *bestSimilarity
+		diff := similarity - best
+		isNewMax := best < 0 || diff > similarityEpsilon
+		isBest := isNewMax || (diff >= -similarityEpsilon && diff <= similarityEpsilon)
+		if isNewMax {
+			*bestSimilarity = similarity
+			if f.sampleRecorder != nil {
+				f.sampleRecorder.Reset()
+			}
+			if f.constraintCollector != nil && len(recordedSelectors) > 0 {
+				for sel := range recordedSelectors {
+					selBytes, err := hexutil.Decode(sel)
+					if err != nil || len(selBytes) < 4 {
+						continue
+					}
+					f.constraintCollector.ResetSamples(contractAddr, selBytes[:4])
 				}
-			} else if f.skipInvariantForHighSim && similarity >= f.threshold {
-				log.Printf("[Worker %d] 跳过 高相似度样本跳过不变量评估 (sim=%.4f >= %.4f)", workerID, similarity, f.threshold)
 			}
-
-			// 没有状态变更且无违规，视为无效，不计数
-			if stateChangeCount == 0 && len(violations) == 0 {
-				continue
+			for sel := range recordedSelectors {
+				delete(recordedSelectors, sel)
 			}
+		}
 
-			// 通过路径相似度检查(以及可选的不变量检查),记录结果
-			atomic.AddInt32(validCount, 1)
-
-			// 记录达标时间点与最高相似度时间
-			elapsed := time.Since(f.stats.StartTime)
-			if atomic.LoadInt64(&f.firstHitAt) == 0 {
-				atomic.CompareAndSwapInt64(&f.firstHitAt, 0, elapsed.Nanoseconds())
+		if isBest {
+			f.recordSamples(contractAddr, similarity, observedCalls)
+			if targetSelectorHex != "" {
+				recordedSelectors[targetSelectorHex] = struct{}{}
 			}
-			for {
-				oldBits := atomic.LoadUint64(&f.maxSimVal)
-				old := math.Float64frombits(oldBits)
-				if similarity <= old {
-					break
-				}
-				if atomic.CompareAndSwapUint64(&f.maxSimVal, oldBits, math.Float64bits(similarity)) {
-					atomic.StoreInt64(&f.maxSimAt, elapsed.Nanoseconds())
-					break
-				}
-			}
-
-			// 创建参数值列表
-			paramValues := f.extractParameterValues(combo, selector, targetMethod)
-
-			// 记录高相似样本用于约束生成
-			if f.constraintCollector != nil && similarity >= f.threshold {
+			if f.constraintCollector != nil {
 				if rule := f.constraintCollector.RecordSample(contractAddr, selector, paramValues, simResult.StateChanges, similarity); rule != nil {
 					log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
 				}
-				// 同步记录连锁调用样本，便于为其他受保护函数生成表达式规则
-				if len(observedCalls) > 0 {
-					for _, oc := range observedCalls {
-						if oc.selector == "" || len(oc.params) == 0 {
-							continue
-						}
-						if strings.EqualFold(oc.selector, targetSelectorHex) {
-							continue
-						}
-						selBytes, err := hexutil.Decode(oc.selector)
-						if err != nil || len(selBytes) < 4 {
-							continue
-						}
-						if rule := f.constraintCollector.RecordSample(contractAddr, selBytes[:4], oc.params, simResult.StateChanges, similarity); rule != nil {
-							log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
-						}
+			}
+			// 同步记录连锁调用样本，便于为其他受保护函数生成表达式规则
+			if len(observedCalls) > 0 {
+				for _, oc := range observedCalls {
+					if oc.selector == "" || len(oc.params) == 0 {
+						continue
+					}
+					selKey := strings.ToLower(oc.selector)
+					if selKey != "" {
+						recordedSelectors[selKey] = struct{}{}
+					}
+					if f.constraintCollector == nil {
+						continue
+					}
+					if strings.EqualFold(oc.selector, targetSelectorHex) {
+						continue
+					}
+					selBytes, err := hexutil.Decode(oc.selector)
+					if err != nil || len(selBytes) < 4 {
+						continue
+					}
+					if rule := f.constraintCollector.RecordSample(contractAddr, selBytes[:4], oc.params, simResult.StateChanges, similarity); rule != nil {
+						log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
 					}
 				}
 			}
+		}
+		resultMutex.Unlock()
 
-			result := FuzzingResult{
-				CallData:            newCallData,
-				Parameters:          paramValues,
-				Similarity:          similarity,
-				JumpDests:           simResult.JumpDests,
-				GasUsed:             simResult.GasUsed,
-				Success:             simResult.Success,
-				InvariantViolations: violations, // 记录违规信息
-				StateChanges:        simResult.StateChanges,
+		//  检查是否达到目标相似度
+		targetSimEnabled := f.targetSimilarity > 0 && f.maxHighSimResults > 0
+		if targetSimEnabled && similarity >= f.targetSimilarity {
+			currentHighSim := atomic.AddInt32(highSimCount, 1)
+			log.Printf("[Worker %d]  Found high-similarity result #%d (sim=%.4f >= %.4f)",
+				workerID, currentHighSim, similarity, f.targetSimilarity)
+
+			// 达到目标数量，触发全局停止
+			if int(currentHighSim) >= f.maxHighSimResults {
+				log.Printf("[Fuzzer]  Found %d high-similarity results (>= %.4f), stopping all workers",
+					currentHighSim, f.targetSimilarity)
+				cancel() // 取消所有worker
+				return
 			}
+		}
 
-			// 线程安全地添加结果
-			resultMutex.Lock()
-			*results = append(*results, result)
-			resultMutex.Unlock()
-
-			//  检查是否达到目标相似度
-			targetSimEnabled := f.targetSimilarity > 0 && f.maxHighSimResults > 0
-			if targetSimEnabled && similarity >= f.targetSimilarity {
-				currentHighSim := atomic.AddInt32(highSimCount, 1)
-				log.Printf("[Worker %d]  Found high-similarity result #%d (sim=%.4f >= %.4f)",
-					workerID, currentHighSim, similarity, f.targetSimilarity)
-
-				// 达到目标数量，触发全局停止
-				if int(currentHighSim) >= f.maxHighSimResults {
-					log.Printf("[Fuzzer]  Found %d high-similarity results (>= %.4f), stopping all workers",
-						currentHighSim, f.targetSimilarity)
-					cancel() // 取消所有worker
-					return
-				}
-			}
-
-			if int(atomic.LoadInt32(validCount))%10 == 0 {
-				log.Printf("[Worker %d] Found valid combination #%d with similarity %.4f (violations: %d)",
-					workerID, atomic.LoadInt32(validCount), similarity, len(violations))
-			}
+		if int(atomic.LoadInt32(validCount))%10 == 0 {
+			log.Printf("[Worker %d] Found valid combination #%d with similarity %.4f (violations: %d)",
+				workerID, atomic.LoadInt32(validCount), similarity, len(violations))
 		}
 	}
 }
@@ -5397,6 +5400,8 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	mutationSeedCfg *SeedConfig,
 	loopBaseline bool,
 	preparedMutations map[string]*PreparedMutation,
+	bestSimilarity *float64,
+	recordedSelectors map[string]struct{},
 ) []FuzzingResult {
 	if seedCfg == nil {
 		log.Printf("[Adaptive]  Seed config missing, skip adaptive fuzzing")
@@ -5434,7 +5439,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 	log.Printf("[Adaptive] Using fixed seed-based ranges")
 
 	initialCombos := seedGen.GenerateSeedBasedCombinations(parsedData.Parameters)
-	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
+	initialResults := f.executeFuzzing(ctx, initialCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations, bestSimilarity, recordedSelectors)
 	allResults = append(allResults, initialResults...)
 
 	log.Printf("[Adaptive] Iteration 0 completed: %d valid results, total: %d",
@@ -5474,7 +5479,7 @@ func (f *CallDataFuzzer) executeAdaptiveFuzzing(
 
 		// 4. 执行新一轮模糊测试
 		log.Printf("[Adaptive] Executing fuzzing with adaptive ranges...")
-		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations)
+		iterResults := f.executeFuzzing(ctx, adaptiveCombos, parsedData.Selector, targetMethod, originalPath, targetCall, contractAddr, pathContractAddr, simBlockNumber, stateOverride, callTree, mutationSeedCfg, loopBaseline, preparedMutations, bestSimilarity, recordedSelectors)
 
 		// 5. 累积结果
 		allResults = append(allResults, iterResults...)
@@ -6194,6 +6199,7 @@ func (f *CallDataFuzzer) buildChainedReportsFromSamples(
 			OriginalTxHash:       txHash,
 			BlockNumber:          blockNumber,
 			ValidParameters:      params,
+			DerivedFromChained:   true,
 			TotalCombinations:    totalSamples,
 			ValidCombinations:    totalSamples,
 			AverageSimilarity:    avgSim,

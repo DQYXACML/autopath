@@ -68,7 +68,27 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "103792950019966286986710181280465481502461508388362038469032226524331654288845",
+            "index": "8",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "13",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_2": {
+            "index": "67828280014163985389840729353858788464681482252176824536696028341613585041307",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_3": {
+            "index": "103852258880105441409008374343423695947320328432527423558016773400457294889794",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_4": {
+            "index": "46057834907028144672368302126502861332309347349153932519666992844495524592901",
             "severity": "critical",
             "threshold": 0.25
           }
@@ -79,9 +99,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -113,9 +131,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -142,9 +158,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -181,9 +195,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -210,9 +222,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -239,9 +249,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -278,9 +286,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -312,9 +318,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -381,9 +385,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -415,9 +417,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -444,9 +444,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -493,9 +491,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -522,9 +518,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     },
     {
@@ -545,9 +539,7 @@
         "addCollateral",
         "borrow",
         "repay",
-        "repayForAll",
-        "userBorrowPart",
-        "totalBorrow"
+        "repayForAll"
       ]
     }
   ],
@@ -574,16 +566,6 @@
         "contract": "0x7259e152103756e1616a77ae982353c3751a6a90",
         "function": "repayForAll",
         "signature": "repayForAll(uint128,bool)"
-      },
-      {
-        "contract": "0x7259e152103756e1616a77ae982353c3751a6a90",
-        "function": "userBorrowPart",
-        "signature": "userBorrowPart(address => uint256)"
-      },
-      {
-        "contract": "0x7259e152103756e1616a77ae982353c3751a6a90",
-        "function": "totalBorrow",
-        "signature": "totalBorrow()"
       }
     ],
     "threshold": 0.7,
@@ -810,25 +792,25 @@
           "true"
         ],
         "0": [
+          "0x3b473f790818976d207c2accda42cb432b749451",
+          "0x33d778ed712c8c4add5a07bab012d1ce7bb0b4c7",
+          "0x7e1c8fef68a87f7bddf4ae644fe4d6e6362f5ff1",
           "0x0ab7999894f36ede923278d4e898e78085b289e6",
+          "0xe435beba6dee3d6f99392ab9568777eb8165719d",
+          "0x214be7ebec865c25c83df5b343e45aa3bf8df881",
           "0x5615deb798bb3e4dfa0139dfa1b3d433cc23b72f",
+          "0x941ec857134b13c255d6ebeed1623b1904378de9",
+          "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
+          "0x577be3ed9a71e1c355f519bbdf5f09ba2018b1cc",
+          "0xee64495bf9894f6c0a2df4ac983581aadb87f62d",
+          "0x2f2a75279a2ac0c6b64087ce1915b1435b1d3ce2",
+          "0xd24cb02bed630baa49887168440d90be8da6708c",
+          "0xc0433e26e3d2ae7d1d80e39a6d58062d1eaa54f5",
+          "0xc3be098f9594e57a3e71f485a53d990fe3961fe5",
           "0x2c561ab0ed33e40c70ea380baa0dbc1ae75ccd34",
           "0x7259e152103756e1616a77ae982353c3751a6a90",
-          "0xc0433e26e3d2ae7d1d80e39a6d58062d1eaa54f5",
-          "0x33d778ed712c8c4add5a07bab012d1ce7bb0b4c7",
-          "0x2f2a75279a2ac0c6b64087ce1915b1435b1d3ce2",
-          "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
-          "0x214be7ebec865c25c83df5b343e45aa3bf8df881",
-          "0x941ec857134b13c255d6ebeed1623b1904378de9",
-          "0xd24cb02bed630baa49887168440d90be8da6708c",
-          "0x3b473f790818976d207c2accda42cb432b749451",
-          "0x7e1c8fef68a87f7bddf4ae644fe4d6e6362f5ff1",
           "0x48ed01117a130b660272228728e07ef9efe21a30",
-          "0xe435beba6dee3d6f99392ab9568777eb8165719d",
-          "0xee64495bf9894f6c0a2df4ac983581aadb87f62d",
-          "0x9445e93057f3f5e3452ce50fc867b22a48b4d82a",
-          "0xc3be098f9594e57a3e71f485a53d990fe3961fe5",
-          "0x577be3ed9a71e1c355f519bbdf5f09ba2018b1cc"
+          "0x9445e93057f3f5e3452ce50fc867b22a48b4d82a"
         ],
         "2": [
           "15",

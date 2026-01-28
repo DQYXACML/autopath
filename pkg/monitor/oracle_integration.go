@@ -169,11 +169,6 @@ func (oi *OracleIntegration) shouldPush(report *fuzzer.AttackParameterReport) bo
 		return false
 	}
 
-	// 检查相似度阈值
-	if report.MaxSimilarity < oi.config.PushThreshold {
-		return false
-	}
-
 	// 检查推送历史，避免重复推送
 	key := fmt.Sprintf("%s-%s", report.ContractAddress.Hex(), report.FunctionSig)
 	oi.historyMutex.RLock()
@@ -322,34 +317,51 @@ func (oi *OracleIntegration) pushGroup(ctx context.Context, key string, reports 
 		return nil
 	}
 
-	// 获取最新报告的信息
-	latest := reports[len(reports)-1]
-	projectAddr, _ := oi.getProjectAddress(latest.ContractAddress)
-	funcSig, err := oi.normalizeReportSignature(latest)
+	const similarityEpsilon = 1e-6
+
+	var best *fuzzer.AttackParameterReport
+	for _, report := range reports {
+		if report == nil {
+			continue
+		}
+		if best == nil {
+			best = report
+			continue
+		}
+		diff := report.MaxSimilarity - best.MaxSimilarity
+		if diff > similarityEpsilon || (diff >= -similarityEpsilon && diff <= similarityEpsilon) {
+			best = report
+		}
+	}
+	if best == nil {
+		return nil
+	}
+
+	projectAddr, _ := oi.getProjectAddress(best.ContractAddress)
+	funcSig, err := oi.normalizeReportSignature(best)
 	if err != nil {
 		return fmt.Errorf("invalid function signature: %w", err)
 	}
 
-	// 合并报告中的参数；若包含约束规则则优先使用约束生成的参数摘要
-	mergedParams := oi.mergeReportParameters(reports)
-	if latest.ConstraintRule != nil && len(latest.ConstraintRule.ParamConstraints) > 0 {
-		if summaries := convertParamConstraintsToSummaries(latest.ConstraintRule.ParamConstraints); len(summaries) > 0 {
+	// 仅使用最高相似度报告生成参数规则
+	mergedParams := best.ValidParameters
+	if best.ConstraintRule != nil && len(best.ConstraintRule.ParamConstraints) > 0 {
+		if summaries := convertParamConstraintsToSummaries(best.ConstraintRule.ParamConstraints); len(summaries) > 0 {
 			mergedParams = summaries
 		}
 	}
 
-	// 汇总表达式规则：合并所有报告中出现的表达式，避免覆盖丢失
-	exprRules := mergeExpressionRules(reports)
+	exprRules := best.ExpressionRules
 
 	// 调用推送器
 	err = oi.pusher.ProcessFuzzingReport(ctx, projectAddr, funcSig, &fuzzer.AttackParameterReport{
-		ContractAddress:   latest.ContractAddress,
-		FunctionSig:       latest.FunctionSig,
+		ContractAddress:   best.ContractAddress,
+		FunctionSig:       best.FunctionSig,
 		ValidParameters:   mergedParams,
-		MaxSimilarity:     latest.MaxSimilarity,
-		TotalCombinations: latest.TotalCombinations,
-		ValidCombinations: latest.ValidCombinations,
-		ConstraintRule:    latest.ConstraintRule,
+		MaxSimilarity:     best.MaxSimilarity,
+		TotalCombinations: best.TotalCombinations,
+		ValidCombinations: best.ValidCombinations,
+		ConstraintRule:    best.ConstraintRule,
 		ExpressionRules:   exprRules,
 	})
 
@@ -359,7 +371,7 @@ func (oi *OracleIntegration) pushGroup(ctx context.Context, key string, reports 
 			projectAddr,
 			funcSig,
 			mergedParams,
-			latest.MaxSimilarity,
+			best.MaxSimilarity,
 		)
 		if exportErr != nil {
 			log.Printf("[OracleIntegration] Failed to export rules: %v", exportErr)

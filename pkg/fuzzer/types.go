@@ -60,6 +60,8 @@ type AttackParameterReport struct {
 	// 有效参数组合
 	ValidParameters []ParameterSummary `json:"valid_parameters"`
 	ExpressionRules []ExpressionRule   `json:"expression_rules,omitempty"`
+	// 由连锁调用样本派生的报告（仅用于展示/区分）
+	DerivedFromChained bool `json:"derived_from_chained,omitempty"`
 
 	// 统计信息
 	TotalCombinations    int     `json:"total_combinations_tested"`

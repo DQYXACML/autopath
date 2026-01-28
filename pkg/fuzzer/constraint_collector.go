@@ -26,6 +26,7 @@ type constraintSample struct {
 type ConstraintCollector struct {
 	mu              sync.Mutex
 	samples         map[string][]constraintSample // key: contract-selector
+	maxSimilarity   map[string]float64            // key: contract-selector -> max similarity
 	rules           map[string]*ConstraintRule
 	threshold       int
 	exprs           map[string]*ExpressionRule
@@ -50,6 +51,7 @@ func NewConstraintCollectorWithBasePath(threshold int, basePath string) *Constra
 	}
 	return &ConstraintCollector{
 		samples:       make(map[string][]constraintSample),
+		maxSimilarity: make(map[string]float64),
 		rules:         make(map[string]*ConstraintRule),
 		exprs:         make(map[string]*ExpressionRule),
 		exprCost:      make(map[string]int64),
@@ -101,6 +103,21 @@ func (cc *ConstraintCollector) RecordSample(
 				log.Printf("[ConstraintCollector] Loaded constraint rules for contract %s", contract.Hex())
 			}
 		}
+	}
+
+	if best, ok := cc.maxSimilarity[key]; ok {
+		if similarity > best+similarityEpsilon {
+			cc.samples[key] = nil
+			delete(cc.rules, key)
+			delete(cc.exprs, key)
+			delete(cc.exprCost, key)
+			delete(cc.lastGenSample, key)
+			cc.maxSimilarity[key] = similarity
+		} else if similarity < best-similarityEpsilon {
+			return nil
+		}
+	} else {
+		cc.maxSimilarity[key] = similarity
 	}
 
 	cc.samples[key] = append(cc.samples[key], constraintSample{
@@ -161,6 +178,22 @@ func (cc *ConstraintCollector) GetExpressionGenCost(contract common.Address, sel
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 	return cc.exprCost[cc.ruleKey(contract, selector)]
+}
+
+// ResetSamples 清理指定函数的样本与规则（用于切换到更高相似度样本）
+func (cc *ConstraintCollector) ResetSamples(contract common.Address, selector []byte) {
+	if cc == nil {
+		return
+	}
+	key := cc.ruleKey(contract, selector)
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	delete(cc.samples, key)
+	delete(cc.rules, key)
+	delete(cc.exprs, key)
+	delete(cc.exprCost, key)
+	delete(cc.lastGenSample, key)
+	delete(cc.maxSimilarity, key)
 }
 
 func (cc *ConstraintCollector) ruleKey(contract common.Address, selector []byte) string {

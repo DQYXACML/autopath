@@ -409,12 +409,19 @@ func (fi *FuzzingIntegration) ProcessTransaction(
 
 // printRealtimeResults 实时打印fuzzing结果
 func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParameterReport, duration time.Duration) {
-	for idx, report := range reports {
+	displayIdx := 0
+	suppressed := 0
+	for _, report := range reports {
 		if report == nil {
 			continue
 		}
+		if report.DerivedFromChained {
+			suppressed++
+			continue
+		}
+		displayIdx++
 		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Printf("                     Fuzzing 分析结果 #%d\n", idx+1)
+		fmt.Printf("                     Fuzzing 分析结果 #%d\n", displayIdx)
 		fmt.Println(strings.Repeat("=", 80))
 
 		avgSim := report.AverageSimilarity
@@ -475,6 +482,10 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 		}
 
 		fmt.Println("\n" + strings.Repeat("=", 80))
+	}
+
+	if suppressed > 0 {
+		fmt.Printf("\n(已省略 %d 个连锁复用的分析结果)\n", suppressed)
 	}
 }
 

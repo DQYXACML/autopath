@@ -278,38 +278,49 @@ func (p *OraclePusher) pushGroup(ctx context.Context, key string, requests []*Pu
 		return nil
 	}
 
-	// 使用最新的报告
-	latest := requests[len(requests)-1]
+	const similarityEpsilon = 1e-6
 
-	// 选择最近一次包含表达式规则的报告
-	var exprRules []fuzzer.ExpressionRule
-	for i := len(requests) - 1; i >= 0; i-- {
-		if len(requests[i].Report.ExpressionRules) > 0 {
-			exprRules = requests[i].Report.ExpressionRules
-			break
+	// 选择最高相似度的报告
+	var best *PushRequest
+	for _, req := range requests {
+		if req == nil || req.Report == nil {
+			continue
+		}
+		if best == nil {
+			best = req
+			continue
+		}
+		diff := req.Report.MaxSimilarity - best.Report.MaxSimilarity
+		if diff > similarityEpsilon || (diff >= -similarityEpsilon && diff <= similarityEpsilon) {
+			best = req
 		}
 	}
+	if best == nil {
+		return nil
+	}
+
+	exprRules := best.Report.ExpressionRules
 
 	hasExpr := len(exprRules) > 0
-	hasParams := len(latest.Report.ValidParameters) > 0
+	hasParams := len(best.Report.ValidParameters) > 0
 	// 优先使用参数黑名单；只有在没有参数规则时才推送表达式
 	if hasParams {
 		hasExpr = false
 	}
 
 	// 相似度过滤
-	if latest.Report.MaxSimilarity < p.config.PushThreshold {
-		log.Printf("[OraclePusher] Group %s similarity %.2f below threshold %.2f, skipping", key, latest.Report.MaxSimilarity, p.config.PushThreshold)
+	if best.Report.MaxSimilarity < p.config.PushThreshold {
+		log.Printf("[OraclePusher] Group %s similarity %.2f below threshold %.2f, skipping", key, best.Report.MaxSimilarity, p.config.PushThreshold)
 		return nil
 	}
 
 	if hasExpr {
-		if err := p.pushExpressionRules(ctx, latest.Project, latest.FunctionSig, exprRules); err != nil {
+		if err := p.pushExpressionRules(ctx, best.Project, best.FunctionSig, exprRules); err != nil {
 			return err
 		}
 		log.Printf("[OraclePusher] Expression rules pushed for grouped key %s", key)
 	} else if hasParams {
-		paramSummaries, err := p.convertToChainFormat(latest.Report.ValidParameters)
+		paramSummaries, err := p.convertToChainFormat(best.Report.ValidParameters)
 		if err != nil {
 			return err
 		}
@@ -317,7 +328,7 @@ func (p *OraclePusher) pushGroup(ctx context.Context, key string, requests []*Pu
 			log.Printf("[OraclePusher] Skip group %s: empty param summaries", key)
 			return nil
 		}
-		if err := p.pushParamRules(ctx, latest.Project, latest.FunctionSig, paramSummaries, latest.Report.MaxSimilarity); err != nil {
+		if err := p.pushParamRules(ctx, best.Project, best.FunctionSig, paramSummaries, best.Report.MaxSimilarity); err != nil {
 			return err
 		}
 		log.Printf("[OraclePusher] Param rules pushed for grouped key %s", key)
