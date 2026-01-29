@@ -465,6 +465,13 @@ func (oi *OracleIntegration) mergeParameters(params []fuzzer.ParameterSummary) f
 func convertParamConstraintsToSummaries(constraints []fuzzer.ParamConstraint) []fuzzer.ParameterSummary {
 	var out []fuzzer.ParameterSummary
 	for _, c := range constraints {
+		if c.IsRange {
+			if strings.TrimSpace(c.RangeMin) == "" && strings.TrimSpace(c.RangeMax) == "" {
+				continue
+			}
+		} else if len(c.Values) == 0 {
+			continue
+		}
 		ps := fuzzer.ParameterSummary{
 			ParamIndex:      c.Index,
 			ParamType:       c.Type,

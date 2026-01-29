@@ -39,9 +39,11 @@ const (
 
 // NewResultMerger 创建结果合并器
 func NewResultMerger() *ResultMerger {
+	// 尝试自动推断项目根目录，避免硬编码路径
+	basePath := resolveBasePath()
 	return &ResultMerger{
 		mergeStrategy: MergeAuto,
-		basePath:      "/home/dqy/Firewall/FirewallOnchain",
+		basePath:      basePath,
 	}
 }
 
@@ -362,6 +364,34 @@ func (m *ResultMerger) extractUniqueValues(values []ParameterValue) []string {
 	}
 
 	return unique
+}
+
+func (m *ResultMerger) appendAttackValues(values []string, paramType string, constraint *ParamConstraintInfo) []string {
+	if constraint == nil || len(constraint.AttackValues) == 0 {
+		return values
+	}
+	if !m.isNumericType(paramType) {
+		return values
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		seen[v] = struct{}{}
+	}
+
+	for _, av := range constraint.AttackValues {
+		if bi := normalizeBigIntValue(av); bi != nil {
+			strVal := m.valueToString(bi)
+			if _, ok := seen[strVal]; ok {
+				continue
+			}
+			values = append(values, strVal)
+			seen[strVal] = struct{}{}
+		}
+	}
+
+	sort.Strings(values)
+	return values
 }
 
 // valueToString 将值转换为字符串
@@ -908,24 +938,32 @@ func (m *ResultMerger) extractParameterSummariesWithConstraints(groups map[int][
 		if m.shouldMergeAsRange(paramType, values) {
 			// 合并为范围
 			rangeMin, rangeMax := m.findRangeWithConstraint(values, paramConstraint)
-			summary.IsRange = true
-			summary.RangeMin = m.valueToString(rangeMin)
-			summary.RangeMax = m.valueToString(rangeMax)
+			if rangeMin == nil && rangeMax == nil {
+				// 约束不足以生成范围，回退为离散值
+				summary.IsRange = false
+				summary.SingleValues = m.extractUniqueValues(values)
+				summary.SingleValues = m.appendAttackValues(summary.SingleValues, paramType, paramConstraint)
+			} else {
+				summary.IsRange = true
+				summary.RangeMin = m.valueToString(rangeMin)
+				summary.RangeMax = m.valueToString(rangeMax)
 
-			// 输出约束信息
-			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
-				log.Printf("[ResultMerger] Param #%d (%s): Applied constraint - SafeMax=%s, ObservedMax=%s, FinalMax=%s",
-					idx,
-					paramName,
-					paramConstraint.SafeThreshold.String(),
-					m.valueToString(rangeMax),
-					summary.RangeMax,
-				)
+				// 输出约束信息
+				if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
+					log.Printf("[ResultMerger] Param #%d (%s): Applied constraint - SafeMax=%s, ObservedMax=%s, FinalMax=%s",
+						idx,
+						paramName,
+						paramConstraint.SafeThreshold.String(),
+						m.valueToString(rangeMax),
+						summary.RangeMax,
+					)
+				}
 			}
 		} else {
 			// 记录离散值
 			summary.IsRange = false
 			summary.SingleValues = m.extractUniqueValues(values)
+			summary.SingleValues = m.appendAttackValues(summary.SingleValues, paramType, paramConstraint)
 		}
 
 		summaries = append(summaries, summary)
@@ -1011,9 +1049,9 @@ func (m *ResultMerger) findRangeWithConstraint(values []ParameterValue, constrai
 		return nil, nil
 	}
 
-	// 应用约束规则
-	// 对于安全上界约束（amount <= safe_threshold），将 rangeMax 设置为 safe_threshold
-	// 对于安全下界约束（amount >= safe_threshold），将 rangeMin 设置为 safe_threshold
+	// 应用约束规则（黑名单范围）
+	// 对于安全上界约束（amount <= safe_threshold），拦截 >= safe_threshold
+	// 对于安全下界约束（amount >= safe_threshold），拦截 <= safe_threshold
 
 	minVal, _ := m.toBigInt(observedMin)
 	maxVal, ok := m.toBigInt(observedMax)
@@ -1026,23 +1064,10 @@ func (m *ResultMerger) findRangeWithConstraint(values []ParameterValue, constrai
 	// 判断约束类型
 	if constraint.IsSafeUpper {
 		// 安全条件是上界（amount <= threshold）
-		// 规则应该允许 [0, safe_threshold]
-		// 而不是只允许 [observed_min, observed_max]（攻击参数范围）
-
-		log.Printf("[ResultMerger] Applying upper bound constraint: observed [%s, %s] -> allowed [0, %s]",
-			minVal.String(),
-			maxVal.String(),
-			constraint.SafeThreshold.String(),
-		)
-
-		// 返回 [0, safe_threshold]
-		return big.NewInt(0), constraint.SafeThreshold
-	} else {
-		// 安全条件是下界（amount >= threshold）
-		// 规则应该允许 [safe_threshold, ∞]，使用类型最大值作为上界
+		// 黑名单范围： [safe_threshold, max]
 		maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
 
-		log.Printf("[ResultMerger] Applying lower bound constraint: observed [%s, %s] -> allowed [%s, max]",
+		log.Printf("[ResultMerger] Applying upper bound constraint: observed [%s, %s] -> blacklist [%s, max]",
 			minVal.String(),
 			maxVal.String(),
 			constraint.SafeThreshold.String(),
@@ -1050,4 +1075,13 @@ func (m *ResultMerger) findRangeWithConstraint(values []ParameterValue, constrai
 
 		return constraint.SafeThreshold, maxUint256
 	}
+	// 安全条件是下界（amount >= threshold）
+	// 黑名单范围： [0, safe_threshold]
+	log.Printf("[ResultMerger] Applying lower bound constraint: observed [%s, %s] -> blacklist [0, %s]",
+		minVal.String(),
+		maxVal.String(),
+		constraint.SafeThreshold.String(),
+	)
+
+	return big.NewInt(0), constraint.SafeThreshold
 }

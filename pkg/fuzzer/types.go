@@ -317,6 +317,9 @@ type Config struct {
 	//  全交易路径记录
 	RecordFullTrace bool `yaml:"record_full_trace"` // 记录全交易路径（不截断到受保护合约）
 
+	//  相似度比较范围: "protected"(默认，仅受保护合约) / "full"(从首个受保护合约进入点开始，包含后续全路径)
+	SimilarityScope string `yaml:"similarity_scope" json:"similarity_scope"`
+
 	//  严格prestate模式（禁止attack_state覆盖，仅允许baseline_state补全）
 	StrictPrestate bool `yaml:"strict_prestate" json:"strict_prestate"`
 	//  attack_state仅补代码（不写入余额/存储）

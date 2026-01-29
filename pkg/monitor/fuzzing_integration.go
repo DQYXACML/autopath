@@ -88,6 +88,9 @@ type FuzzingConfig struct {
 	//  全交易路径记录
 	RecordFullTrace bool `json:"record_full_trace"` // 记录全交易路径（不截断到受保护合约）
 
+	//  相似度比较范围: "protected" / "full"
+	SimilarityScope string `json:"similarity_scope"`
+
 	//  严格prestate模式（禁止attack_state覆盖，仅允许baseline_state补全）
 	StrictPrestate bool `json:"strict_prestate"`
 	//  attack_state仅补代码（不写入余额/存储）
@@ -175,6 +178,7 @@ func NewFuzzingIntegration(rpcURL string, config *FuzzingConfig) (*FuzzingIntegr
 
 		//  全交易路径记录
 		RecordFullTrace: config.RecordFullTrace,
+		SimilarityScope: config.SimilarityScope,
 		//  严格prestate模式与attack_state代码补齐
 		StrictPrestate:      config.StrictPrestate,
 		AttackStateCodeOnly: config.AttackStateCodeOnly,
@@ -427,10 +431,13 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 		fmt.Printf("\n 统计信息:\n")
 		fmt.Printf("   总测试组合数: %d\n", report.TotalCombinations)
 		fmt.Printf("   有效组合数: %d\n", report.ValidCombinations)
+		fmt.Printf("   平均相似度: %.4f\n", report.AverageSimilarity)
+		fmt.Printf("   最高相似度: %.4f\n", report.MaxSimilarity)
+		fmt.Printf("   最低相似度: %.4f\n", report.MinSimilarity)
 		if report.RawStatsAvailable {
-			fmt.Printf("   重叠平均相似度: %.4f\n", report.RawAverageSimilarity)
-			fmt.Printf("   重叠最高相似度: %.4f\n", report.RawMaxSimilarity)
-			fmt.Printf("   重叠最低相似度: %.4f\n", report.RawMinSimilarity)
+			fmt.Printf("   重叠平均相似度(参考): %.4f\n", report.RawAverageSimilarity)
+			fmt.Printf("   重叠最高相似度(参考): %.4f\n", report.RawMaxSimilarity)
+			fmt.Printf("   重叠最低相似度(参考): %.4f\n", report.RawMinSimilarity)
 		}
 		fmt.Printf("   执行时间: %v\n", duration)
 
@@ -471,7 +478,7 @@ func (fi *FuzzingIntegration) printRealtimeResults(reports []*fuzzer.AttackParam
 			}
 		}
 		if highSimCount > 0 {
-			fmt.Printf("\n 高相似度路径 (>= %.2f, 按重叠相似度): %d 个\n", saveThreshold, highSimCount)
+			fmt.Printf("\n 高相似度路径 (>= %.2f, 按相似度): %d 个\n", saveThreshold, highSimCount)
 		}
 
 		fmt.Println("\n" + strings.Repeat("=", 80))

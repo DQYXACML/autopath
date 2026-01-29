@@ -775,9 +775,23 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			continue
 		}
 
+		// 查找参数的约束规则
+		paramConstraint := pickParamConstraint(funcConstraints, i)
+		if isNumeric && paramConstraint != nil && len(paramConstraint.AttackValues) > 0 {
+			for _, av := range paramConstraint.AttackValues {
+				if bi := normalizeBigIntValue(av); bi != nil {
+					numericValues[bi.String()] = struct{}{}
+					if minVal == nil || bi.Cmp(minVal) < 0 {
+						minVal = new(big.Int).Set(bi)
+					}
+					if maxVal == nil || bi.Cmp(maxVal) > 0 {
+						maxVal = new(big.Int).Set(bi)
+					}
+				}
+			}
+		}
+
 		if isNumeric && minVal != nil && maxVal != nil {
-			// 查找参数的约束规则
-			paramConstraint := pickParamConstraint(funcConstraints, i)
 			if len(numericValues) <= 1 && (paramConstraint == nil || paramConstraint.ConstraintType == "discrete_numeric") {
 				log.Printf("[ConstraintCollector] 跳过单值数值规则: param#%d value=%s", i, minVal.String())
 				continue

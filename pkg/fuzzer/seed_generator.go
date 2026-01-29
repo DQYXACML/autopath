@@ -387,10 +387,30 @@ func (sg *SeedGenerator) generateNumericSeedVariations(seed interface{}, count i
 		}
 	case *big.Int:
 		seedValue = new(big.Int).Set(v)
+	case int:
+		seedValue = big.NewInt(int64(v))
 	case int64:
 		seedValue = big.NewInt(v)
+	case int32:
+		seedValue = big.NewInt(int64(v))
+	case int16:
+		seedValue = big.NewInt(int64(v))
+	case int8:
+		seedValue = big.NewInt(int64(v))
+	case uint:
+		seedValue = new(big.Int).SetUint64(uint64(v))
 	case uint64:
 		seedValue = new(big.Int).SetUint64(v)
+	case uint32:
+		seedValue = new(big.Int).SetUint64(uint64(v))
+	case uint16:
+		seedValue = new(big.Int).SetUint64(uint64(v))
+	case uint8:
+		seedValue = new(big.Int).SetUint64(uint64(v))
+	case float64:
+		seedValue = big.NewInt(int64(v))
+	case float32:
+		seedValue = big.NewInt(int64(v))
 	case string:
 		// 尝试解析十六进制或十进制字符串
 		val, ok := new(big.Int).SetString(v, 0)

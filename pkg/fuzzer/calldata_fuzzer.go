@@ -359,6 +359,8 @@ type CallDataFuzzer struct {
 	dualSimulator   *simulator.DualModeSimulator //  双模式模拟器（支持本地执行）
 	localExecution  bool                         //  是否启用本地执行模式
 	recordFullTrace bool                         //  是否记录全交易路径
+	// 相似度比较范围（protected/full）
+	similarityScope string
 	parser          *ABIParser
 	generator       *ParamGenerator
 	comparator      *PathComparator
@@ -482,18 +484,13 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 	}
 
 	// 构建 basePath 用于加载约束规则
-	// Monitor通常在 autopath/ 目录启动，所以 basePath 是 ".." (父目录)
-	basePath := ".."
-	if _, err := os.Stat(filepath.Join(basePath, "DeFiHackLabs")); err != nil {
-		// 如果 "../DeFiHackLabs" 不存在，尝试当前目录
-		basePath = "."
-	}
+	basePath := resolveBasePath()
 
 	fuzzer := &CallDataFuzzer{
 		parser:                  NewABIParser(),
 		generator:               gen,
 		comparator:              NewPathComparator(),
-		merger:                  NewResultMerger(),
+		merger:                  NewResultMergerWithBasePath(basePath),
 		tracer:                  NewTransactionTracer(rpcClient),
 		threshold:               config.Threshold,
 		maxWorkers:              config.Workers,
@@ -518,6 +515,7 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 		attackStateCodeOnly:     config.AttackStateCodeOnly,
 		localExecution:          config.LocalExecution, //  本地执行模式
 		recordFullTrace:         config.RecordFullTrace,
+		similarityScope:         config.SimilarityScope,
 		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
 		sampleRecorder:          newSampleRecorder(),
 	}
@@ -592,18 +590,13 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 	}
 
 	// 构建 basePath 用于加载约束规则
-	// Monitor通常在 autopath/ 目录启动，所以 basePath 是 ".." (父目录)
-	basePath := ".."
-	if _, err := os.Stat(filepath.Join(basePath, "DeFiHackLabs")); err != nil {
-		// 如果 "../DeFiHackLabs" 不存在，尝试当前目录
-		basePath = "."
-	}
+	basePath := resolveBasePath()
 
 	fuzzer := &CallDataFuzzer{
 		parser:                  NewABIParser(),
 		generator:               gen,
 		comparator:              NewPathComparator(),
-		merger:                  NewResultMerger(),
+		merger:                  NewResultMergerWithBasePath(basePath),
 		tracer:                  NewTransactionTracer(rpcClient),
 		threshold:               config.Threshold,
 		maxWorkers:              config.Workers,
@@ -628,6 +621,7 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 		attackStateCodeOnly:     config.AttackStateCodeOnly,
 		localExecution:          config.LocalExecution, //  本地执行模式
 		recordFullTrace:         config.RecordFullTrace,
+		similarityScope:         config.SimilarityScope,
 		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
 		sampleRecorder:          newSampleRecorder(),
 	}
@@ -2921,6 +2915,11 @@ func (f *CallDataFuzzer) validateBaselinePath(result *simulator.ReplayResult, co
 				contractAddr.Hex(), resolved, hits, mode)
 			return nil
 		}
+		if resolved, hits, mode := resolveDelegateCallCaller(result, contractAddr); resolved != "" {
+			log.Printf("[Fuzzer]  基准路径未包含目标合约%s，检测到delegatecall调用方%s (hits=%d, mode=%s)，继续使用调用方路径",
+				contractAddr.Hex(), resolved, hits, mode)
+			return nil
+		}
 		log.Printf("[Fuzzer]  基准路径校验失败详情: callEdges=%d, callTargets=%d, protectedStart=%d",
 			len(result.CallEdges), len(result.CallTargets), result.ProtectedStartIndex)
 		if len(result.CallEdges) > 0 {
@@ -3048,6 +3047,49 @@ func resolveDelegateCallTarget(result *simulator.ReplayResult, contractAddr comm
 	return best, bestCount, mode
 }
 
+func resolveDelegateCallCaller(result *simulator.ReplayResult, contractAddr common.Address) (string, int, string) {
+	if result == nil || contractAddr == (common.Address{}) {
+		return "", 0, ""
+	}
+	if len(result.CallEdges) == 0 {
+		return "", 0, ""
+	}
+
+	targetLower := strings.ToLower(contractAddr.Hex())
+	candidates := make(map[string]int)
+	for _, edge := range result.CallEdges {
+		if edge.Caller == "" || edge.Target == "" {
+			continue
+		}
+		if strings.EqualFold(edge.Target, targetLower) && (edge.Op == "DELEGATECALL" || edge.Op == "CALLCODE") {
+			candidates[strings.ToLower(edge.Caller)] = 0
+		}
+	}
+	if len(candidates) == 0 {
+		return "", 0, ""
+	}
+
+	for _, jd := range result.ContractJumpDests {
+		addr := strings.ToLower(jd.Contract)
+		if _, ok := candidates[addr]; ok {
+			candidates[addr]++
+		}
+	}
+
+	best := ""
+	bestCount := 0
+	for addr, count := range candidates {
+		if count > bestCount {
+			best = addr
+			bestCount = count
+		}
+	}
+	if best == "" {
+		return "", 0, ""
+	}
+	return best, bestCount, "delegatecall-callee"
+}
+
 func hasCallEdgeTarget(result *simulator.ReplayResult, contractAddr common.Address) bool {
 	if result == nil || contractAddr == (common.Address{}) {
 		return false
@@ -3081,6 +3123,11 @@ func resolvePathContractAddr(result *simulator.ReplayResult, contractAddr common
 			return contractAddr
 		}
 		log.Printf("[Fuzzer]  代理路径映射: %s -> %s (hits=%d, mode=%s)",
+			contractAddr.Hex(), resolved, hits, mode)
+		return common.HexToAddress(resolved)
+	}
+	if resolved, hits, mode := resolveDelegateCallCaller(result, contractAddr); resolved != "" {
+		log.Printf("[Fuzzer]  delegatecall调用方路径映射: %s -> %s (hits=%d, mode=%s)",
 			contractAddr.Hex(), resolved, hits, mode)
 		return common.HexToAddress(resolved)
 	}
@@ -4401,12 +4448,33 @@ func (f *CallDataFuzzer) worker(
 		}
 
 		// 入口对齐 + 固定窗口 + overlap：基准/候选路径从受保护合约首次命中开始截取
-		baseline := extractProtectedContractPath(origContractJumpDests, pathContractAddr, baselineStart, "基准入口对齐")
-		candidatePath := extractProtectedContractPath(simResult.ContractJumpDests, pathContractAddr, 0, "候选入口对齐")
-		if len(fallbackBaseline) > 0 {
-			baseline = fallbackBaseline
-			if currentCount <= 5 || currentCount%500 == 0 {
-				log.Printf("[Worker %d]  基准路径过短，切换为函数级基准 (len=%d)", workerID, len(baseline))
+		useFullPath := strings.EqualFold(f.similarityScope, "full") || strings.EqualFold(f.similarityScope, "all")
+		var baseline []ContractJumpDest
+		var candidatePath []ContractJumpDest
+		if useFullPath {
+			// 全路径比较：从受保护合约首次命中开始，包含后续所有合约JUMPDEST
+			if currentCount == 1 && workerID == 0 {
+				log.Printf("[Worker %d]  相似度范围=full，使用全路径比较", workerID)
+			}
+			if baselineStart < 0 || baselineStart >= len(origContractJumpDests) {
+				baselineStart = 0
+			}
+			baseline = origContractJumpDests
+			if baselineStart > 0 && baselineStart < len(origContractJumpDests) {
+				baseline = origContractJumpDests[baselineStart:]
+			}
+			candidatePath = simResult.ContractJumpDests
+			if idx := findProtectedStartIndex(candidatePath, pathContractAddr); idx >= 0 && idx < len(candidatePath) {
+				candidatePath = candidatePath[idx:]
+			}
+		} else {
+			baseline = extractProtectedContractPath(origContractJumpDests, pathContractAddr, baselineStart, "基准入口对齐")
+			candidatePath = extractProtectedContractPath(simResult.ContractJumpDests, pathContractAddr, 0, "候选入口对齐")
+			if len(fallbackBaseline) > 0 {
+				baseline = fallbackBaseline
+				if currentCount <= 5 || currentCount%500 == 0 {
+					log.Printf("[Worker %d]  基准路径过短，切换为函数级基准 (len=%d)", workerID, len(baseline))
+				}
 			}
 		}
 		if len(baseline) == 0 || len(candidatePath) == 0 {
@@ -4440,12 +4508,18 @@ func (f *CallDataFuzzer) worker(
 		overlapSim := f.comparator.OverlapContractJumpDests(compareBaseline, compareCandidate)
 		similarity := overlapSim
 
-		// 相似度校正：当基准明显短于候选且Overlap饱和时，使用长度敏感的Dice相似度避免恒为1
+		// 相似度校正：当路径长度明显不匹配且Overlap饱和时，使用长度敏感的Dice相似度避免恒为1
 		adjustedSim := overlapSim
 		if overlapSim >= 0.999 && len(alignedBaseline) > 0 && len(candidatePath) > 0 {
 			baselineLen := len(alignedBaseline)
 			candidateLen := len(candidatePath)
-			if candidateLen > baselineLen && float64(candidateLen) >= float64(baselineLen)*1.2 {
+			longerLen := baselineLen
+			shorterLen := candidateLen
+			if candidateLen > baselineLen {
+				longerLen = candidateLen
+				shorterLen = baselineLen
+			}
+			if shorterLen > 0 && float64(longerLen) >= float64(shorterLen)*1.2 {
 				adjustedSim = f.comparator.CompareContractJumpDests(alignedBaseline, candidatePath, 0)
 				similarity = adjustedSim
 				if currentCount <= 5 || currentCount%500 == 0 {
@@ -5163,8 +5237,26 @@ func normalizeBigInt(val interface{}) *big.Int {
 		return big.NewInt(int64(v))
 	case int64:
 		return big.NewInt(v)
+	case int32:
+		return big.NewInt(int64(v))
+	case int16:
+		return big.NewInt(int64(v))
+	case int8:
+		return big.NewInt(int64(v))
+	case uint:
+		return new(big.Int).SetUint64(uint64(v))
 	case uint64:
 		return new(big.Int).SetUint64(v)
+	case uint32:
+		return new(big.Int).SetUint64(uint64(v))
+	case uint16:
+		return new(big.Int).SetUint64(uint64(v))
+	case uint8:
+		return new(big.Int).SetUint64(uint64(v))
+	case float64:
+		return big.NewInt(int64(v))
+	case float32:
+		return big.NewInt(int64(v))
 	case string:
 		base := 10
 		str := v
