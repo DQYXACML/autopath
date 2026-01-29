@@ -4,7 +4,7 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    "0xdbB20A979a92ccCcE15229e41c9B082D5b5d7E31",
+    "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
     "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397",
     "0x6B175474E89094C44Da98b954EedeAC495271d0F",
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -15,14 +15,9 @@
     "0x60594a405d53811d3BC4766596EFD80fd545A270",
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
     "0x6e10ff27cae71a13525bd61167857e5c982b4674",
-    "0x0000000000000000000000000000000000000000",
-    "0xffffffffffffffffffffffffffffffffffffffff",
     "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f",
-    "0x00000000000000000000000037b87ba4c3edb420",
     "0x37B87BA4C3edB420ed4552F1982c983B55D8B9d1",
-    "0x5a9eeaf8949838813289046091e8ea8a9196a226",
-    "0x0000000000000000000000007fa9385be102ac3e",
-    "0x00000000000000000000000002f92800f57bcd74"
+    "0x5a9eeaf8949838813289046091e8ea8a9196a226"
   ],
   "invariants": [
     {
@@ -32,28 +27,23 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        "threshold": 0.25,
+        "threshold": 0.1,
         "contracts": [
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
         ],
         "slots": {
-          "slot_0": {
-            "index": "2",
+          "reserve0_slot": {
+            "index": "8",
             "severity": "critical",
-            "threshold": 0.25
-          },
-          "slot_1": {
-            "index": "43338921159469841899711384791100799473247905780846710754558330455962694164420",
-            "severity": "critical",
-            "threshold": 0.25
+            "threshold": 0.1
           }
         },
-        "formula": "abs(value_after - value_before) / value_before <= 0.25"
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     },
     {
@@ -63,23 +53,28 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        "threshold": 0.25,
+        "threshold": 0.1,
         "contracts": [
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         ],
         "slots": {
-          "reserve0_slot": {
-            "index": "8",
+          "slot_0": {
+            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
             "severity": "critical",
-            "threshold": 0.25
+            "threshold": 0.1
+          },
+          "slot_1": {
+            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
+            "severity": "critical",
+            "threshold": 0.1
           }
         },
-        "formula": "abs(value_after - value_before) / value_before <= 0.25"
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     },
     {
@@ -89,25 +84,25 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.3,
+        "threshold": 0.12,
         "contracts": [
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397",
           "0x02f92800F57BCD74066F5709F1Daa1A4302Df875",
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         ],
         "slots": {
           "reserve0_slot": {
             "index": "8",
             "severity": "high",
-            "threshold": 0.3
+            "threshold": 0.12
           }
         },
-        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     },
     {
@@ -117,28 +112,23 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.4,
+        "threshold": 0.16,
         "contracts": [
-          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
         ],
         "slots": {
-          "slot_0": {
-            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
+          "reserve0_slot": {
+            "index": "8",
             "severity": "high",
-            "threshold": 0.4
-          },
-          "slot_1": {
-            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
-            "severity": "high",
-            "threshold": 0.4
+            "threshold": 0.16
           }
         },
-        "formula": "(value_after - value_before) / value_before <= 0.4"
+        "formula": "(value_after - value_before) / value_before <= 0.16"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     },
     {
@@ -148,23 +138,28 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.4,
+        "threshold": 0.16,
         "contracts": [
-          "0xbed4fbf7c3e36727ccdab4c6706c3c0e17b10397"
+          "0x6B175474E89094C44Da98b954EedeAC495271d0F"
         ],
         "slots": {
-          "reserve0_slot": {
-            "index": "8",
+          "slot_0": {
+            "index": "30645486631603752361223653315915313192754344272179238389287990517191522147541",
             "severity": "high",
-            "threshold": 0.4
+            "threshold": 0.16
+          },
+          "slot_1": {
+            "index": "1311428694430413507064611963368844046692563004276897792095973957181437681423",
+            "severity": "high",
+            "threshold": 0.16
           }
         },
-        "formula": "(value_after - value_before) / value_before <= 0.4"
+        "formula": "(value_after - value_before) / value_before <= 0.16"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     },
     {
@@ -174,47 +169,49 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.25,
+        "threshold": 0.1,
         "contracts": [
           "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         ],
         "slots": {},
-        "formula": "abs(balance_after - balance_before) / balance_before <= 0.25"
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
       },
       "monitored_functions": [
+        "flash",
         "bond",
-        "debond",
-        "flash"
+        "debond"
       ]
     }
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
-        "contract": "0xdbB20A979a92ccCcE15229e41c9B082D5b5d7E31",
+        "contract": "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
+        "function": "flash",
+        "signature": "flash(address,address,uint256,bytes)"
+      },
+      {
+        "contract": "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
         "function": "bond",
         "signature": "bond(address,uint256)"
       },
       {
-        "contract": "0xdbB20A979a92ccCcE15229e41c9B082D5b5d7E31",
+        "contract": "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
         "function": "debond",
         "signature": "debond(uint256,address[],uint8[])"
-      },
-      {
-        "contract": "0xdbB20A979a92ccCcE15229e41c9B082D5b5d7E31",
-        "function": "flash",
-        "signature": "flash(address,address,uint256,bytes)"
       }
     ],
     "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 10,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/peapodsfinance",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -255,7 +252,187 @@
         "zone_gap_percent": 0.1,
         "zone_threshold": 0.75
       },
-      "enabled": true
+      "enabled": true,
+      "constraint_ranges": {
+        "flash(address,address,uint256,bytes)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
+            "danger_threshold": "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
+            "attack_values": [
+              "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
+              "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          },
+          "1": {
+            "type": "address",
+            "safe_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "danger_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "attack_values": [
+              "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(Peas)"
+          },
+          "2": {
+            "type": "uint256",
+            "safe_threshold": "1423661343265398980608",
+            "danger_threshold": "293877894759882629745878",
+            "attack_values": [
+              "293877894759882629745878",
+              "1423661343265398980608",
+              "88163368427964788923763"
+            ],
+            "range": {
+              "min": "1423661343265398980608",
+              "max": "293877894759882629745878"
+            },
+            "mutation_strategy": "boundary_breakthrough",
+            "confidence": 0.6,
+            "value_expr": "Peas.balanceOf(address(ppPP))"
+          },
+          "3": {
+            "type": "bytes",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "\"\""
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "\"\""
+          }
+        },
+        "debond(uint256,address[],uint8[])": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "1036117090629850628096",
+            "danger_threshold": "18962873888275452765844",
+            "attack_values": [
+              "18962873888275452765844",
+              "1036117090629850628096",
+              "5688862166482635829753"
+            ],
+            "range": {
+              "min": "1036117090629850628096",
+              "max": "18962873888275452765844"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.7,
+            "value_expr": "ppPP.balanceOf(address(this))"
+          },
+          "1": {
+            "type": "address[]",
+            "safe_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "danger_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "attack_values": [
+              "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+            ],
+            "range": {
+              "min": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+              "max": "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "token"
+          },
+          "2": {
+            "type": "uint8[]",
+            "safe_threshold": "100",
+            "danger_threshold": "100",
+            "attack_values": [
+              "100"
+            ],
+            "range": {
+              "min": "100",
+              "max": "100"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "percentage"
+          }
+        },
+        "bond(address,uint256)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "danger_threshold": "0x02f92800f57bcd74066f5709f1daa1a4302df875",
+            "attack_values": [
+              "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(Peas)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "1423661343265398980608",
+            "danger_threshold": "293877894759882629745878",
+            "attack_values": [
+              "293877894759882629745878",
+              "1423661343265398980608",
+              "146938947379941314872939"
+            ],
+            "range": {
+              "min": "1423661343265398980608",
+              "max": "293877894759882629745878"
+            },
+            "mutation_strategy": "boundary_breakthrough",
+            "confidence": 0.6,
+            "value_expr": "Peas.balanceOf(address(this))"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "0xdbb20a979a92cccce15229e41c9b082d5b5d7e31",
+          "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
+          "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+        ],
+        "1": [
+          "0x02f92800f57bcd74066f5709f1daa1a4302df875"
+        ],
+        "2": [
+          "711830671632699490304",
+          "1281295208938859134976",
+          "1423661343265398980608",
+          "1566027477591939088384",
+          "2135492014898098470912",
+          "2847322686530797961216",
+          "88163368427964788923763",
+          "146938947379941313871872",
+          "146938947379941314872939",
+          "264490105283894354903040",
+          "293877894759882629745878",
+          "323265684235870934138880",
+          "440816842139823958392832",
+          "587755789519765259491756"
+        ],
+        "3": [
+          "0x"
+        ]
+      }
     }
   },
   "alert_config": {

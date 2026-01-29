@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,6 +56,8 @@ var baselineStateCache sync.Map     // key: 路径 -> *baselineStateFile
 
 // targetSelectorCache 缓存项目的目标函数选择器（contract -> selectors）
 var targetSelectorCache sync.Map // key: cacheKey, value: map[string]map[string]bool
+// targetSignatureCache 缓存项目的目标函数签名（contract -> selector -> signature）
+var targetSignatureCache sync.Map // key: cacheKey, value: map[string]map[string]string
 
 // projectTargetConfig 用于轻量级解析目标函数配置
 type projectTargetConfig struct {
@@ -214,6 +217,114 @@ func loadTargetSelectors(projectID string, contractAddr common.Address) map[stri
 	}
 	log.Printf("[Fuzzer]  未在配置中找到target_functions (projectID=%s, contract=%s)", projectID, contractAddr.Hex())
 	return result
+}
+
+// loadTargetSignatures 解析配置文件中的 target_functions，返回 selector -> signature 映射
+func loadTargetSignatures(projectID string, contractAddr common.Address) map[string]map[string]string {
+	cacheKey := projectID
+	if cacheKey == "" {
+		cacheKey = strings.ToLower(contractAddr.Hex())
+	}
+
+	if cached, ok := targetSignatureCache.Load(cacheKey); ok {
+		if m, ok2 := cached.(map[string]map[string]string); ok2 {
+			return m
+		}
+	}
+
+	candidateDirs := []string{}
+	for depth := 0; depth <= 3; depth++ {
+		prefix := strings.Repeat(".."+string(os.PathSeparator), depth)
+		candidateDirs = append(candidateDirs, filepath.Join(prefix, "pkg", "invariants", "configs"))
+		candidateDirs = append(candidateDirs, filepath.Join(prefix, "autopath", "pkg", "invariants", "configs"))
+	}
+
+	var matches []string
+	for _, dir := range candidateDirs {
+		pattern := filepath.Join(dir, "*.json")
+		found, globErr := filepath.Glob(pattern)
+		if globErr != nil {
+			continue
+		}
+		valid := make([]string, 0, len(found))
+		for _, m := range found {
+			if _, err := os.Stat(m); err == nil {
+				valid = append(valid, m)
+			}
+		}
+		if len(valid) > 0 {
+			matches = append(matches, valid...)
+		}
+	}
+
+	result := make(map[string]map[string]string)
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var cfg projectTargetConfig
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			continue
+		}
+		if cfg.FuzzingConfig == nil || len(cfg.FuzzingConfig.TargetFunctions) == 0 {
+			continue
+		}
+
+		cfgProj := strings.TrimSpace(cfg.ProjectID)
+		targetProj := strings.TrimSpace(projectID)
+		if targetProj != "" && !strings.EqualFold(cfgProj, targetProj) {
+			continue
+		}
+
+		for _, tf := range cfg.FuzzingConfig.TargetFunctions {
+			if tf.Contract == "" || tf.Signature == "" {
+				continue
+			}
+			addrHex := common.HexToAddress(tf.Contract).Hex()
+			if projectID == "" && !strings.EqualFold(addrHex, contractAddr.Hex()) {
+				continue
+			}
+			sel, err := signatureToSelector(tf.Signature)
+			if err != nil {
+				continue
+			}
+			addr := strings.ToLower(addrHex)
+			if result[addr] == nil {
+				result[addr] = make(map[string]string)
+			}
+			result[addr][strings.ToLower(sel)] = tf.Signature
+		}
+
+		if projectID != "" && len(result) > 0 {
+			break
+		}
+	}
+
+	if len(result) > 0 {
+		targetSignatureCache.Store(cacheKey, result)
+		return result
+	}
+
+	if projectID != "" {
+		return loadTargetSignatures("", contractAddr)
+	}
+	return result
+}
+
+func lookupTargetSignature(projectID string, contractAddr common.Address, selector []byte) string {
+	if len(selector) < 4 {
+		return ""
+	}
+	sigs := loadTargetSignatures(projectID, contractAddr)
+	addr := strings.ToLower(contractAddr.Hex())
+	if sigMap, ok := sigs[addr]; ok {
+		sel := "0x" + hex.EncodeToString(selector[:4])
+		if sig, ok := sigMap[strings.ToLower(sel)]; ok {
+			return sig
+		}
+	}
+	return ""
 }
 
 // NewTransactionTracer 创建交易追踪器
@@ -2509,20 +2620,17 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		log.Printf("[Fuzzer] Found %d valid combinations", len(results))
 	}
 
-	// 仅保留最高相似度组合进入规则生成路径
-	if bestSimilarity >= 0 && len(results) > 0 {
-		lower := bestSimilarity - similarityEpsilon
-		upper := bestSimilarity + similarityEpsilon
+	// 仅保留相似度>=阈值的组合进入规则生成路径
+	const ruleGenMinSimilarity = 0.6
+	if len(results) > 0 {
 		filtered := results[:0]
 		for _, r := range results {
-			if r.Similarity >= lower && r.Similarity <= upper {
+			if r.Similarity >= ruleGenMinSimilarity {
 				filtered = append(filtered, r)
 			}
 		}
 		results = filtered
-	}
-	if bestSimilarity >= 0 {
-		log.Printf("[Fuzzer] Selected %d max-sim combinations (max=%.4f)", len(results), bestSimilarity)
+		log.Printf("[Fuzzer] Selected %d rule-gen combinations (sim >= %.2f, max=%.4f)", len(results), ruleGenMinSimilarity, bestSimilarity)
 	}
 
 	// 步骤5: 生成报告
@@ -2563,7 +2671,7 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		report.RawAverageSimilarity = rawSum / float64(attempts)
 		report.RawMaxSimilarity = rawMax
 		report.RawMinSimilarity = rawMin
-		log.Printf("[Fuzzer]  报告统计（含低相似度）：total=%d avg=%.4f min=%.4f max=%.4f 阈值=%.4f 有效=%d, 校正avg=%.4f min=%.4f max=%.4f",
+		log.Printf("[Fuzzer]  报告统计（含低相似度）：total=%d avg=%.4f min=%.4f max=%.4f 阈值=%.4f 有效=%d, 重叠avg=%.4f min=%.4f max=%.4f",
 			attempts, report.AverageSimilarity, report.MinSimilarity, report.MaxSimilarity, f.threshold, len(results),
 			report.RawAverageSimilarity, report.RawMinSimilarity, report.RawMaxSimilarity)
 	} else {
@@ -2649,6 +2757,14 @@ func (f *CallDataFuzzer) parseCallDataWithABI(contractAddr common.Address, callD
 		}
 	}
 
+	if contractABI != nil && len(callData) >= 4 {
+		if _, err := contractABI.MethodById(callData[:4]); err != nil && f.parser != nil {
+			if loaded, err := f.parser.LoadABIForAddressWithSelector(contractAddr, callData[:4]); err == nil {
+				contractABI = loaded
+			}
+		}
+	}
+
 	if contractABI != nil {
 		parsed, err := f.parser.ParseCallDataWithABI(callData, contractABI)
 		if err == nil {
@@ -2656,6 +2772,24 @@ func (f *CallDataFuzzer) parseCallDataWithABI(contractAddr common.Address, callD
 			if m, err := contractABI.MethodById(parsed.Selector); err == nil {
 				method = m
 			} else {
+				if f.parser != nil && len(callData) >= 4 {
+					if sig := lookupTargetSignature(f.projectID, contractAddr, callData[:4]); sig != "" {
+						if synthetic, err := f.parser.BuildABIFromSignature(sig); err == nil {
+							if parsedWith, err := f.parser.ParseCallDataWithABI(callData, synthetic); err == nil {
+								if m2, err := synthetic.MethodById(callData[:4]); err == nil {
+									method = m2
+								}
+								f.parser.SetABI(contractAddr, synthetic)
+								log.Printf("[Fuzzer]   使用目标函数签名解析ABI: %s", sig)
+								return parsedWith, method, nil
+							}
+							log.Printf("[Fuzzer]   使用目标函数签名解析失败: %v", err)
+						} else {
+							log.Printf("[Fuzzer]   生成目标函数ABI失败: %v", err)
+						}
+					}
+				}
+
 				selectorHex := hex.EncodeToString(parsed.Selector)
 				if alias, ok := syntheticSelectorAliases[selectorHex]; ok {
 					// 针对缺失ABI但已知的入口选择器使用占位Method，避免完全失效
@@ -2675,6 +2809,26 @@ func (f *CallDataFuzzer) parseCallDataWithABI(contractAddr common.Address, callD
 			return parsed, method, nil
 		}
 		log.Printf("[Fuzzer]   使用ABI解析失败，改用启发式解析: %v", err)
+	}
+
+	// 尝试使用配置中的目标函数签名构建ABI（适用于代理/缺失ABI场景）
+	if f.parser != nil && len(callData) >= 4 {
+		if sig := lookupTargetSignature(f.projectID, contractAddr, callData[:4]); sig != "" {
+			if synthetic, err := f.parser.BuildABIFromSignature(sig); err == nil {
+				if parsed, err := f.parser.ParseCallDataWithABI(callData, synthetic); err == nil {
+					var method *abi.Method
+					if m, err := synthetic.MethodById(callData[:4]); err == nil {
+						method = m
+					}
+					f.parser.SetABI(contractAddr, synthetic)
+					log.Printf("[Fuzzer]   使用目标函数签名解析ABI: %s", sig)
+					return parsed, method, nil
+				}
+				log.Printf("[Fuzzer]   使用目标函数签名解析失败: %v", err)
+			} else {
+				log.Printf("[Fuzzer]   生成目标函数ABI失败: %v", err)
+			}
+		}
 	}
 
 	parsed, err := f.parser.ParseCallData(callData)
@@ -4283,18 +4437,20 @@ func (f *CallDataFuzzer) worker(
 
 		compareBaseline := alignedBaseline[:windowLen]
 		compareCandidate := candidatePath[:windowLen]
-		similarity := f.comparator.OverlapContractJumpDests(compareBaseline, compareCandidate)
+		overlapSim := f.comparator.OverlapContractJumpDests(compareBaseline, compareCandidate)
+		similarity := overlapSim
 
 		// 相似度校正：当基准明显短于候选且Overlap饱和时，使用长度敏感的Dice相似度避免恒为1
-		adjustedSim := similarity
-		if similarity >= 0.999 && len(alignedBaseline) > 0 && len(candidatePath) > 0 {
+		adjustedSim := overlapSim
+		if overlapSim >= 0.999 && len(alignedBaseline) > 0 && len(candidatePath) > 0 {
 			baselineLen := len(alignedBaseline)
 			candidateLen := len(candidatePath)
 			if candidateLen > baselineLen && float64(candidateLen) >= float64(baselineLen)*1.2 {
 				adjustedSim = f.comparator.CompareContractJumpDests(alignedBaseline, candidatePath, 0)
+				similarity = adjustedSim
 				if currentCount <= 5 || currentCount%500 == 0 {
 					log.Printf("[Worker %d]  相似度校正: overlap=%.4f -> adjusted=%.4f (baseline=%d, candidate=%d)",
-						workerID, similarity, adjustedSim, baselineLen, candidateLen)
+						workerID, overlapSim, adjustedSim, baselineLen, candidateLen)
 				}
 			}
 		}
@@ -4458,7 +4614,7 @@ func (f *CallDataFuzzer) worker(
 		}
 
 		// 记录全量尝试（包含低相似度样本）
-		f.recordAttempt(similarity, adjustedSim)
+		f.recordAttempt(similarity, overlapSim)
 
 		// 记录批次最佳路径（每100个组合汇总一次）
 		if batchTracker != nil {
@@ -4581,6 +4737,12 @@ func (f *CallDataFuzzer) worker(
 
 		// 创建参数值列表
 		paramValues := f.extractParameterValues(combo, selector, targetMethod)
+		ruleParamValues := paramValues
+		if f.constraintCollector != nil {
+			if rawParams := f.extractRuleParameterValues(newCallData, targetMethod); len(rawParams) > 0 {
+				ruleParamValues = rawParams
+			}
+		}
 
 		result := FuzzingResult{
 			CallData:            newCallData,
@@ -4593,7 +4755,7 @@ func (f *CallDataFuzzer) worker(
 			StateChanges:        simResult.StateChanges,
 		}
 
-		// 线程安全地添加结果，并仅用最高相似度样本生成规则
+		// 线程安全地添加结果，后续按相似度阈值筛选用于规则生成
 		resultMutex.Lock()
 		*results = append(*results, result)
 
@@ -4626,7 +4788,7 @@ func (f *CallDataFuzzer) worker(
 				recordedSelectors[targetSelectorHex] = struct{}{}
 			}
 			if f.constraintCollector != nil {
-				if rule := f.constraintCollector.RecordSample(contractAddr, selector, paramValues, simResult.StateChanges, similarity); rule != nil {
+				if rule := f.constraintCollector.RecordSample(contractAddr, selector, ruleParamValues, simResult.StateChanges, similarity); rule != nil {
 					log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
 				}
 			}
@@ -4746,6 +4908,13 @@ func normalizeSingleParam(val interface{}, typeStr string) interface{} {
 				return bi
 			}
 		case strings.HasPrefix(typeStr, "bytes"):
+			size := parseFixedBytesSize(typeStr)
+			if size > 0 {
+				if fixed := normalizeFixedBytesValue(val, size); fixed != nil {
+					return fixed
+				}
+				break
+			}
 			if b := normalizeBytes(val); b != nil {
 				return b
 			}
@@ -4779,6 +4948,23 @@ func normalizeSingleParam(val interface{}, typeStr string) interface{} {
 		// 标量包装为单元素数组
 		if bi := normalizeBigInt(val); bi != nil {
 			return fitBigIntSliceLength([]*big.Int{bi}, fixedLen)
+		}
+	case strings.HasPrefix(baseElementType, "bytes"):
+		size := parseFixedBytesSize(baseElementType)
+		if size > 0 {
+			if arr := normalizeFixedBytesArray(val, size, fixedLen); arr != nil {
+				return arr
+			}
+			if fixed := normalizeFixedBytesValue(val, size); fixed != nil {
+				return normalizeFixedBytesArray(fixed, size, fixedLen)
+			}
+			break
+		}
+		if arr := normalizeBytesSlice(val); arr != nil {
+			return fitBytesSliceLength(arr, fixedLen)
+		}
+		if b := normalizeBytes(val); b != nil {
+			return fitBytesSliceLength([][]byte{b}, fixedLen)
 		}
 	}
 
@@ -4999,11 +5185,15 @@ func normalizeBytes(val interface{}) []byte {
 	switch v := val.(type) {
 	case []byte:
 		return v
+	case common.Hash:
+		return v.Bytes()
 	case []interface{}:
 		if len(v) > 0 {
 			return normalizeBytes(v[0])
 		}
 		return nil
+	case [32]byte:
+		return v[:]
 	case string:
 		if strings.HasPrefix(v, "0x") {
 			if b, err := hexutil.Decode(v); err == nil {
@@ -5013,6 +5203,198 @@ func normalizeBytes(val interface{}) []byte {
 		return []byte(v)
 	}
 	return nil
+}
+
+func normalizeBytesSlice(val interface{}) [][]byte {
+	switch v := val.(type) {
+	case [][]byte:
+		return v
+	case []string:
+		out := make([][]byte, 0, len(v))
+		for _, s := range v {
+			if b := normalizeBytes(s); b != nil {
+				out = append(out, b)
+			}
+		}
+		return out
+	case []common.Hash:
+		out := make([][]byte, 0, len(v))
+		for _, h := range v {
+			out = append(out, h.Bytes())
+		}
+		return out
+	case []interface{}:
+		out := make([][]byte, 0, len(v))
+		for _, item := range v {
+			if b := normalizeBytes(item); b != nil {
+				out = append(out, b)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+func fitBytesSliceLength(arr [][]byte, length int) [][]byte {
+	if length <= 0 {
+		return arr
+	}
+	if len(arr) >= length {
+		return arr[:length]
+	}
+	out := make([][]byte, length)
+	copy(out, arr)
+	for i := len(arr); i < length; i++ {
+		out[i] = []byte{}
+	}
+	return out
+}
+
+func parseFixedBytesSize(typeStr string) int {
+	if !strings.HasPrefix(typeStr, "bytes") {
+		return 0
+	}
+	sizeStr := strings.TrimPrefix(typeStr, "bytes")
+	if sizeStr == "" {
+		return 0
+	}
+	if size, err := strconv.Atoi(sizeStr); err == nil {
+		return size
+	}
+	return 0
+}
+
+func normalizeFixedBytesValue(val interface{}, size int) interface{} {
+	if size <= 0 {
+		return nil
+	}
+	data := normalizeBytes(val)
+	if data == nil {
+		return nil
+	}
+	fixed := padFixedBytes(data, size)
+	return buildFixedBytesValue(fixed, size)
+}
+
+func normalizeFixedBytesArray(val interface{}, size int, fixedLen int) interface{} {
+	if size <= 0 {
+		return nil
+	}
+	elems := normalizeFixedBytesElements(val, size)
+	if fixedLen > 0 {
+		if len(elems) >= fixedLen {
+			elems = elems[:fixedLen]
+		} else {
+			for len(elems) < fixedLen {
+				elems = append(elems, make([]byte, size))
+			}
+		}
+	} else if elems == nil {
+		elems = [][]byte{}
+	}
+	return buildFixedBytesSlice(elems, size)
+}
+
+func normalizeFixedBytesElements(val interface{}, size int) [][]byte {
+	switch v := val.(type) {
+	case nil:
+		return nil
+	case []common.Hash:
+		if size != 32 {
+			return nil
+		}
+		out := make([][]byte, 0, len(v))
+		for _, h := range v {
+			out = append(out, padFixedBytes(h.Bytes(), size))
+		}
+		return out
+	case []string:
+		out := make([][]byte, 0, len(v))
+		for _, s := range v {
+			if b := normalizeBytes(s); b != nil {
+				out = append(out, padFixedBytes(b, size))
+			}
+		}
+		return out
+	case [][]byte:
+		out := make([][]byte, 0, len(v))
+		for _, b := range v {
+			out = append(out, padFixedBytes(b, size))
+		}
+		return out
+	case []interface{}:
+		out := make([][]byte, 0, len(v))
+		for _, item := range v {
+			if b := normalizeBytes(item); b != nil {
+				out = append(out, padFixedBytes(b, size))
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+
+	rv := reflect.ValueOf(val)
+	if rv.IsValid() && (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array) {
+		elemType := rv.Type().Elem()
+		if elemType.Kind() == reflect.Array && elemType.Len() == size && elemType.Elem().Kind() == reflect.Uint8 {
+			out := make([][]byte, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elem := rv.Index(i)
+				bytes := make([]byte, size)
+				for j := 0; j < size; j++ {
+					bytes[j] = byte(elem.Index(j).Uint())
+				}
+				out = append(out, bytes)
+			}
+			return out
+		}
+	}
+
+	if single := normalizeBytes(val); single != nil {
+		return [][]byte{padFixedBytes(single, size)}
+	}
+
+	return nil
+}
+
+func padFixedBytes(data []byte, size int) []byte {
+	if size <= 0 {
+		return data
+	}
+	if len(data) == size {
+		return append([]byte(nil), data...)
+	}
+	out := make([]byte, size)
+	if len(data) >= size {
+		copy(out, data[:size])
+		return out
+	}
+	copy(out, data)
+	return out
+}
+
+func buildFixedBytesValue(data []byte, size int) interface{} {
+	elemType := reflect.ArrayOf(size, reflect.TypeOf(byte(0)))
+	arr := reflect.New(elemType).Elem()
+	for i := 0; i < size && i < len(data); i++ {
+		arr.Index(i).SetUint(uint64(data[i]))
+	}
+	return arr.Interface()
+}
+
+func buildFixedBytesSlice(elems [][]byte, size int) interface{} {
+	elemType := reflect.ArrayOf(size, reflect.TypeOf(byte(0)))
+	sliceType := reflect.SliceOf(elemType)
+	slice := reflect.MakeSlice(sliceType, len(elems), len(elems))
+	for i, b := range elems {
+		arr := reflect.New(elemType).Elem()
+		for j := 0; j < size && j < len(b); j++ {
+			arr.Index(j).SetUint(uint64(b[j]))
+		}
+		slice.Index(i).Set(arr)
+	}
+	return slice.Interface()
 }
 
 // buildSmartUintSeeds 根据原始数值生成小幅震荡的种子组合（锁定拓扑，微扰数值）
@@ -5269,6 +5651,278 @@ func (f *CallDataFuzzer) extractParameterValues(combo []interface{}, selector []
 	}
 
 	return values
+}
+
+// extractRuleParameterValues 将calldata解析为32字节对齐的参数列表，并结合ABI提示修正类型
+func (f *CallDataFuzzer) extractRuleParameterValues(callData []byte, method *abi.Method) []ParameterValue {
+	if len(callData) < 4 || f.parser == nil {
+		return nil
+	}
+
+	paramData := callData[4:]
+	rawParams := f.parser.parseRawParameters(paramData)
+	if len(rawParams) == 0 {
+		return nil
+	}
+
+	values := make([]ParameterValue, len(rawParams))
+	for i, p := range rawParams {
+		values[i] = ParameterValue{
+			Index:   p.Index,
+			Type:    p.Type,
+			Name:    p.Name,
+			Value:   p.Value,
+			IsRange: false,
+		}
+	}
+
+	if method != nil {
+		applyRawParamTypeHints(values, paramData, method, f.parser)
+	}
+
+	return values
+}
+
+func applyRawParamTypeHints(values []ParameterValue, paramData []byte, method *abi.Method, parser *ABIParser) {
+	if method == nil || parser == nil || len(values) == 0 {
+		return
+	}
+
+	for i := range values {
+		values[i].Type = "skip"
+	}
+
+	wordCount := len(values)
+	headIndex := 0
+
+	for _, input := range method.Inputs {
+		if headIndex >= wordCount {
+			break
+		}
+
+		t := input.Type
+		if isDynamicABIType(t) {
+			markSkipParam(values, headIndex, "offset")
+			if startIdx, ok := offsetToWordIndex(paramData, headIndex, wordCount); ok {
+				switch t.T {
+				case abi.StringTy, abi.BytesTy:
+					annotateDynamicBytes(values, paramData, startIdx, t.String())
+				case abi.SliceTy:
+					if t.Elem != nil && !isDynamicABIType(*t.Elem) {
+						annotateDynamicArray(values, paramData, startIdx, *t.Elem, parser)
+					}
+				case abi.ArrayTy:
+					if t.Elem != nil && !isDynamicABIType(*t.Elem) {
+						annotateDynamicArray(values, paramData, startIdx, *t.Elem, parser)
+					}
+				}
+			}
+			headIndex += abiTypeWordSize(t)
+			continue
+		}
+
+		annotateStaticParam(values, paramData, headIndex, t, parser)
+		headIndex += abiTypeWordSize(t)
+	}
+}
+
+func annotateDynamicArray(values []ParameterValue, paramData []byte, startIdx int, elemType abi.Type, parser *ABIParser) {
+	wordCount := len(values)
+	if startIdx < 0 || startIdx >= wordCount {
+		return
+	}
+	lengthWord := readParamWord(paramData, startIdx)
+	length := wordToInt(lengthWord)
+	if length == nil || length.BitLen() > 63 {
+		return
+	}
+	n := int(length.Int64())
+	if n < 0 {
+		return
+	}
+	markSkipParam(values, startIdx, "length")
+
+	elemSize := abiTypeWordSize(elemType)
+	if elemSize <= 0 {
+		return
+	}
+
+	idx := startIdx + 1
+	for i := 0; i < n; i++ {
+		if idx >= wordCount {
+			break
+		}
+		if elemType.T == abi.FixedBytesTy {
+			word := readParamWord(paramData, idx)
+			values[idx].Type = elemType.String() + "_elem"
+			if parser != nil && word != nil {
+				values[idx].Value = parser.parseValue(elemType.String(), word)
+			}
+		} else {
+			annotateStaticParam(values, paramData, idx, elemType, parser)
+		}
+		idx += elemSize
+	}
+}
+
+func annotateDynamicBytes(values []ParameterValue, paramData []byte, startIdx int, payloadType string) {
+	wordCount := len(values)
+	if startIdx < 0 || startIdx >= wordCount {
+		return
+	}
+	lengthWord := readParamWord(paramData, startIdx)
+	length := wordToInt(lengthWord)
+	if length == nil || length.BitLen() > 63 {
+		return
+	}
+	n := int(length.Int64())
+	if n < 0 {
+		return
+	}
+	markSkipParam(values, startIdx, "length")
+
+	dataWords := (n + 31) / 32
+	for i := 0; i < dataWords; i++ {
+		idx := startIdx + 1 + i
+		if idx >= wordCount {
+			break
+		}
+		word := readParamWord(paramData, idx)
+		values[idx].Type = payloadType
+		values[idx].Value = append([]byte(nil), word...)
+	}
+}
+
+func annotateStaticParam(values []ParameterValue, paramData []byte, startIdx int, paramType abi.Type, parser *ABIParser) {
+	if startIdx < 0 || startIdx >= len(values) {
+		return
+	}
+
+	if paramType.T == abi.ArrayTy && paramType.Elem != nil && !isDynamicABIType(*paramType.Elem) {
+		elemSize := abiTypeWordSize(*paramType.Elem)
+		if elemSize <= 0 {
+			return
+		}
+		for i := 0; i < paramType.Size; i++ {
+			childIdx := startIdx + i*elemSize
+			if paramType.Elem.T == abi.FixedBytesTy {
+				word := readParamWord(paramData, childIdx)
+				values[childIdx].Type = paramType.Elem.String() + "_elem"
+				if parser != nil && word != nil {
+					values[childIdx].Value = parser.parseValue(paramType.Elem.String(), word)
+				}
+				continue
+			}
+			annotateStaticParam(values, paramData, childIdx, *paramType.Elem, parser)
+		}
+		return
+	}
+
+	if paramType.T == abi.TupleTy && !isDynamicABIType(paramType) {
+		offset := startIdx
+		for _, elem := range paramType.TupleElems {
+			if elem == nil {
+				continue
+			}
+			annotateStaticParam(values, paramData, offset, *elem, parser)
+			offset += abiTypeWordSize(*elem)
+		}
+		return
+	}
+
+	word := readParamWord(paramData, startIdx)
+	values[startIdx].Type = paramType.String()
+	if parser != nil && word != nil {
+		values[startIdx].Value = parser.parseValue(paramType.String(), word)
+	}
+}
+
+func markSkipParam(values []ParameterValue, index int, skipType string) {
+	if index < 0 || index >= len(values) {
+		return
+	}
+	values[index].Type = skipType
+}
+
+func offsetToWordIndex(paramData []byte, wordIndex int, wordCount int) (int, bool) {
+	word := readParamWord(paramData, wordIndex)
+	offset := wordToInt(word)
+	if offset == nil || offset.BitLen() > 63 {
+		return 0, false
+	}
+	raw := offset.Int64()
+	if raw < 0 || raw%32 != 0 {
+		return 0, false
+	}
+	idx := int(raw / 32)
+	if idx < 0 || idx >= wordCount {
+		return 0, false
+	}
+	return idx, true
+}
+
+func wordToInt(word []byte) *big.Int {
+	if len(word) == 0 {
+		return nil
+	}
+	return new(big.Int).SetBytes(word)
+}
+
+func readParamWord(data []byte, index int) []byte {
+	start := index * 32
+	end := start + 32
+	if start < 0 || end > len(data) {
+		return nil
+	}
+	return data[start:end]
+}
+
+func isDynamicABIType(t abi.Type) bool {
+	switch t.T {
+	case abi.StringTy, abi.BytesTy, abi.SliceTy:
+		return true
+	case abi.ArrayTy:
+		if t.Elem == nil {
+			return false
+		}
+		return isDynamicABIType(*t.Elem)
+	case abi.TupleTy:
+		for _, elem := range t.TupleElems {
+			if elem != nil && isDynamicABIType(*elem) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func abiTypeWordSize(t abi.Type) int {
+	if isDynamicABIType(t) {
+		return 1
+	}
+	switch t.T {
+	case abi.ArrayTy:
+		if t.Elem == nil {
+			return 1
+		}
+		return t.Size * abiTypeWordSize(*t.Elem)
+	case abi.TupleTy:
+		size := 0
+		for _, elem := range t.TupleElems {
+			if elem == nil {
+				continue
+			}
+			size += abiTypeWordSize(*elem)
+		}
+		if size == 0 {
+			return 1
+		}
+		return size
+	default:
+		return 1
+	}
 }
 
 // detectType 检测值的类型
@@ -5913,7 +6567,7 @@ func (f *CallDataFuzzer) InitializeParamPools(poolSize int) error {
 }
 
 // recordAttempt 记录一次组合尝试（包含低相似度样本）
-func (f *CallDataFuzzer) recordAttempt(similarity float64, adjusted float64) {
+func (f *CallDataFuzzer) recordAttempt(similarity float64, overlap float64) {
 	f.attemptMu.Lock()
 	defer f.attemptMu.Unlock()
 
@@ -5925,19 +6579,19 @@ func (f *CallDataFuzzer) recordAttempt(similarity float64, adjusted float64) {
 	if f.attempts == 1 || similarity > f.simMax {
 		f.simMax = similarity
 	}
-	f.rawSimSum += adjusted
-	if f.attempts == 1 || adjusted < f.rawSimMin {
-		f.rawSimMin = adjusted
+	f.rawSimSum += overlap
+	if f.attempts == 1 || overlap < f.rawSimMin {
+		f.rawSimMin = overlap
 	}
-	if f.attempts == 1 || adjusted > f.rawSimMax {
-		f.rawSimMax = adjusted
+	if f.attempts == 1 || overlap > f.rawSimMax {
+		f.rawSimMax = overlap
 	}
 
 	// 调试日志：前几次和每100次打印一次
 	if f.attempts <= 5 || f.attempts%100 == 0 {
 		avg := f.simSum / float64(f.attempts)
 		rawAvg := f.rawSimSum / float64(f.attempts)
-		log.Printf("[Fuzzer]  尝试#%d 相似度=%.4f (阈值=%.4f) 统计: avg=%.4f min=%.4f max=%.4f, 校正avg=%.4f min=%.4f max=%.4f",
+		log.Printf("[Fuzzer]  尝试#%d 相似度=%.4f (阈值=%.4f) 统计: avg=%.4f min=%.4f max=%.4f, 重叠avg=%.4f min=%.4f max=%.4f",
 			f.attempts, similarity, f.threshold, avg, f.simMin, f.simMax, rawAvg, f.rawSimMin, f.rawSimMax)
 	}
 }
@@ -6066,6 +6720,9 @@ func convertParamConstraintsToSummaries(constraints []ParamConstraint) []Paramet
 	for _, c := range constraints {
 		// 地址类型不输出规则
 		if isAddressType(c.Type) {
+			continue
+		}
+		if shouldSkipParamType(c.Type) {
 			continue
 		}
 		// 跳过空规则，避免推送空黑名单

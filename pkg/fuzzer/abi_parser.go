@@ -1,7 +1,9 @@
 package fuzzer
 
 import (
+	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -362,9 +364,50 @@ func (p *ABIParser) LoadABIForAddress(address common.Address) (*abi.ABI, error) 
 		return cached, nil
 	}
 
+	contractDir, err := p.findAddressDir(address)
+	if err != nil {
+		return nil, err
+	}
+
+	contractABI, err := p.loadABIFromDir(contractDir, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 缓存结果，避免重复扫描
+	p.SetABI(address, &contractABI)
+	return &contractABI, nil
+}
+
+// LoadABIForAddressWithSelector 在加载ABI时尽量保证包含指定selector
+func (p *ABIParser) LoadABIForAddressWithSelector(address common.Address, selector []byte) (*abi.ABI, error) {
+	if cached, ok := p.GetABI(address); ok {
+		if selector == nil || len(selector) < 4 {
+			return cached, nil
+		}
+		if _, err := cached.MethodById(selector); err == nil {
+			return cached, nil
+		}
+	}
+
+	contractDir, err := p.findAddressDir(address)
+	if err != nil {
+		return nil, err
+	}
+
+	contractABI, err := p.loadABIFromDir(contractDir, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	p.SetABI(address, &contractABI)
+	return &contractABI, nil
+}
+
+func (p *ABIParser) findAddressDir(address common.Address) (string, error) {
 	baseDir, searchErr := p.locateExtractedRoot()
 	if searchErr != nil {
-		return nil, fmt.Errorf("未找到ABI根目录: %w", searchErr)
+		return "", fmt.Errorf("未找到ABI根目录: %w", searchErr)
 	}
 
 	lowerAddr := strings.ToLower(address.Hex()[2:])
@@ -378,36 +421,200 @@ func (p *ABIParser) LoadABIForAddress(address common.Address) (*abi.ABI, error) 
 		if d.IsDir() {
 			return nil
 		}
-		// 目录名中包含地址且文件名为 abi.json
 		if strings.EqualFold(d.Name(), "abi.json") && strings.Contains(strings.ToLower(path), lowerAddr) {
-			matched = path
+			matched = filepath.Dir(path)
 			return errStop
 		}
 		return nil
 	})
 
 	if walkErr != nil && !errors.Is(walkErr, errStop) {
-		return nil, walkErr
+		return "", walkErr
 	}
 
-	if matched == "" {
-		return nil, fmt.Errorf("未找到地址 %s 对应的ABI文件", address.Hex())
+	if matched != "" {
+		return matched, nil
 	}
 
-	file, err := os.Open(matched)
+	var addrDir string
+	errStop = errors.New("addr-dir-found")
+	_ = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && strings.Contains(strings.ToLower(d.Name()), lowerAddr) {
+			addrDir = path
+			return errStop
+		}
+		return nil
+	})
+	if addrDir != "" {
+		return addrDir, nil
+	}
+
+	return "", fmt.Errorf("未找到地址 %s 对应的ABI目录", address.Hex())
+}
+
+func (p *ABIParser) loadABIFromDir(dir string, selector []byte) (abi.ABI, error) {
+	abiPath := filepath.Join(dir, "abi.json")
+	candidates := []string{}
+	if st, err := os.Stat(abiPath); err == nil && !st.IsDir() {
+		candidates = append(candidates, abiPath)
+	}
+
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(d.Name()), ".json") {
+			return nil
+		}
+		if path == abiPath {
+			return nil
+		}
+		candidates = append(candidates, path)
+		return nil
+	})
+
+	var lastErr error
+	for _, candidate := range candidates {
+		parsed, err := p.loadABIFromFile(candidate)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if selector != nil && len(selector) >= 4 {
+			if _, err := parsed.MethodById(selector); err != nil {
+				lastErr = err
+				continue
+			}
+		}
+		return *parsed, nil
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("未找到可用ABI文件")
+	}
+	return abi.ABI{}, lastErr
+}
+
+func (p *ABIParser) loadABIFromFile(path string) (*abi.ABI, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
-	contractABI, err := abi.JSON(file)
+	if parsed, err := abi.JSON(bytes.NewReader(data)); err == nil {
+		return &parsed, nil
+	}
+
+	var wrapper struct {
+		ABI json.RawMessage `json:"abi"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err == nil && len(wrapper.ABI) > 0 {
+		parsed, err := abi.JSON(bytes.NewReader(wrapper.ABI))
+		if err == nil {
+			return &parsed, nil
+		}
+	}
+
+	return nil, fmt.Errorf("ABI解析失败: %s", path)
+}
+
+type syntheticABIParam struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type syntheticABIEntry struct {
+	Type            string              `json:"type"`
+	Name            string              `json:"name"`
+	Inputs          []syntheticABIParam `json:"inputs"`
+	Outputs         []syntheticABIParam `json:"outputs"`
+	StateMutability string              `json:"stateMutability,omitempty"`
+}
+
+// BuildABIFromSignature 根据函数签名构建最小ABI（仅包含该函数）
+func (p *ABIParser) BuildABIFromSignature(signature string) (*abi.ABI, error) {
+	name, args, err := parseFunctionSignature(signature)
 	if err != nil {
 		return nil, err
 	}
 
-	// 缓存结果，避免重复扫描
-	p.SetABI(address, &contractABI)
-	return &contractABI, nil
+	inputs := make([]syntheticABIParam, 0, len(args))
+	for i, arg := range args {
+		arg = strings.TrimSpace(arg)
+		if arg == "" {
+			continue
+		}
+		inputs = append(inputs, syntheticABIParam{
+			Name: fmt.Sprintf("arg%d", i),
+			Type: arg,
+		})
+	}
+
+	entry := syntheticABIEntry{
+		Type:            "function",
+		Name:            name,
+		Inputs:          inputs,
+		Outputs:         []syntheticABIParam{},
+		StateMutability: "nonpayable",
+	}
+
+	payload, err := json.Marshal([]syntheticABIEntry{entry})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal synthetic ABI: %w", err)
+	}
+
+	parsed, err := abi.JSON(bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
+}
+
+func parseFunctionSignature(signature string) (string, []string, error) {
+	sig := strings.TrimSpace(signature)
+	if sig == "" {
+		return "", nil, fmt.Errorf("empty signature")
+	}
+
+	openIdx := strings.Index(sig, "(")
+	closeIdx := strings.LastIndex(sig, ")")
+	if openIdx <= 0 || closeIdx < openIdx {
+		return "", nil, fmt.Errorf("invalid signature: %s", signature)
+	}
+
+	name := strings.TrimSpace(sig[:openIdx])
+	argsStr := strings.TrimSpace(sig[openIdx+1 : closeIdx])
+	if argsStr == "" {
+		return name, []string{}, nil
+	}
+
+	var args []string
+	depth := 0
+	start := 0
+	for i, ch := range argsStr {
+		switch ch {
+		case '(', '[':
+			depth++
+		case ')', ']':
+			if depth > 0 {
+				depth--
+			}
+		case ',':
+			if depth == 0 {
+				args = append(args, strings.TrimSpace(argsStr[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if start < len(argsStr) {
+		args = append(args, strings.TrimSpace(argsStr[start:]))
+	}
+
+	return name, args, nil
 }
 
 // locateExtractedRoot 查找 extracted_contracts 根目录，兼容不同工作目录

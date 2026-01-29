@@ -534,6 +534,9 @@ func extractNumericParams(samples []constraintSample) map[int][]*big.Int {
 			if isAddressType(p.Type) {
 				continue
 			}
+			if shouldSkipParamType(p.Type) {
+				continue
+			}
 			if val := normalizeToBigInt(p.Value); val != nil {
 				out[p.Index] = append(out[p.Index], val)
 			}
@@ -729,11 +732,14 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 
 	for i := 0; i < paramCount; i++ {
 		pc := &constraints[i]
+		if shouldSkipParamType(pc.Type) {
+			continue
+		}
 		// 地址类型不生成规则，直接跳过
 		if isAddressType(pc.Type) {
 			continue
 		}
-		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
+		isNumeric := (strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")) && !strings.Contains(pc.Type, "[")
 
 		var minVal, maxVal *big.Int
 		numericValues := make(map[string]struct{})
@@ -760,6 +766,15 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			}
 		}
 
+		if !isNumeric {
+			if len(valueSet) <= 1 && !allowSingleValueNonNumeric(pc.Type) {
+				log.Printf("[ConstraintCollector] 跳过单值非数值规则: param#%d value=%s", i, dedupValueSetSample(valueSet))
+				continue
+			}
+			pc.Values = dedupMapKeys(valueSet)
+			continue
+		}
+
 		if isNumeric && minVal != nil && maxVal != nil {
 			// 查找参数的约束规则
 			paramConstraint := pickParamConstraint(funcConstraints, i)
@@ -771,6 +786,7 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			// 默认使用攻击样本范围作为黑名单区间
 			rangeMinHex := "0x" + minVal.Text(16)
 			rangeMaxHex := "0x" + maxVal.Text(16)
+			useRange := true
 
 			// 如果存在安全阈值，转换为“拦截 unsafe 区间”的范围
 			if paramConstraint != nil && paramConstraint.SafeThreshold != nil {
@@ -794,11 +810,19 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 				}
 			} else {
 				log.Printf("[ConstraintCollector] 使用攻击样本范围作为黑名单: param#%d [%s, %s]", i, minVal.String(), maxVal.String())
+				if !shouldUseNumericRange(minVal, maxVal, len(numericValues)) {
+					useRange = false
+				}
 			}
 
-			pc.IsRange = true
-			pc.RangeMin = rangeMinHex
-			pc.RangeMax = rangeMaxHex
+			if useRange {
+				pc.IsRange = true
+				pc.RangeMin = rangeMinHex
+				pc.RangeMax = rangeMaxHex
+			} else {
+				pc.Values = numericValuesToHex(numericValues)
+				log.Printf("[ConstraintCollector] 使用离散值替代宽范围: param#%d values=%d", i, len(pc.Values))
+			}
 		} else {
 			pc.Values = dedupMapKeys(valueSet)
 		}
@@ -853,11 +877,14 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 
 	for i := 0; i < paramCount; i++ {
 		pc := &constraints[i]
+		if shouldSkipParamType(pc.Type) {
+			continue
+		}
 		// 地址类型不生成规则，直接跳过
 		if isAddressType(pc.Type) {
 			continue
 		}
-		isNumeric := strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")
+		isNumeric := (strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")) && !strings.Contains(pc.Type, "[")
 
 		var minVal, maxVal *big.Int
 		numericValues := make(map[string]struct{})
@@ -883,14 +910,28 @@ func aggregateParamConstraints(samples []constraintSample) []ParamConstraint {
 			}
 		}
 
+		if !isNumeric {
+			if len(valueSet) <= 1 && !allowSingleValueNonNumeric(pc.Type) {
+				log.Printf("[ConstraintCollector] 跳过单值非数值规则: param#%d value=%s", i, dedupValueSetSample(valueSet))
+				continue
+			}
+			pc.Values = dedupMapKeys(valueSet)
+			continue
+		}
+
 		if isNumeric && minVal != nil && maxVal != nil {
 			if len(numericValues) <= 1 {
 				log.Printf("[ConstraintCollector] 跳过单值数值规则: param#%d value=%s", i, minVal.String())
 				continue
 			}
-			pc.IsRange = true
-			pc.RangeMin = "0x" + minVal.Text(16)
-			pc.RangeMax = "0x" + maxVal.Text(16)
+			if shouldUseNumericRange(minVal, maxVal, len(numericValues)) {
+				pc.IsRange = true
+				pc.RangeMin = "0x" + minVal.Text(16)
+				pc.RangeMax = "0x" + maxVal.Text(16)
+			} else {
+				pc.Values = numericValuesToHex(numericValues)
+				log.Printf("[ConstraintCollector] 使用离散值替代宽范围: param#%d values=%d", i, len(pc.Values))
+			}
 		} else {
 			pc.Values = dedupMapKeys(valueSet)
 		}
@@ -930,6 +971,43 @@ func aggregateStateConstraints(contract common.Address, samples []constraintSamp
 	return constraints
 }
 
+func shouldUseNumericRange(minVal, maxVal *big.Int, uniqueCount int) bool {
+	if minVal == nil || maxVal == nil || uniqueCount < 2 {
+		return false
+	}
+	rangeSize := new(big.Int).Sub(maxVal, minVal)
+	if rangeSize.Sign() < 0 {
+		return false
+	}
+	// 范围太大时避免直接生成范围规则，防止误报
+	if rangeSize.BitLen() > 100 {
+		return false
+	}
+	maxInt64 := new(big.Int).SetInt64(int64(^uint64(0) >> 1))
+	if rangeSize.Cmp(maxInt64) > 0 {
+		return false
+	}
+	coverage := float64(uniqueCount) / float64(new(big.Int).Add(rangeSize, big.NewInt(1)).Int64())
+	return coverage >= 0.5
+}
+
+func numericValuesToHex(values map[string]struct{}) []string {
+	out := make([]string, 0, len(values))
+	for v := range values {
+		if bi, ok := new(big.Int).SetString(v, 10); ok {
+			out = append(out, "0x"+bi.Text(16))
+		}
+	}
+	return out
+}
+
+func dedupValueSetSample(values map[string]struct{}) string {
+	for v := range values {
+		return v
+	}
+	return ""
+}
+
 func dedupMapKeys(m map[string]struct{}) []string {
 	if len(m) == 0 {
 		return nil
@@ -939,6 +1017,29 @@ func dedupMapKeys(m map[string]struct{}) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+func shouldSkipParamType(paramType string) bool {
+	lower := strings.ToLower(paramType)
+	if strings.HasSuffix(lower, "_elem") {
+		return true
+	}
+	switch lower {
+	case "offset", "length", "bytes", "string", "skip":
+		return true
+	default:
+		return false
+	}
+}
+
+func allowSingleValueNonNumeric(paramType string) bool {
+	lower := strings.ToLower(paramType)
+	switch lower {
+	case "bytes32", "bytes4", "bytes20":
+		return true
+	default:
+		return false
+	}
 }
 
 // normalizeBigIntValue 将各种输入转为*big.Int
