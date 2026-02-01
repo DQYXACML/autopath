@@ -98,6 +98,13 @@ func (s *DualModeSimulator) SetRecordFullTrace(enable bool) {
 	s.recordFullTrace = enable
 }
 
+func (s *DualModeSimulator) SetRPCURL(url string) {
+	if s == nil || s.EVMSimulator == nil {
+		return
+	}
+	s.EVMSimulator.SetRPCURL(url)
+}
+
 // GetExecutionMode 获取当前执行模式
 func (s *DualModeSimulator) GetExecutionMode() ExecutionMode {
 	return s.mode

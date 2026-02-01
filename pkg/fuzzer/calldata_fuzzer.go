@@ -542,6 +542,9 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 			dualSim := simulator.NewDualModeSimulatorWithClients(rpcClient, client)
 			dualSim.SetExecutionMode(simulator.ModeLocal)
 			dualSim.SetRecordFullTrace(config.RecordFullTrace)
+			if config.RPCURL != "" {
+				dualSim.SetRPCURL(config.RPCURL)
+			}
 			fuzzer.dualSimulators = append(fuzzer.dualSimulators, dualSim)
 		}
 		if len(fuzzer.dualSimulators) > 0 {
@@ -648,6 +651,9 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 			dualSim := simulator.NewDualModeSimulatorWithClients(rpcClient, client)
 			dualSim.SetExecutionMode(simulator.ModeLocal)
 			dualSim.SetRecordFullTrace(config.RecordFullTrace)
+			if config.RPCURL != "" {
+				dualSim.SetRPCURL(config.RPCURL)
+			}
 			fuzzer.dualSimulators = append(fuzzer.dualSimulators, dualSim)
 		}
 		if len(fuzzer.dualSimulators) > 0 {
@@ -657,6 +663,9 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 	} else {
 		log.Printf("[Fuzzer]  使用RPC执行模式")
 		sim := simulator.NewEVMSimulatorWithClients(rpcClient, client)
+		if config.RPCURL != "" {
+			sim.SetRPCURL(config.RPCURL)
+		}
 		fuzzer.simulator = sim
 	}
 

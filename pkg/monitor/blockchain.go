@@ -76,6 +76,7 @@ func NewBlockchainMonitor(rpcURL string, registry *invariants.Registry) (*Blockc
 	client := ethclient.NewClient(rpcClient)
 
 	sim := simulator.NewEVMSimulatorWithClients(rpcClient, client)
+	sim.SetRPCURL(rpcURL)
 
 	return &BlockchainMonitor{
 		client:              client,
@@ -116,7 +117,7 @@ func (m *BlockchainMonitor) ConfigureFuzzing(config *FuzzingConfig, rpcURL strin
 	log.Printf("[Monitor]  配置Fuzzing，复用Monitor的RPC连接")
 
 	// 使用Monitor现有的RPC客户端创建fuzzing集成，避免创建新连接
-	fuzzing, err := NewFuzzingIntegrationWithClients(m.rpcClient, m.client, config)
+	fuzzing, err := NewFuzzingIntegrationWithClients(m.rpcClient, m.client, rpcURL, config)
 	if err != nil {
 		return fmt.Errorf("failed to create fuzzing integration: %w", err)
 	}

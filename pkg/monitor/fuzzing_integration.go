@@ -205,7 +205,7 @@ func NewFuzzingIntegration(rpcURL string, config *FuzzingConfig) (*FuzzingIntegr
 
 // NewFuzzingIntegrationWithClients 使用现有的RPC和Ethereum客户端创建模糊测试集成模块
 // 这个方法允许复用Monitor的连接，避免创建多个独立的RPC连接
-func NewFuzzingIntegrationWithClients(rpcClient *rpc.Client, client *ethclient.Client, config *FuzzingConfig) (*FuzzingIntegration, error) {
+func NewFuzzingIntegrationWithClients(rpcClient *rpc.Client, client *ethclient.Client, rpcURL string, config *FuzzingConfig) (*FuzzingIntegration, error) {
 	if config == nil {
 		config = &FuzzingConfig{
 			Enabled:            false,
@@ -245,7 +245,7 @@ func NewFuzzingIntegrationWithClients(rpcClient *rpc.Client, client *ethclient.C
 	}
 
 	fuzzerConfig := &fuzzer.Config{
-		RPCURL:                 "", // 不使用URL，因为我们传入了客户端
+		RPCURL:                 rpcURL,
 		TargetFunctionFallback: config.TargetFunctionFallback,
 		Threshold:              config.Threshold,
 		MaxVariations:          config.MaxVariations,

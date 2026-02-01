@@ -38,11 +38,6 @@
             "index": "6",
             "severity": "critical",
             "threshold": 5.0
-          },
-          "slot_0": {
-            "index": "10",
-            "severity": "critical",
-            "threshold": 0.25
           }
         },
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
@@ -121,6 +116,7 @@
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
         "contract": "0x34b666992fcce34669940ab6b017fe11e5750799",
@@ -131,11 +127,12 @@
     "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 10,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/citadelfinance",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -176,7 +173,143 @@
         "zone_gap_percent": 0.1,
         "zone_threshold": 0.75
       },
-      "enabled": true
+      "enabled": true,
+      "constraint_ranges": {
+        "redeem(uint256,uint256,uint256,uint8)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "5951614269374999822336",
+            "danger_threshold": "19838714231250000000001",
+            "attack_values": [
+              "19838714231250000000001",
+              "5951614269374999822336",
+              "5951614269375000000000"
+            ],
+            "range": {
+              "min": "5951614269374999822336",
+              "max": "19838714231250000000001"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "1"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
+          },
+          "2": {
+            "type": "uint256",
+            "safe_threshold": "191987557076612907008",
+            "danger_threshold": "19838714231250000000001",
+            "attack_values": [
+              "19838714231250000000001",
+              "191987557076612907008",
+              "5951614269375000000000"
+            ],
+            "range": {
+              "min": "191987557076612907008",
+              "max": "19838714231250000000001"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "redeemAmount"
+          },
+          "3": {
+            "type": "uint8",
+            "safe_threshold": "5951614269374999822336",
+            "danger_threshold": "19838714231250000000001",
+            "attack_values": [
+              "19838714231250000000001",
+              "5951614269374999822336",
+              "5951614269375000000000"
+            ],
+            "range": {
+              "min": "5951614269374999822336",
+              "max": "19838714231250000000001"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "1"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "1",
+          "2975807134687499911168",
+          "5356452842437500469248",
+          "5951614269374999822336",
+          "5951614269375000000000",
+          "6546775696312500224000",
+          "8927421404062499733504",
+          "9919357115625000000000",
+          "9919357115625000402944",
+          "11903228538749999644672",
+          "17854842808125001564160",
+          "19838714231250000000001",
+          "21822585654375004241920",
+          "29758071346875001208832",
+          "39677428462500000000002"
+        ],
+        "2": [
+          "1",
+          "95993778538306453504",
+          "172788801368951619584",
+          "191987557076612907008",
+          "211186312784274227200",
+          "287981335614919344128",
+          "383975114153225814016",
+          "5951614269375000000000",
+          "9919357115625000000000",
+          "9919357115625000402944",
+          "17854842808125001564160",
+          "19838714231250000000001",
+          "21822585654375004241920",
+          "29758071346875001208832",
+          "39677428462500000000002"
+        ],
+        "3": [
+          "1",
+          "2975807134687499911168",
+          "5356452842437500469248",
+          "5951614269374999822336",
+          "5951614269375000000000",
+          "6546775696312500224000",
+          "8927421404062499733504",
+          "9919357115625000000000",
+          "9919357115625000402944",
+          "11903228538749999644672",
+          "17854842808125001564160",
+          "19838714231250000000001",
+          "21822585654375004241920",
+          "29758071346875001208832",
+          "39677428462500000000002"
+        ]
+      }
     }
   },
   "alert_config": {

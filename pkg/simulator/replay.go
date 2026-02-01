@@ -23,6 +23,7 @@ import (
 type EVMSimulator struct {
 	client    *ethclient.Client
 	rpcClient *rpc.Client
+	rpcURL    string
 }
 
 // NewEVMSimulator 创建EVM模拟器
@@ -37,6 +38,7 @@ func NewEVMSimulator(rpcURL string) (*EVMSimulator, error) {
 	return &EVMSimulator{
 		client:    client,
 		rpcClient: rpcClient,
+		rpcURL:    rpcURL,
 	}, nil
 }
 
@@ -47,7 +49,12 @@ func NewEVMSimulatorWithClients(rpcClient *rpc.Client, client *ethclient.Client)
 	return &EVMSimulator{
 		client:    client,
 		rpcClient: rpcClient,
+		rpcURL:    "",
 	}
+}
+
+func (s *EVMSimulator) SetRPCURL(url string) {
+	s.rpcURL = url
 }
 
 // buildReplayTracerCode 生成重放交易的 JS tracer 代码
@@ -357,6 +364,149 @@ func parseReplayResult(raw json.RawMessage) (*ReplayResult, error) {
 	return replay, nil
 }
 
+func normalizeStackAddress(word string) string {
+	w := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(word)), "0x")
+	if w == "" {
+		return ""
+	}
+	if len(w) > 40 {
+		w = w[len(w)-40:]
+	}
+	if len(w) < 40 {
+		w = strings.Repeat("0", 40-len(w)) + w
+	}
+	return "0x" + w
+}
+
+func wsURLToHTTP(url string) string {
+	switch {
+	case strings.HasPrefix(url, "ws://"):
+		return "http://" + strings.TrimPrefix(url, "ws://")
+	case strings.HasPrefix(url, "wss://"):
+		return "https://" + strings.TrimPrefix(url, "wss://")
+	default:
+		return url
+	}
+}
+
+func callTargetFromStack(op string, stack []string) string {
+	if len(stack) == 0 {
+		return ""
+	}
+	var idx int
+	switch op {
+	case "CALL", "CALLCODE":
+		idx = len(stack) - 6
+	case "DELEGATECALL", "STATICCALL":
+		idx = len(stack) - 5
+	default:
+		return ""
+	}
+	if idx < 0 || idx >= len(stack) {
+		return ""
+	}
+	return normalizeStackAddress(stack[idx])
+}
+
+func isCallOp(op string) bool {
+	switch op {
+	case "CALL", "CALLCODE", "DELEGATECALL", "STATICCALL":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveProtectedIndices(path []ContractJumpDest, target common.Address) (int, int) {
+	if target == (common.Address{}) {
+		if len(path) == 0 {
+			return -1, -1
+		}
+		return 0, len(path)
+	}
+	targetLower := strings.ToLower(target.Hex())
+	start := -1
+	end := -1
+	for i, jd := range path {
+		if strings.EqualFold(jd.Contract, targetLower) {
+			if start == -1 {
+				start = i
+			}
+			end = i + 1
+		}
+	}
+	return start, end
+}
+
+func buildPathFromGethTrace(steps []gethTraceStep, rootAddr common.Address) ([]uint64, []ContractJumpDest, []string, []CallEdge) {
+	root := strings.ToLower(rootAddr.Hex())
+	addrByDepth := make(map[int]string)
+	pendingByDepth := make(map[int]string)
+	prevDepth := -1
+
+	var jumpDests []uint64
+	var contractJumpDests []ContractJumpDest
+	var callTargets []string
+	var callEdges []CallEdge
+
+	for _, step := range steps {
+		depth := step.Depth
+		if prevDepth == -1 {
+			if root != "" {
+				addrByDepth[depth] = root
+			}
+		} else {
+			if depth > prevDepth {
+				if pending, ok := pendingByDepth[prevDepth]; ok && pending != "" {
+					addrByDepth[depth] = pending
+				} else if addrByDepth[prevDepth] != "" {
+					addrByDepth[depth] = addrByDepth[prevDepth]
+				}
+			} else if depth < prevDepth {
+				for d := prevDepth; d > depth; d-- {
+					delete(addrByDepth, d)
+					delete(pendingByDepth, d)
+				}
+				if _, ok := addrByDepth[depth]; !ok && root != "" {
+					addrByDepth[depth] = root
+				}
+			} else if _, ok := addrByDepth[depth]; !ok && root != "" {
+				addrByDepth[depth] = root
+			}
+		}
+		prevDepth = depth
+
+		currentAddr := addrByDepth[depth]
+		if currentAddr == "" {
+			currentAddr = root
+		}
+
+		if step.Op == "JUMPDEST" {
+			jumpDests = append(jumpDests, step.PC)
+			contractJumpDests = append(contractJumpDests, ContractJumpDest{
+				Contract: currentAddr,
+				PC:       step.PC,
+			})
+		}
+
+		if isCallOp(step.Op) {
+			target := callTargetFromStack(step.Op, step.Stack)
+			if target != "" {
+				pendingByDepth[depth] = target
+				callTargets = append(callTargets, target)
+				callEdges = append(callEdges, CallEdge{
+					Caller: currentAddr,
+					Target: target,
+					Op:     step.Op,
+					Depth:  depth,
+				})
+			}
+		}
+	}
+
+	return jumpDests, contractJumpDests, callTargets, callEdges
+}
+
 // ContractJumpDest 合约维度的 JUMPDEST
 type ContractJumpDest struct {
 	Contract string `json:"contract"` // 合约地址
@@ -434,9 +584,35 @@ type PathStep struct {
 	Contract common.Address `json:"contract"` // 当前合约地址
 }
 
+type gethTraceStep struct {
+	Depth   int      `json:"depth"`
+	PC      uint64   `json:"pc"`
+	Op      string   `json:"op"`
+	Gas     uint64   `json:"gas"`
+	GasCost uint64   `json:"gasCost"`
+	Stack   []string `json:"stack"`
+	Memory  []string `json:"memory,omitempty"`
+}
+
+type gethTraceResult struct {
+	Gas         uint64          `json:"gas"`
+	ReturnValue string          `json:"returnValue"`
+	StructLogs  []gethTraceStep `json:"structLogs"`
+	Failed      bool            `json:"failed"`
+}
+
 // ForkAndReplay Fork状态并重放交易
 func (s *EVMSimulator) ForkAndReplay(ctx context.Context, blockNumber uint64, txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
-	// 使用 debug_traceTransaction 获取执行轨迹
+	// 优先使用 geth-style debug_traceTransaction(structLogs)
+	if res, err := s.traceTransactionWithGethTracer(ctx, txHash, protectedContract); err == nil {
+		fmt.Printf("[DEBUG ForkAndReplay] geth tracer 成功! JumpDests=%d, ContractJumpDests=%d, ProtectedStart=%d\n",
+			len(res.JumpDests), len(res.ContractJumpDests), res.ProtectedStartIndex)
+		return res, nil
+	} else {
+		fmt.Printf("[DEBUG ForkAndReplay] geth tracer 失败: %v\n", err)
+	}
+
+	// 回退到 JS tracer
 	result, err := s.traceTransactionWithCustomTracer(txHash, protectedContract)
 	if err != nil {
 		fmt.Printf("[DEBUG ForkAndReplay] traceTransactionWithCustomTracer失败: %v\n", err)
@@ -452,6 +628,103 @@ func (s *EVMSimulator) ForkAndReplay(ctx context.Context, blockNumber uint64, tx
 	fmt.Printf("[DEBUG ForkAndReplay] 成功! JumpDests=%d, ContractJumpDests=%d, ProtectedStart=%d\n",
 		len(result.JumpDests), len(result.ContractJumpDests), result.ProtectedStartIndex)
 	return result, nil
+}
+
+func (s *EVMSimulator) resolveTraceRootAddress(ctx context.Context, txHash common.Hash) (common.Address, error) {
+	if s.client == nil {
+		return common.Address{}, fmt.Errorf("eth client not initialized")
+	}
+	if tx, _, err := s.client.TransactionByHash(ctx, txHash); err == nil && tx != nil {
+		if to := tx.To(); to != nil {
+			return *to, nil
+		}
+	}
+	if receipt, err := s.client.TransactionReceipt(ctx, txHash); err == nil && receipt != nil {
+		if receipt.ContractAddress != (common.Address{}) {
+			return receipt.ContractAddress, nil
+		}
+	}
+	return common.Address{}, fmt.Errorf("failed to resolve root address for trace")
+}
+
+func (s *EVMSimulator) traceTransactionWithGethTracer(ctx context.Context, txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
+	rootAddr, err := s.resolveTraceRootAddress(ctx, txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	traceParams := map[string]interface{}{
+		"disableStorage": true,
+		"disableMemory":  true,
+		"disableStack":   false,
+	}
+
+	// 若主RPC为ws/wss，优先使用HTTP执行trace以避免大响应触发读限制
+	if httpURL := wsURLToHTTP(s.rpcURL); httpURL != "" && httpURL != s.rpcURL {
+		if httpClient, dialErr := rpc.Dial(httpURL); dialErr == nil {
+			defer httpClient.Close()
+			var httpTrace gethTraceResult
+			if httpErr := httpClient.CallContext(ctx, &httpTrace, "debug_traceTransaction", txHash, traceParams); httpErr == nil {
+				if len(httpTrace.StructLogs) == 0 {
+					return nil, fmt.Errorf("geth trace returned empty structLogs")
+				}
+				jumpDests, contractJumpDests, callTargets, callEdges := buildPathFromGethTrace(httpTrace.StructLogs, rootAddr)
+				startIdx, endIdx := resolveProtectedIndices(contractJumpDests, protectedContract)
+				return &ReplayResult{
+					Success:             !httpTrace.Failed,
+					GasUsed:             httpTrace.Gas,
+					ReturnData:          httpTrace.ReturnValue,
+					JumpDests:           jumpDests,
+					ContractJumpDests:   contractJumpDests,
+					CallTargets:         callTargets,
+					CallEdges:           callEdges,
+					ProtectedStartIndex: startIdx,
+					ProtectedEndIndex:   endIdx,
+				}, nil
+			}
+		}
+	}
+
+	var trace gethTraceResult
+	err = s.rpcClient.CallContext(ctx, &trace, "debug_traceTransaction", txHash, traceParams)
+	if err != nil {
+		if strings.Contains(err.Error(), "read limit exceeded") && s.rpcURL != "" {
+			httpURL := wsURLToHTTP(s.rpcURL)
+			if httpURL != "" && httpURL != s.rpcURL {
+				if httpClient, dialErr := rpc.Dial(httpURL); dialErr == nil {
+					defer httpClient.Close()
+					var httpTrace gethTraceResult
+					if httpErr := httpClient.CallContext(ctx, &httpTrace, "debug_traceTransaction", txHash, traceParams); httpErr == nil {
+						trace = httpTrace
+						err = nil
+					} else {
+						err = httpErr
+					}
+				}
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("geth trace failed: %w", err)
+		}
+	}
+	if len(trace.StructLogs) == 0 {
+		return nil, fmt.Errorf("geth trace returned empty structLogs")
+	}
+
+	jumpDests, contractJumpDests, callTargets, callEdges := buildPathFromGethTrace(trace.StructLogs, rootAddr)
+	startIdx, endIdx := resolveProtectedIndices(contractJumpDests, protectedContract)
+
+	return &ReplayResult{
+		Success:             !trace.Failed,
+		GasUsed:             trace.Gas,
+		ReturnData:          trace.ReturnValue,
+		JumpDests:           jumpDests,
+		ContractJumpDests:   contractJumpDests,
+		CallTargets:         callTargets,
+		CallEdges:           callEdges,
+		ProtectedStartIndex: startIdx,
+		ProtectedEndIndex:   endIdx,
+	}, nil
 }
 
 // traceTransactionWithCustomTracer 使用自定义追踪器追踪交易
@@ -478,6 +751,10 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 	startTime := time.Now()
 	err := s.rpcClient.Call(&result, "debug_traceTransaction", txHash, map[string]interface{}{
 		"tracer": tracerCode,
+		// Ensure deep call frames are traced (some Anvil builds default to top-level only)
+		"tracerConfig": map[string]interface{}{
+			"onlyTopCall": false,
+		},
 	})
 	elapsed := time.Since(startTime)
 
@@ -521,6 +798,10 @@ func (s *EVMSimulator) ReplayTransactionWithOverride(
 
 	options := map[string]interface{}{
 		"tracer": tracerCode,
+		// Ensure deep call frames are traced (some Anvil builds default to top-level only)
+		"tracerConfig": map[string]interface{}{
+			"onlyTopCall": false,
+		},
 	}
 
 	params := []interface{}{
@@ -1241,15 +1522,19 @@ func (s *EVMSimulator) traceTransactionWithCallTracer(txHash common.Hash) (*Repl
 	if err := json.Unmarshal(raw, &frame); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal callTracer frame: %w", err)
 	}
-	addrs := flattenCallAddresses(frame)
+	addrs := normalizeCallAddresses(flattenCallAddresses(frame))
 	pseudo := addressesToPseudoJumpDests(addrs)
+	contractJumpDests := addressesToContractJumpDests(addrs, pseudo)
 	return &ReplayResult{
-		Success:       true,
-		GasUsed:       0,
-		ReturnData:    "",
-		JumpDests:     pseudo,
-		ExecutionPath: nil,
-		Error:         "",
+		Success:             true,
+		GasUsed:             0,
+		ReturnData:          "",
+		JumpDests:           pseudo,
+		ContractJumpDests:   contractJumpDests,
+		CallTargets:         addrs,
+		ExecutionPath:       nil,
+		ProtectedStartIndex: 0,
+		Error:               "",
 	}, nil
 }
 
@@ -1290,14 +1575,18 @@ func (s *EVMSimulator) simulateWithCallTracer(
 	if err := json.Unmarshal(raw, &frame); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal callTracer frame: %w", err)
 	}
-	addrs := flattenCallAddresses(frame)
+	addrs := normalizeCallAddresses(flattenCallAddresses(frame))
 	pseudo := addressesToPseudoJumpDests(addrs)
+	contractJumpDests := addressesToContractJumpDests(addrs, pseudo)
 	return &ReplayResult{
-		Success:    true,
-		GasUsed:    0,
-		ReturnData: "",
-		JumpDests:  pseudo,
-		Error:      "",
+		Success:             true,
+		GasUsed:             0,
+		ReturnData:          "",
+		JumpDests:           pseudo,
+		ContractJumpDests:   contractJumpDests,
+		CallTargets:         addrs,
+		ProtectedStartIndex: 0,
+		Error:               "",
 	}, nil
 }
 
@@ -1314,6 +1603,38 @@ func flattenCallAddresses(frame callTracerFrame) []string {
 	}
 	dfs(frame)
 	return res
+}
+
+func normalizeCallAddresses(addrs []string) []string {
+	if len(addrs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		if addr == "" {
+			continue
+		}
+		out = append(out, strings.ToLower(addr))
+	}
+	return out
+}
+
+func addressesToContractJumpDests(addrs []string, pseudo []uint64) []ContractJumpDest {
+	if len(addrs) == 0 {
+		return nil
+	}
+	out := make([]ContractJumpDest, 0, len(addrs))
+	for i, addr := range addrs {
+		pc := uint64(0)
+		if i < len(pseudo) {
+			pc = pseudo[i]
+		}
+		out = append(out, ContractJumpDest{
+			Contract: addr,
+			PC:       pc,
+		})
+	}
+	return out
 }
 
 func addressesToPseudoJumpDests(addrs []string) []uint64 {

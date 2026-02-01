@@ -42,14 +42,9 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "2",
-            "severity": "critical",
-            "threshold": 0.25
-          },
-          "slot_1": {
             "index": "69889958586084086470533215365566224385617876877312293383688826592950727306725",
             "severity": "critical",
-            "threshold": 0.25
+            "threshold": 0.15
           }
         },
         "formula": "abs(value_after - value_before) / value_before <= 0.15"
@@ -506,26 +501,28 @@
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
         "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
         "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
+        "signature": "deposit(uint256,uint256,address,address,uint256[4])"
       },
       {
         "contract": "0x1F1Ca4e8236CD13032653391dB7e9544a6ad123E",
         "function": "deposit",
-        "signature": "deposit(uint256,uint256,address,address,uint256)"
+        "signature": "deposit(uint256,uint256,address,address,uint256[4])"
       }
     ],
     "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 10,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/gamma",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -630,7 +627,7 @@
             "value_expr": "0"
           },
           "2": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "3000000000000",
             "danger_threshold": "3000000000000",
             "attack_values": [
@@ -645,7 +642,7 @@
             "value_expr": "3_000_000_000_000"
           },
           "3": {
-            "type": "address",
+            "type": "bytes",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -683,7 +680,7 @@
             "value_expr": "false"
           },
           "2": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "0",
             "danger_threshold": "0",
             "attack_values": [],
@@ -696,7 +693,7 @@
             "value_expr": "int256(I(usdce).balanceOf(address(this)))"
           },
           "3": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "4526582309038291990822582",
             "danger_threshold": "4526582309038291990822582",
             "attack_values": [
@@ -769,7 +766,7 @@
             "value_expr": "arr01"
           },
           "2": {
-            "type": "address",
+            "type": "uint256",
             "safe_threshold": "2000000000000",
             "danger_threshold": "2000000000000",
             "attack_values": [
@@ -784,7 +781,7 @@
             "value_expr": "arr02"
           },
           "3": {
-            "type": "address",
+            "type": "bytes",
             "safe_threshold": "\"x\"",
             "danger_threshold": "\"x\"",
             "attack_values": [],
@@ -948,8 +945,7 @@
           "231584178474632390847141970017375815706539969331281128078915168015826259279870"
         ]
       }
-    },
-    "record_full_trace": true
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

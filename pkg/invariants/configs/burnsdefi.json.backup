@@ -4,7 +4,7 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD",
+    "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
     "0xc9fbcf3eb24385491f73bbf691b13a6f8be7c339",
     "0xb5eebf73448e22ce6a556f848360057f6aadd4e7",
     "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
@@ -19,9 +19,7 @@
     "0xBA5Fe23f8a3a24BEd3236F05F2FcF35fd0BF0B5C",
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
     "0xb38645331535d8a24250bd866c230d0d85c11b90",
-    "0x0000000000000000000000000000000000000000",
-    "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f",
-    "0x000000000000000000000000000000000000dEaD"
+    "0x5ff10565516c110180bb9cc111cdbc2b0a68e09f"
   ],
   "invariants": [
     {
@@ -31,7 +29,7 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        "threshold": 0.1,
+        "threshold": 0.25,
         "contracts": [
           "0x91f1d3C7ddB8d5E290e71f893baD45F16E8Bd7BA"
         ],
@@ -39,10 +37,10 @@
           "slot_0": {
             "index": "16721512684780778038822999274059501864770822696976252784500644160565778069977",
             "severity": "critical",
-            "threshold": 0.1
+            "threshold": 0.25
           }
         },
-        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
       "monitored_functions": [
         "receiveRewards",
@@ -51,56 +49,6 @@
     },
     {
       "id": "PATTERN_flash_change_002",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.1,
-        "contracts": [
-          "0x55d398326f99059fF775485246999027B3197955"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "85020258511802602552357718591233560073424276047458034666751184169276252620384",
-            "severity": "critical",
-            "threshold": 0.1
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.1"
-      },
-      "monitored_functions": [
-        "receiveRewards",
-        "burnToHolder"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_003",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD"
-        ],
-        "slots": {
-          "reserve1_slot": {
-            "index": "9",
-            "severity": "critical",
-            "threshold": 5.0
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "receiveRewards",
-        "burnToHolder"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_006",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -160,28 +108,24 @@
       ]
     },
     {
-      "id": "PATTERN_ratio_break_002",
-      "name": "Ensure ratio stability between related values",
-      "type": "ratio_stability",
-      "severity": "high",
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
       "enabled": true,
       "parameters": {
-        "threshold": 0.12,
+        "threshold": 0.25,
         "contracts": [
-          "0x91f1d3C7ddB8d5E290e71f893baD45F16E8Bd7BA",
-          "0x55d398326f99059fF775485246999027B3197955",
-          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-          "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD",
-          "0xb5eebf73448e22ce6a556f848360057f6aadd4e7"
+          "0x55d398326f99059fF775485246999027B3197955"
         ],
         "slots": {
-          "reserve1_slot": {
-            "index": "9",
-            "severity": "high",
-            "threshold": 0.12
+          "slot_0": {
+            "index": "85020258511802602552357718591233560073424276047458034666751184169276252620384",
+            "severity": "critical",
+            "threshold": 0.25
           }
         },
-        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
       "monitored_functions": [
         "receiveRewards",
@@ -189,7 +133,61 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_004",
+      "id": "PATTERN_flash_change_004",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "receiveRewards",
+        "burnToHolder"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.3,
+        "contracts": [
+          "0x91f1d3C7ddB8d5E290e71f893baD45F16E8Bd7BA",
+          "0xb5eebf73448e22ce6a556f848360057f6aadd4e7",
+          "0x55d398326f99059fF775485246999027B3197955",
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 0.3
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
+      },
+      "monitored_functions": [
+        "receiveRewards",
+        "burnToHolder"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -219,32 +217,7 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_005",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD"
-        ],
-        "slots": {
-          "reserve1_slot": {
-            "index": "9",
-            "severity": "high",
-            "threshold": 5.0
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "receiveRewards",
-        "burnToHolder"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_006",
+      "id": "PATTERN_monotonic_increase_002",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -304,18 +277,43 @@
       ]
     },
     {
+      "id": "PATTERN_monotonic_increase_003",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "receiveRewards",
+        "burnToHolder"
+      ]
+    },
+    {
       "id": "PATTERN_reentrancy_balance_001",
       "name": "Limit balance changes to prevent reentrancy attacks",
       "type": "balance_change_limit",
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.1,
+        "threshold": 0.25,
         "contracts": [
           "0x91f1d3C7ddB8d5E290e71f893baD45F16E8Bd7BA"
         ],
         "slots": {},
-        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.25"
       },
       "monitored_functions": [
         "receiveRewards",
@@ -329,12 +327,12 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.1,
+        "threshold": 0.25,
         "contracts": [
           "0xc9fbcf3eb24385491f73bbf691b13a6f8be7c339"
         ],
         "slots": {},
-        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.25"
       },
       "monitored_functions": [
         "receiveRewards",
@@ -344,26 +342,28 @@
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
-        "contract": "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD",
+        "contract": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
         "function": "receiveRewards",
         "signature": "receiveRewards(address)"
       },
       {
-        "contract": "0x4fb9657Ac5d311dD54B37A75cFB873b127Eb21FD",
+        "contract": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
         "function": "burnToHolder",
         "signature": "burnToHolder(uint256,address)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/burnsdefi",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -406,14 +406,15 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "burnToHolder": {
-          "1": {
+        "flashLoan(uint256,uint256,address,uint256)": {
+          "0": {
             "type": "uint256",
             "safe_threshold": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
             "danger_threshold": "115792089230712320190221029862257368673225124874509870542732570770446756104699",
             "attack_values": [
               "115792089230712320190221029862257368673225124874509870542732570770446756104699",
-              "34737626769213695565514836164503977698005748977364513567099950545353310208000"
+              "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "34737626769213696057066308958677210601967537462352961162819771231134026831409"
             ],
             "range": {
               "min": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
@@ -421,7 +422,150 @@
             },
             "mutation_strategy": "progressive_approach",
             "confidence": 0.75,
-            "value_expr": "exploiter"
+            "value_expr": "250_000 * 1e18"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
+          },
+          "2": {
+            "type": "address",
+            "safe_threshold": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
+            "danger_threshold": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
+            "attack_values": [
+              "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          },
+          "3": {
+            "type": "uint256",
+            "safe_threshold": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+            "danger_threshold": "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+            "attack_values": [
+              "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+              "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "34737626769213696057066308958677210601967537462352961162819771231134026831409"
+            ],
+            "range": {
+              "min": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "max": "115792089230712320190221029862257368673225124874509870542732570770446756104699"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "data"
+          }
+        },
+        "getAmountsIn(uint256,address[])": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+            "danger_threshold": "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+            "attack_values": [
+              "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+              "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "57896044615356160095110514931128684336612562437254935271366285385223378052349"
+            ],
+            "range": {
+              "min": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "max": "115792089230712320190221029862257368673225124874509870542732570770446756104699"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "amountOut1"
+          },
+          "1": {
+            "type": "address[]",
+            "safe_threshold": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+            "danger_threshold": "0x91f1d3c7ddb8d5e290e71f893bad45f16e8bd7ba",
+            "attack_values": [
+              "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+              "0x91f1d3c7ddb8d5e290e71f893bad45f16e8bd7ba"
+            ],
+            "range": {
+              "min": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+              "max": "0x91f1d3c7ddb8d5e290e71f893bad45f16e8bd7ba"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "path"
+          }
+        },
+        "burnToHolder(uint256,address)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+            "danger_threshold": "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+            "attack_values": [
+              "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+              "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "34737626769213696057066308958677210601967537462352961162819771231134026831409"
+            ],
+            "range": {
+              "min": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "max": "115792089230712320190221029862257368673225124874509870542732570770446756104699"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "amounts[0]"
+          }
+        },
+        "receiveRewards(address)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
+            "danger_threshold": "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd",
+            "attack_values": [
+              "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          }
+        },
+        "transfer(address,uint256)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0xd5f05644ef5d0a36ca8c8b5177ffbd09ec63f92f",
+            "danger_threshold": "0xd5f05644ef5d0a36ca8c8b5177ffbd09ec63f92f",
+            "attack_values": [
+              "0xd5f05644ef5d0a36ca8c8b5177ffbd09ec63f92f"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(DSP)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+            "danger_threshold": "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+            "attack_values": [
+              "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+              "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "57896044615356160095110514931128684336612562437254935271366285385223378052349"
+            ],
+            "range": {
+              "min": "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+              "max": "115792089230712320190221029862257368673225124874509870542732570770446756104699"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "baseAmount"
           }
         }
       },
@@ -439,7 +583,31 @@
         "random_within_range_ratio": 0.3
       },
       "attack_seeds": {
+        "0": [
+          "0xd5f05644ef5d0a36ca8c8b5177ffbd09ec63f92f",
+          "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+        ],
         "1": [
+          "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+          "0x91f1d3c7ddb8d5e290e71f893bad45f16e8bd7ba",
+          "17368813384606847782757418082251988849002874488682256783549975272676655104000",
+          "31263864092292329222839441066034131012129358761953267254795943056403649789952",
+          "34737626769213695565514836164503977698005748977364513567099950545353310208000",
+          "38211389446135068335942408298934926551730508557426169968215933165474311831552",
+          "52106440153820540134396165728775415463084438783721565306243938252444294709248",
+          "57896044615356160095110514931128684336612562437254935271366285385223378052349",
+          "57896044615356161418442119286160330219292371417157659308103909285979297415168",
+          "69475253538427391131029672329007955396011497954729027134199901090706620416000",
+          "104212880307641093124296685529473035261865616296743950790111826767231271829504",
+          "115792089230712320190221029862257368673225124874509870542732570770446756104699",
+          "127371298153783565404976145687090489951000608101187506619927760639028600242176",
+          "173688133846068484255326357858480990657877114251472977924311727857937892245504",
+          "231584178461424640380442059724514737346450249749019741085465141540893512209398"
+        ],
+        "2": [
+          "0x4fb9657ac5d311dd54b37a75cfb873b127eb21fd"
+        ],
+        "3": [
           "17368813384606847782757418082251988849002874488682256783549975272676655104000",
           "31263864092292329222839441066034131012129358761953267254795943056403649789952",
           "34737626769213695565514836164503977698005748977364513567099950545353310208000",

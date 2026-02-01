@@ -439,6 +439,7 @@
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
         "contract": "0xb38c2d2d6a168d41aa8eb4cead47e01badbdcf57",
@@ -454,6 +455,7 @@
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/mic",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -663,8 +665,7 @@
           "231584178474632390847141970017375815706539969331281128078915168015826259279870"
         ]
       }
-    },
-    "record_full_trace": true
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",
