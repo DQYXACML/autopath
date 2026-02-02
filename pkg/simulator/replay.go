@@ -378,6 +378,22 @@ func normalizeStackAddress(word string) string {
 	return "0x" + w
 }
 
+func isSuspiciousLowAddress(addr string) bool {
+	a := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(addr)), "0x")
+	if a == "" {
+		return true
+	}
+	if len(a) > 40 {
+		a = a[len(a)-40:]
+	}
+	if len(a) < 40 {
+		a = strings.Repeat("0", 40-len(a)) + a
+	}
+	// Treat very low addresses (<= 0xFFFF) as suspicious call targets
+	// 40 hex chars = 20 bytes. <= 0xFFFF means the high 18 bytes are zero.
+	return strings.TrimLeft(a[:36], "0") == ""
+}
+
 func wsURLToHTTP(url string) string {
 	switch {
 	case strings.HasPrefix(url, "ws://"):
@@ -394,18 +410,33 @@ func callTargetFromStack(op string, stack []string) string {
 		return ""
 	}
 	var idx int
+	var altIdx int
 	switch op {
 	case "CALL", "CALLCODE":
 		idx = len(stack) - 6
+		altIdx = 5 // some tracers return stack with top at index 0
 	case "DELEGATECALL", "STATICCALL":
 		idx = len(stack) - 5
+		altIdx = 4
 	default:
 		return ""
 	}
 	if idx < 0 || idx >= len(stack) {
-		return ""
+		idx = -1
 	}
-	return normalizeStackAddress(stack[idx])
+	if idx >= 0 {
+		cand := normalizeStackAddress(stack[idx])
+		if !isSuspiciousLowAddress(cand) {
+			return cand
+		}
+	}
+	if altIdx >= 0 && altIdx < len(stack) {
+		candAlt := normalizeStackAddress(stack[altIdx])
+		if !isSuspiciousLowAddress(candAlt) {
+			return candAlt
+		}
+	}
+	return ""
 }
 
 func isCallOp(op string) bool {
@@ -533,6 +564,68 @@ type CallFrame struct {
 	Output  string                  `json:"output"`
 	Error   string                  `json:"error"`
 	Calls   []CallFrame             `json:"calls"`
+}
+
+func collectCallEdgesFromTracerFrame(frame CallFrame, depth int, edges *[]CallEdge, targets *[]string) {
+	if frame.To != "" && frame.From != "" {
+		op := strings.ToUpper(strings.TrimSpace(frame.Type))
+		if op == "" {
+			op = "CALL"
+		}
+		caller := normalizeStackAddress(frame.From)
+		target := normalizeStackAddress(frame.To)
+		if !isSuspiciousLowAddress(target) && !isSuspiciousLowAddress(caller) {
+			*edges = append(*edges, CallEdge{
+				Caller: caller,
+				Target: target,
+				Op:     op,
+				Depth:  depth,
+			})
+			*targets = append(*targets, target)
+		}
+	}
+	for i := range frame.Calls {
+		collectCallEdgesFromTracerFrame(frame.Calls[i], depth+1, edges, targets)
+	}
+}
+
+func mergeCallEdges(primary []CallEdge, extra []CallEdge) []CallEdge {
+	if len(extra) == 0 {
+		return primary
+	}
+	seen := make(map[string]struct{}, len(primary))
+	for _, e := range primary {
+		key := strings.ToLower(e.Caller) + "->" + strings.ToLower(e.Target) + ":" + strings.ToUpper(e.Op)
+		seen[key] = struct{}{}
+	}
+	for _, e := range extra {
+		key := strings.ToLower(e.Caller) + "->" + strings.ToLower(e.Target) + ":" + strings.ToUpper(e.Op)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		primary = append(primary, e)
+	}
+	return primary
+}
+
+func mergeCallTargets(primary []string, extra []string) []string {
+	if len(extra) == 0 {
+		return primary
+	}
+	seen := make(map[string]struct{}, len(primary))
+	for _, t := range primary {
+		seen[strings.ToLower(t)] = struct{}{}
+	}
+	for _, t := range extra {
+		key := strings.ToLower(t)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		primary = append(primary, t)
+	}
+	return primary
 }
 
 // ReplayResult 重放结果
@@ -669,6 +762,10 @@ func (s *EVMSimulator) traceTransactionWithGethTracer(ctx context.Context, txHas
 					return nil, fmt.Errorf("geth trace returned empty structLogs")
 				}
 				jumpDests, contractJumpDests, callTargets, callEdges := buildPathFromGethTrace(httpTrace.StructLogs, rootAddr)
+				if tracerEdges, tracerTargets, tracerErr := s.callEdgesFromCallTracer(ctx, txHash); tracerErr == nil {
+					callEdges = mergeCallEdges(callEdges, tracerEdges)
+					callTargets = mergeCallTargets(callTargets, tracerTargets)
+				}
 				startIdx, endIdx := resolveProtectedIndices(contractJumpDests, protectedContract)
 				return &ReplayResult{
 					Success:             !httpTrace.Failed,
@@ -712,6 +809,10 @@ func (s *EVMSimulator) traceTransactionWithGethTracer(ctx context.Context, txHas
 	}
 
 	jumpDests, contractJumpDests, callTargets, callEdges := buildPathFromGethTrace(trace.StructLogs, rootAddr)
+	if tracerEdges, tracerTargets, tracerErr := s.callEdgesFromCallTracer(ctx, txHash); tracerErr == nil {
+		callEdges = mergeCallEdges(callEdges, tracerEdges)
+		callTargets = mergeCallTargets(callTargets, tracerTargets)
+	}
 	startIdx, endIdx := resolveProtectedIndices(contractJumpDests, protectedContract)
 
 	return &ReplayResult{
@@ -725,6 +826,24 @@ func (s *EVMSimulator) traceTransactionWithGethTracer(ctx context.Context, txHas
 		ProtectedStartIndex: startIdx,
 		ProtectedEndIndex:   endIdx,
 	}, nil
+}
+
+func (s *EVMSimulator) callEdgesFromCallTracer(ctx context.Context, txHash common.Hash) ([]CallEdge, []string, error) {
+	var raw json.RawMessage
+	if err := s.rpcClient.CallContext(ctx, &raw, "debug_traceTransaction", txHash, map[string]interface{}{
+		"tracer":       "callTracer",
+		"tracerConfig": map[string]interface{}{"onlyTopCall": false},
+	}); err != nil {
+		return nil, nil, err
+	}
+	var frame callTracerFrame
+	if err := json.Unmarshal(raw, &frame); err != nil {
+		return nil, nil, err
+	}
+	edges := []CallEdge{}
+	targets := []string{}
+	collectCallEdgesFromTracerFrame(frame, 0, &edges, &targets)
+	return edges, targets, nil
 }
 
 // traceTransactionWithCustomTracer 使用自定义追踪器追踪交易

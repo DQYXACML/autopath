@@ -3126,6 +3126,11 @@ func resolvePathContractAddr(result *simulator.ReplayResult, contractAddr common
 	}
 
 	if resolved, hits, mode := resolveDelegateCallTarget(result, contractAddr); resolved != "" {
+		if isLikelyLowAddress(resolved) {
+			log.Printf("[Fuzzer]  路径映射忽略：低地址疑似偏移值 (target=%s, resolved=%s, mode=%s)",
+				contractAddr.Hex(), resolved, mode)
+			return contractAddr
+		}
 		if mode != "delegatecall-caller" && mode != "delegatecall-any" {
 			log.Printf("[Fuzzer]  路径映射忽略：非delegatecall模式 (mode=%s, target=%s, resolved=%s)",
 				mode, contractAddr.Hex(), resolved)
@@ -3136,12 +3141,33 @@ func resolvePathContractAddr(result *simulator.ReplayResult, contractAddr common
 		return common.HexToAddress(resolved)
 	}
 	if resolved, hits, mode := resolveDelegateCallCaller(result, contractAddr); resolved != "" {
+		if isLikelyLowAddress(resolved) {
+			log.Printf("[Fuzzer]  路径映射忽略：低地址疑似偏移值 (target=%s, resolved=%s, mode=%s)",
+				contractAddr.Hex(), resolved, mode)
+			return contractAddr
+		}
 		log.Printf("[Fuzzer]  delegatecall调用方路径映射: %s -> %s (hits=%d, mode=%s)",
 			contractAddr.Hex(), resolved, hits, mode)
 		return common.HexToAddress(resolved)
 	}
 
 	return contractAddr
+}
+
+func isLikelyLowAddress(addr string) bool {
+	a := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(addr)), "0x")
+	if a == "" {
+		return true
+	}
+	if len(a) > 40 {
+		a = a[len(a)-40:]
+	}
+	if len(a) < 40 {
+		a = strings.Repeat("0", 40-len(a)) + a
+	}
+	// Treat very low addresses (<= 0xFFFF) as suspicious call targets
+	// 40 hex chars = 20 bytes. <= 0xFFFF means the high 18 bytes are zero.
+	return strings.TrimLeft(a[:36], "0") == ""
 }
 
 // getOriginalExecution 获取原始交易的执行路径
