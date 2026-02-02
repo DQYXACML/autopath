@@ -22,72 +22,10 @@
     "0xBafE01ff935C7305907c33BF824352eE5979B526",
     "0x3363BAe2Fc44dA742Df13CD3ee94b6bB868ea376",
     "0xd956188795ca6F4A74092ddca33E0Ea4cA3a1395",
-    "0x0000000000000000000000000000000000000000",
-    "0x000000000000000000000000000000e2f75c38bc",
-    "0x01265b280000000000000000000000e2f75c38bc",
-    "0x00000000000000000000000039aa39c021dfbae8",
-    "0x01265b2800000000000000000000000000c24fba",
-    "0x00000000000000000000000035a18000230da775",
-    "0x0000000000000000000000000000000000c24fba",
-    "0x000000000000000000000000000000000001b73a",
-    "0x0100048f9c00000000000000000000000a98ea1e",
-    "0x000100012c012c006fff21160000000000000000",
-    "0x00000000000000000000000000000001312b3a4b",
-    "0x000000000000000000000000000000000184baeb",
-    "0x00000000000000000000000000000001fe64bbbf",
-    "0x00000000000000000000000000000000023e8467",
-    "0x000000000000000000000000000000000001f20d",
-    "0x0103288e910000000000000000000010b7ba125c",
-    "0x00010002d302d300e302ff4500000000000047e8",
-    "0x0165a1ac030000000000000001eb046366848a9b",
-    "0x0000000000000000000000000000000000007eb7",
-    "0x00000000000000000000000000000e8efeee909f",
-    "0x00000000000000000000000000000e44af453217",
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    "0xea80dd88ed2c8da1b3cfa53b6b2568ae58fe83d4",
-    "0x231554ca30e30e3daf1985a58abe660eac42605f",
-    "0x9eec21cbcbe49a9595d7eb0824a6fc04dcfce1a0",
-    "0xd3d8ec56653fd25ce44d8de1229fc5bfc7b6aee0",
-    "0x8fc13d1caece6612221ef6979b11849610022c9b",
-    "0x0126545e0000000000000000000000e2f75c38bc",
-    "0xbccdc544072f1d154275788f84bcf1a9429a7563",
-    "0xc43a18728dee70c1cf76a513eef739350a6e2b67",
-    "0x60c5448f9600c8cfb7b7dd0290d6477ddbc2ca3e",
-    "0x54e45edb6ae82a28c984636fb12937385069a8f9",
-    "0x3707462b181da5757afb393000713f9d89955f52",
-    "0xc37f68e20000000000000000000000007fa9385b",
-    "0x95dd91930000000000000000000000007fa9385b",
-    "0x94026470579dade20bbb195e632db4bf2b9b3b80",
-    "0x01262b4100000000000000000000000000c24fba",
-    "0x682eb2f8453604ce179764b3166248987047b144",
-    "0xd3444737ce043bfa7143ba897b3e4f3b3739c8e8",
     "0xbbf3f1421D886E9b2c5D716B5192aC998af2012c",
-    "0x4fb66b896fddf3708da281eec5e36eecf339a212",
-    "0x82b34cdc4a5e594815d7017fb18029bb16fde230",
-    "0x9a37937c0ede8c307bf0496ec60e131422d44420",
-    "0x721f2b1cb9f99b674fe5c7c0cdfaeb08cbc94d46",
-    "0xa20c45dd8a851b8b8653a17982859bee31b444ff",
-    "0xb884b91182324d70fdc7c8411c40d802e62f41c4",
-    "0x1da434b76eba4736d6e760bfd78cbf883a0776ee",
-    "0x60cff0c23fc1da8f79d34e3688edc4bc06ef3187",
-    "0x2fd001a4ba34c4a16dfe4e09bc7a6a4c7e77e9d2",
-    "0x0165d41d8f0000000000000000000a26a238bb17",
-    "0x000100012c012c006fff21640000000000000000",
-    "0x24a22e16b21307b87d2d45e013c273ca1e6e3dd8",
-    "0x00000000000000000000000000000000cd38884d",
-    "0x00000000000000000000000000000000009287c6",
-    "0x00000000000000000000000000000001fe575944",
-    "0x00000000000000000000000000000001fc1b008a",
-    "0x00000000000000000000000000000000021550a4",
-    "0x0162b01e9a0000000000000000000a15f51792d9",
-    "0x1f21a62c4538bacf2aabeca410f0fe63151869f1",
-    "0x390f6178407c9b8e95802b8659e6df8e34c1e3d4",
-    "0x00010002d302d300e302ff3f00000000000047e3",
-    "0xa99c246bf102f1a2c53a06c162e7c901706b8b88",
-    "0x0100370128000000000000000000683e3db31d1d",
-    "0x0000000000000000000000000000000000000330",
-    "0x00000000000000000000000000000e8efe38e059",
-    "0x0000000000000000000000000000004a4f83f97f"
+    "0x34cfac646f301356faa8b21e94227e3583fe3f5f",
+    "0x800c32eaa2a6c93cf4cb51794450ed77fbfbb172"
   ],
   "invariants": [
     {
@@ -111,7 +49,10 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     },
     {
@@ -127,37 +68,37 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_1": {
-            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_2": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_3": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_4": {
-            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_5": {
             "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
             "severity": "critical",
             "threshold": 0.05
           },
-          "slot_6": {
+          "slot_1": {
             "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_3": {
+            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_4": {
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_5": {
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_6": {
+            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
             "severity": "critical",
             "threshold": 0.05
           }
@@ -165,11 +106,73 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     },
     {
       "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_004",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "59117466412162506550059207072488077507276415900827911855542178413730728601597",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_005",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -194,60 +197,10 @@
         "formula": "abs(value_after - value_before) / value_before <= 4.8"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_004",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.05,
-        "contracts": [
-          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "59117466412162506550059207072488077507276415900827911855542178413730728601597",
-            "severity": "critical",
-            "threshold": 0.05
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.05"
-      },
-      "monitored_functions": [
-        "getUnderlyingPrice"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_005",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.05,
-        "contracts": [
-          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_1": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
-            "severity": "critical",
-            "threshold": 0.05
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.05"
-      },
-      "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     },
     {
@@ -261,9 +214,9 @@
         "contracts": [
           "0x39AA39c021dfbaE8faC545936693aC917d5E7563",
           "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B",
-          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+          "0x35A18000230DA775CAc24873d00Ff85BccdeD550",
           "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
+          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
         ],
         "slots": {
           "slot_4": {
@@ -275,7 +228,10 @@
         "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.06"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     },
     {
@@ -291,37 +247,37 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_1": {
-            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_2": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_3": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_4": {
-            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_5": {
             "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
             "severity": "high",
             "threshold": 0.08
           },
-          "slot_6": {
+          "slot_1": {
             "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_2": {
+            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_3": {
+            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_4": {
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_5": {
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_6": {
+            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
             "severity": "high",
             "threshold": 0.08
           }
@@ -329,11 +285,46 @@
         "formula": "(value_after - value_before) / value_before <= 0.08"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     },
     {
       "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.08,
+        "contracts": [
+          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
+            "severity": "high",
+            "threshold": 0.08
+          },
+          "slot_1": {
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
+            "severity": "high",
+            "threshold": 0.08
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.08"
+      },
+      "monitored_functions": [
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_003",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -353,56 +344,47 @@
         "formula": "(value_after - value_before) / value_before <= 4.82"
       },
       "monitored_functions": [
-        "getUnderlyingPrice"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_003",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.08,
-        "contracts": [
-          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
-            "severity": "high",
-            "threshold": 0.08
-          },
-          "slot_1": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
-            "severity": "high",
-            "threshold": 0.08
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 0.08"
-      },
-      "monitored_functions": [
-        "getUnderlyingPrice"
+        "getUnderlyingPrice",
+        "pokeFailedOverPrice",
+        "activateFailover",
+        "deactivateFailover"
       ]
     }
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
         "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
         "function": "getUnderlyingPrice",
         "signature": "getUnderlyingPrice(address)"
+      },
+      {
+        "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
+        "function": "pokeFailedOverPrice",
+        "signature": "pokeFailedOverPrice(bytes32)"
+      },
+      {
+        "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
+        "function": "activateFailover",
+        "signature": "activateFailover(bytes32)"
+      },
+      {
+        "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
+        "function": "deactivateFailover",
+        "signature": "deactivateFailover(bytes32)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/compounduni",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -444,76 +426,265 @@
         "zone_threshold": 0.75
       },
       "enabled": true,
-      "attack_seeds": {
-        "0": [
-          "this"
-        ],
-        "1": [
-          "tokens"
-        ],
-        "2": [
-          "amounts"
-        ],
-        "3": [
-          "bytes(\"\")"
-        ]
+      "constraint_ranges": {
+        "flashLoan(address,address[],uint256[],uint256)": {
+          "1": {
+            "type": "address[]",
+            "safe_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "danger_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "attack_values": [
+              "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            ],
+            "range": {
+              "min": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+              "max": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "tokens"
+          },
+          "2": {
+            "type": "uint256[]",
+            "safe_threshold": "193020254960",
+            "danger_threshold": "193020254960",
+            "attack_values": [
+              "193020254960"
+            ],
+            "range": {
+              "min": "193020254960",
+              "max": "193020254960"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "amounts"
+          },
+          "3": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "bytes(\"\")"
+          }
+        },
+        "transfer(address,uint256)": {
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "193020254960",
+            "danger_threshold": "194293561859",
+            "attack_values": [
+              "193020254960",
+              "194293561859"
+            ],
+            "range": {
+              "min": "193020254960",
+              "max": "194293561859"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "AMOUNT"
+          }
+        },
+        "approve(address,uint256)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+            "danger_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+            "attack_values": [
+              "0x39aa39c021dfbae8fac545936693ac917d5e7563"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(cUSDC)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "193020254960",
+            "danger_threshold": "193020254960",
+            "attack_values": [
+              "193020254960"
+            ],
+            "range": {
+              "min": "193020254960",
+              "max": "193020254960"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "AMOUNT"
+          }
+        },
+        "mint(uint256)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "193020254960",
+            "danger_threshold": "193020254960",
+            "attack_values": [
+              "193020254960"
+            ],
+            "range": {
+              "min": "193020254960",
+              "max": "193020254960"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "AMOUNT"
+          }
+        },
+        "enterMarkets(address[])": {
+          "0": {
+            "type": "address[]",
+            "safe_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+            "danger_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+            "attack_values": [
+              "0x39aa39c021dfbae8fac545936693ac917d5e7563"
+            ],
+            "range": {
+              "min": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+              "max": "0x39aa39c021dfbae8fac545936693ac917d5e7563"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "cTokens"
+          }
+        },
+        "getUnderlyingPrice(address)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x35a18000230da775cac24873d00ff85bccded550",
+            "danger_threshold": "0x35a18000230da775cac24873d00ff85bccded550",
+            "attack_values": [
+              "0x35a18000230da775cac24873d00ff85bccded550"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(cUniToken)"
+          }
+        },
+        "borrow(uint256)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "10",
+            "danger_threshold": "19788000000000000000000",
+            "attack_values": [
+              "10",
+              "19788000000000000000000"
+            ],
+            "range": {
+              "min": "10",
+              "max": "19788000000000000000000"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "max_UNI_borrow"
+          }
+        },
+        "swap(address,bool,int256,uint160,bytes)": {
+          "1": {
+            "type": "bool",
+            "safe_threshold": "True",
+            "danger_threshold": "False",
+            "attack_values": [
+              "True",
+              "False"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "false"
+          },
+          "2": {
+            "type": "int256",
+            "safe_threshold": "65855246851492826558",
+            "danger_threshold": "65855246851492826558",
+            "attack_values": [
+              "65855246851492826558"
+            ],
+            "range": {
+              "min": "65855246851492826558",
+              "max": "65855246851492826558"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "int256(WETH.balanceOf(address(this)))"
+          },
+          "3": {
+            "type": "uint160",
+            "safe_threshold": "1461446703485210103287273052203988822378723970341",
+            "danger_threshold": "1461446703485210103287273052203988822378723970341",
+            "attack_values": [
+              "1461446703485210103287273052203988822378723970341"
+            ],
+            "range": {
+              "min": "1461446703485210103287273052203988822378723970341",
+              "max": "1461446703485210103287273052203988822378723970341"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341"
+          },
+          "4": {
+            "type": "bytes",
+            "safe_threshold": "9",
+            "danger_threshold": "9",
+            "attack_values": [
+              "bytes(\"\")"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "bytes(\"\")"
+          }
+        }
       },
-      "range_config": {
-        "numeric_range_percent": [
-          1,
-          2,
-          5,
-          10,
-          20,
+      "range_mutation_config": {
+        "focus_percentiles": [
           50,
+          75,
+          90,
+          95,
+          99,
           100
         ],
-        "address_mutation_types": [
-          "original",
-          "bitflip_1",
-          "bitflip_2",
-          "nearby"
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "1": [
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "True"
         ],
-        "boundary_exploration": true
-      },
-      "weights": {
-        "seed_based": 0.6,
-        "random": 0.2,
-        "boundary": 0.2
-      },
-      "symbolic_config": {
-        "enabled": true,
-        "mode": "z3",
-        "max_constraints": 30,
-        "solver_timeout": "3s",
-        "extraction": {
-          "max_trace_depth": 5000,
-          "focus_opcodes": [
-            "JUMPI",
-            "LT",
-            "GT",
-            "EQ",
-            "ISZERO",
-            "SLT",
-            "SGT"
-          ],
-          "ignore_loops": true,
-          "max_branches": 15
-        },
-        "solver": {
-          "strategy": "z3",
-          "max_solutions": 8,
-          "use_cache": true,
-          "cache_size": 1000,
-          "parallel": true,
-          "workers": 8
-        },
-        "integration": {
-          "priority": "high",
-          "merge_with_adaptive": true,
-          "confidence_threshold": 0.5,
-          "max_symbolic_seeds": 20
-        }
+        "3": [
+          "21047564370",
+          "37885615866",
+          "42095128740",
+          "46304641614",
+          "63142693110",
+          "84190257480",
+          "730723351742605051643636526101994411189361985170",
+          "730723351742605087996922951667892174463659147264",
+          "1315302033136689255750027410530223948981392637952",
+          "1461446703485210103287273052203988822378723970341",
+          "1607591373833731258496941225354708140451254239232",
+          "2192170055227815263990768855003676523390977441792",
+          "2922893406970420206574546104407977644757447940682"
+        ],
+        "0": [
+          "0x39aa39c021dfbae8fac545936693ac917d5e7563",
+          "0x35a18000230da775cac24873d00ff85bccded550"
+        ],
+        "4": [
+          "bytes(\"\")"
+        ]
       }
     }
   },
