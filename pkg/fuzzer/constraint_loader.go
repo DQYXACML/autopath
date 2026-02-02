@@ -7,7 +7,9 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,45 +85,21 @@ type ConstraintAnalysis struct {
 
 // LoadConstraintRules 从文件加载约束规则
 func LoadConstraintRules(basePath, protocol string) (*ConstraintRulesV2, error) {
-	// 构建文件路径
-	filePath := filepath.Join(basePath, "DeFiHackLabs", "extracted_contracts", "2024-01", protocol, "constraint_rules_v2.json")
+	// 优先使用环境变量指定的年月路径
+	if ym := strings.TrimSpace(os.Getenv("FIREWALL_CONSTRAINT_YEAR_MONTH")); ym != "" {
+		filePath := filepath.Join(basePath, "DeFiHackLabs", "extracted_contracts", ym, protocol, "constraint_rules_v2.json")
+		log.Printf("[ConstraintLoader] Loading rules from: %s (env)", filePath)
+		return loadConstraintRulesFromPath(filePath)
+	}
 
+	// 自动扫描项目下所有年月目录
+	filePath, err := findConstraintRulesPath(basePath, protocol)
+	if err != nil {
+		return nil, err
+	}
 	log.Printf("[ConstraintLoader] Loading rules from: %s", filePath)
 
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read constraint rules: %w", err)
-	}
-
-	var rules ConstraintRulesV2
-	if err := json.Unmarshal(data, &rules); err != nil {
-		return nil, fmt.Errorf("failed to parse constraint rules: %w", err)
-	}
-
-	// 构建索引
-	rules.constraintsByFunc = make(map[string][]FunctionConstraint)
-	for _, c := range rules.Constraints {
-		// 使用函数名和签名都作为键
-		if c.Function != "" {
-			rules.constraintsByFunc[strings.ToLower(c.Function)] = append(rules.constraintsByFunc[strings.ToLower(c.Function)], c)
-		}
-		if c.Signature != "" {
-			sigLower := strings.ToLower(c.Signature)
-			rules.constraintsByFunc[sigLower] = append(rules.constraintsByFunc[sigLower], c)
-
-			// 如果 signature 包含完整的参数列表(包含括号),计算其选择器
-			if strings.Contains(c.Signature, "(") && strings.Contains(c.Signature, ")") {
-				// 计算函数选择器: keccak256(signature)的前4字节
-				hash := crypto.Keccak256Hash([]byte(c.Signature))
-				selector := "0x" + hex.EncodeToString(hash[:4])
-				rules.constraintsByFunc[selector] = append(rules.constraintsByFunc[selector], c)
-				log.Printf("[ConstraintLoader] Indexed constraint by selector: %s -> %s", selector, c.Function)
-			}
-		}
-	}
-
-	log.Printf("[ConstraintLoader] Loaded %d constraints for %s", len(rules.Constraints), protocol)
-	return &rules, nil
+	return loadConstraintRulesFromPath(filePath)
 }
 
 // GetConstraintForFunction 获取函数的约束（可能存在多条）
@@ -227,34 +205,90 @@ func parseConstraintBigInt(value interface{}) (*big.Int, bool) {
 	return nil, false
 }
 
-// LoadConstraintRulesByContractAddr 根据合约地址加载约束规则
-func LoadConstraintRulesByContractAddr(basePath string, contractAddr common.Address) (*ConstraintRulesV2, error) {
-	// 尝试从已知的协议列表中查找
-	protocolDirs := []string{
-		"BarleyFinance_exp",
-		"CitadelFinance_exp",
-		"MIMSpell2_exp",
-		"WiseLending02_exp",
-		"WiseLending03_exp",
-		"OrbitChain_exp",
-		"PeapodsFinance_exp",
-		"XSIJ_exp",
-		"SocketGateway_exp",
-		"Gamma_exp",
-		"MIC_exp",
-		"LQDX_alert_exp",
-		"Bmizapper_exp",
+func findConstraintRulesPath(basePath, protocol string) (string, error) {
+	pattern := filepath.Join(basePath, "DeFiHackLabs", "extracted_contracts", "*", protocol, "constraint_rules_v2.json")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", fmt.Errorf("failed to glob constraint rules: %w", err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("constraint rules not found for protocol %s", protocol)
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
 	}
 
-	addrLower := strings.ToLower(contractAddr.Hex())
+	sort.Slice(matches, func(i, j int) bool {
+		fi, errI := os.Stat(matches[i])
+		fj, errJ := os.Stat(matches[j])
+		if errI != nil && errJ != nil {
+			return matches[i] > matches[j]
+		}
+		if errI != nil {
+			return false
+		}
+		if errJ != nil {
+			return true
+		}
+		return fi.ModTime().After(fj.ModTime())
+	})
+	return matches[0], nil
+}
 
-	for _, protocol := range protocolDirs {
-		rules, err := LoadConstraintRules(basePath, protocol)
+func loadConstraintRulesFromPath(filePath string) (*ConstraintRulesV2, error) {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read constraint rules: %w", err)
+	}
+
+	var rules ConstraintRulesV2
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, fmt.Errorf("failed to parse constraint rules: %w", err)
+	}
+
+	// 构建索引
+	rules.constraintsByFunc = make(map[string][]FunctionConstraint)
+	for _, c := range rules.Constraints {
+		// 使用函数名和签名都作为键
+		if c.Function != "" {
+			rules.constraintsByFunc[strings.ToLower(c.Function)] = append(rules.constraintsByFunc[strings.ToLower(c.Function)], c)
+		}
+		if c.Signature != "" {
+			sigLower := strings.ToLower(c.Signature)
+			rules.constraintsByFunc[sigLower] = append(rules.constraintsByFunc[sigLower], c)
+
+			// 如果 signature 包含完整的参数列表(包含括号),计算其选择器
+			if strings.Contains(c.Signature, "(") && strings.Contains(c.Signature, ")") {
+				// 计算函数选择器: keccak256(signature)的前4字节
+				hash := crypto.Keccak256Hash([]byte(c.Signature))
+				selector := "0x" + hex.EncodeToString(hash[:4])
+				rules.constraintsByFunc[selector] = append(rules.constraintsByFunc[selector], c)
+				log.Printf("[ConstraintLoader] Indexed constraint by selector: %s -> %s", selector, c.Function)
+			}
+		}
+	}
+
+	log.Printf("[ConstraintLoader] Loaded %d constraints for %s", len(rules.Constraints), rules.Protocol)
+	return &rules, nil
+}
+
+// LoadConstraintRulesByContractAddr 根据合约地址加载约束规则
+func LoadConstraintRulesByContractAddr(basePath string, contractAddr common.Address) (*ConstraintRulesV2, error) {
+	addrLower := strings.ToLower(contractAddr.Hex())
+	pattern := filepath.Join(basePath, "DeFiHackLabs", "extracted_contracts", "*", "*", "constraint_rules_v2.json")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to glob constraint rules: %w", err)
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no constraint rules found for contract %s", contractAddr.Hex())
+	}
+
+	for _, path := range matches {
+		rules, err := loadConstraintRulesFromPath(path)
 		if err != nil {
 			continue
 		}
-
-		// 检查地址是否匹配
 		if strings.ToLower(rules.VulnerableContract.Address) == addrLower {
 			return rules, nil
 		}

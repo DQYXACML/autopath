@@ -4,7 +4,7 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+    "0x52d69c67536f55efefe02941868e5e762538dbd6",
     "0x145766a51ae96e69810fe76f6f68fd0e95675a0b",
     "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a",
     "0x1298EF04e9e878DaE51e605816ce3E6A99aD9B80",
@@ -20,8 +20,8 @@
       "parameters": {
         "threshold": 0.12,
         "contracts": [
-          "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
-          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a"
+          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a",
+          "0x52d69c67536f55efefe02941868e5e762538dbd6"
         ],
         "slots": {
           "slot_1": {
@@ -46,16 +46,16 @@
       "parameters": {
         "threshold": 2.0,
         "contracts": [
-          "0x52d69c67536f55EfEfe02941868e5e762538dBD6"
+          "0x52d69c67536f55efefe02941868e5e762538dbd6"
         ],
         "slots": {
           "slot_0": {
-            "index": "1160",
+            "index": "1161",
             "severity": "high",
             "threshold": 2.0
           },
           "slot_1": {
-            "index": "1161",
+            "index": "1160",
             "severity": "high",
             "threshold": 2.0
           }
@@ -76,7 +76,7 @@
       "parameters": {
         "threshold": 0.1,
         "contracts": [
-          "0x52d69c67536f55EfEfe02941868e5e762538dBD6"
+          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a"
         ],
         "slots": {},
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
@@ -95,7 +95,7 @@
       "parameters": {
         "threshold": 0.1,
         "contracts": [
-          "0x8d4de2bc1a566b266bd4b387f62c21e15474d12a"
+          "0x52d69c67536f55efefe02941868e5e762538dbd6"
         ],
         "slots": {},
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
@@ -128,26 +128,28 @@
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
-        "contract": "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+        "contract": "0x52d69c67536f55efefe02941868e5e762538dbd6",
         "function": "newBidEtherMin",
         "signature": "newBidEtherMin()"
       },
       {
-        "contract": "0x52d69c67536f55EfEfe02941868e5e762538dBD6",
+        "contract": "0x52d69c67536f55efefe02941868e5e762538dbd6",
         "function": "makeBid",
         "signature": "makeBid()"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/game",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
