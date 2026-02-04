@@ -13,11 +13,12 @@
     "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    "0x0000000000000000000000000000000000000000"
+    "0x800c32eaa2a6c93cf4cb51794450ed77fbfbb172"
   ],
   "invariants": [],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
         "contract": "0x2b9dc65253c035eb21778cb3898eab5a0ada0cce",
@@ -25,14 +26,15 @@
         "signature": "unwrap(address,uint256)"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/swarmmarkets",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -74,71 +76,72 @@
         "zone_threshold": 0.75
       },
       "enabled": true,
-      "attack_seeds": {
-        "0": [
-          "this"
-        ],
-        "1": [
-          "DAI.balanceOf(address(wrapper))",
-          "USDC.balanceOf(address(wrapper))"
-        ]
+      "constraint_ranges": {
+        "mint(address,uint256)": {
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "3516232",
+            "danger_threshold": "3516232",
+            "attack_values": [
+              "3516232"
+            ],
+            "range": {
+              "min": "3516232",
+              "max": "3516232"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "USDC.balanceOf(address(wrapper))"
+          }
+        },
+        "unwrap(address,uint256)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0xd08e245fdb3f1504aea4056e2c71615da7001440",
+            "danger_threshold": "0xd08e245fdb3f1504aea4056e2c71615da7001440",
+            "attack_values": [
+              "0xd08e245fdb3f1504aea4056e2c71615da7001440"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(XTOKEN)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "3516232",
+            "danger_threshold": "7729322331047062319597",
+            "attack_values": [
+              "7729322331047062319597",
+              "3516232"
+            ],
+            "range": {
+              "min": "3516232",
+              "max": "7729322331047062319597"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "DAI.balanceOf(address(wrapper))"
+          }
+        }
       },
-      "range_config": {
-        "numeric_range_percent": [
-          1,
-          2,
-          5,
-          10,
-          20,
+      "range_mutation_config": {
+        "focus_percentiles": [
           50,
+          75,
+          90,
+          95,
+          99,
           100
         ],
-        "address_mutation_types": [
-          "original",
-          "bitflip_1",
-          "bitflip_2",
-          "nearby"
-        ],
-        "boundary_exploration": true
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
       },
-      "weights": {
-        "seed_based": 0.6,
-        "random": 0.2,
-        "boundary": 0.2
-      },
-      "symbolic_config": {
-        "enabled": true,
-        "mode": "z3",
-        "max_constraints": 30,
-        "solver_timeout": "3s",
-        "extraction": {
-          "max_trace_depth": 5000,
-          "focus_opcodes": [
-            "JUMPI",
-            "LT",
-            "GT",
-            "EQ",
-            "ISZERO",
-            "SLT",
-            "SGT"
-          ],
-          "ignore_loops": true,
-          "max_branches": 15
-        },
-        "solver": {
-          "strategy": "z3",
-          "max_solutions": 8,
-          "use_cache": true,
-          "cache_size": 1000,
-          "parallel": true,
-          "workers": 8
-        },
-        "integration": {
-          "priority": "high",
-          "merge_with_adaptive": true,
-          "confidence_threshold": 0.5,
-          "max_symbolic_seeds": 20
-        }
+      "attack_seeds": {
+        "0": [
+          "0xd08e245fdb3f1504aea4056e2c71615da7001440"
+        ]
       }
     }
   },

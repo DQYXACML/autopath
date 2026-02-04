@@ -4,32 +4,76 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    "0x65c210c59B43EB68112b7a4f75C8393C36491F06",
+    "0x65c210c59b43eb68112b7a4f75c8393c36491f06",
     "0x94641c01a4937f2c8ef930580cf396142a2942dc",
     "0xB05cABCd99cf9a73b19805edefC5f67CA5d1895E",
     "0x45e15d1e4F92f28A916F4f2971Ad9adc278e148B",
     "0x9CBF099ff424979439dFBa03F00B5961784c06ce",
-    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
-    "0x000000000000000000000000b05cabcd99cf9a73"
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
   ],
-  "invariants": [],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0xB05cABCd99cf9a73b19805edefC5f67CA5d1895E"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "6438069266196061073519335294361459564582782368664000812694958618433187907617",
+            "severity": "critical",
+            "threshold": 0.05
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.05"
+      },
+      "monitored_functions": [
+        "performOperations"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.05,
+        "contracts": [
+          "0x94641c01a4937f2c8ef930580cf396142a2942dc"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.05"
+      },
+      "monitored_functions": [
+        "performOperations"
+      ]
+    }
+  ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
       {
-        "contract": "0x65c210c59B43EB68112b7a4f75C8393C36491F06",
+        "contract": "0x65c210c59b43eb68112b7a4f75c8393c36491f06",
         "function": "performOperations",
         "signature": "performOperations(uint8[],uint256[],bytes[])"
       }
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/seneca",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -72,44 +116,51 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "performOperations": {
+        "performOperations(uint8[],uint256[],bytes[])": {
           "0": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
+            "type": "uint8[]",
+            "safe_threshold": "30",
+            "danger_threshold": "30",
+            "attack_values": [
+              "30"
+            ],
             "range": {
-              "min": "0",
-              "max": "0"
+              "min": "30",
+              "max": "30"
             },
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.3,
             "value_expr": "actions"
           },
           "1": {
-            "type": "uint256",
+            "type": "uint256[]",
             "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
+            "danger_threshold": "256",
+            "attack_values": [
+              "0",
+              "256"
+            ],
             "range": {
               "min": "0",
-              "max": "0"
+              "max": "256"
             },
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.3,
             "value_expr": "values"
           },
           "2": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [],
+            "type": "bytes[]",
+            "safe_threshold": "320",
+            "danger_threshold": "320",
+            "attack_values": [
+              "0x000000000000000000000000b05cabcd99cf9a73b19805edefc5f67ca5d1895e00000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006423b872dd0000000000000000000000009cbf099ff424979439dfba03f00b5961784c06ce0000000000000000000000007fa9385be102ac3eac297483dd6233d62b3e149600000000000000000000000000000000000000000000004b180b86618eddc3ab00000000000000000000000000000000000000000000000000000000"
+            ],
             "range": {
-              "min": "0",
-              "max": "0"
+              "min": "320",
+              "max": "320"
             },
             "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
+            "confidence": 0.2,
             "value_expr": "datas"
           }
         }
@@ -127,11 +178,7 @@
         "step_count": 20,
         "random_within_range_ratio": 0.3
       },
-      "attack_seeds": {
-        "0": [],
-        "1": [],
-        "2": []
-      }
+      "attack_seeds": {}
     }
   },
   "alert_config": {

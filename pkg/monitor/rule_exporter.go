@@ -446,7 +446,11 @@ func (re *RuleExporter) buildRuleExport(
 // convertParamType 转换参数类型为枚举值
 func (re *RuleExporter) convertParamType(paramType string) int {
 	// 根据ParamCheckModule.sol中的ParamType枚举
-	switch strings.ToLower(paramType) {
+	lower := strings.ToLower(paramType)
+	if strings.Contains(lower, "[") && strings.HasSuffix(lower, "]") {
+		return 5 // BYTES (动态数组统一按hash处理)
+	}
+	switch lower {
 	case "uint256", "uint":
 		return 0 // UINT256
 	case "int256", "int":

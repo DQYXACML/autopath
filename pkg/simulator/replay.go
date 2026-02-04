@@ -520,20 +520,25 @@ func buildPathFromGethTrace(steps []gethTraceStep, rootAddr common.Address) ([]u
 			})
 		}
 
-		if isCallOp(step.Op) {
-			target := callTargetFromStack(step.Op, step.Stack)
-			if target != "" {
-				pendingByDepth[depth] = target
-				callTargets = append(callTargets, target)
-				callEdges = append(callEdges, CallEdge{
-					Caller: currentAddr,
-					Target: target,
-					Op:     step.Op,
-					Depth:  depth,
-				})
+			if isCallOp(step.Op) {
+				target := callTargetFromStack(step.Op, step.Stack)
+				if target != "" {
+					// DELEGATECALL/CALLCODE 执行上下文地址仍是 caller
+					nextAddr := target
+					if step.Op == "DELEGATECALL" || step.Op == "CALLCODE" {
+						nextAddr = currentAddr
+					}
+					pendingByDepth[depth] = nextAddr
+					callTargets = append(callTargets, target)
+					callEdges = append(callEdges, CallEdge{
+						Caller: currentAddr,
+						Target: target,
+						Op:     step.Op,
+						Depth:  depth,
+					})
+				}
 			}
 		}
-	}
 
 	return jumpDests, contractJumpDests, callTargets, callEdges
 }
@@ -890,6 +895,30 @@ func (s *EVMSimulator) traceTransactionWithCustomTracer(txHash common.Hash, prot
 
 	// 输出原始JSON用于调试
 	fmt.Printf("[DEBUG tracer raw JSON] %s\n", string(result)[:min(500, len(result))])
+
+	return parseReplayResult(result)
+}
+
+// TraceTransactionWithCustomTracer 使用自定义tracer追踪交易（导出stateChanges等）
+// 与ForkAndReplay不同，该方法总是使用JS tracer，适合需要状态变更的场景
+func (s *EVMSimulator) TraceTransactionWithCustomTracer(ctx context.Context, txHash common.Hash, protectedContract common.Address) (*ReplayResult, error) {
+	recordAll := protectedContract == (common.Address{})
+	protectedAddr := ""
+	if !recordAll {
+		protectedAddr = strings.ToLower(protectedContract.Hex())
+	}
+
+	tracerCode := buildReplayTracerCode(protectedAddr, recordAll)
+
+	var result json.RawMessage
+	if err := s.rpcClient.CallContext(ctx, &result, "debug_traceTransaction", txHash, map[string]interface{}{
+		"tracer": tracerCode,
+		"tracerConfig": map[string]interface{}{
+			"onlyTopCall": false,
+		},
+	}); err != nil {
+		return nil, err
+	}
 
 	return parseReplayResult(result)
 }
@@ -1655,6 +1684,14 @@ func (s *EVMSimulator) traceTransactionWithCallTracer(txHash common.Hash) (*Repl
 		ProtectedStartIndex: 0,
 		Error:               "",
 	}, nil
+}
+
+// TraceTransactionWithCallTracer 导出 callTracer 伪路径结果（供上层在基准路径缺失时回退使用）
+func (s *EVMSimulator) TraceTransactionWithCallTracer(txHash common.Hash) (*ReplayResult, error) {
+	if s == nil {
+		return nil, fmt.Errorf("simulator is nil")
+	}
+	return s.traceTransactionWithCallTracer(txHash)
 }
 
 // simulateWithCallTracer 使用内置 callTracer 追踪 eth_call 模拟

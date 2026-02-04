@@ -2892,7 +2892,7 @@ func (f *CallDataFuzzer) waitForTraceAvailable(ctx context.Context, txHash commo
 }
 
 // validateBaselinePath 确保基准路径包含目标合约的JUMPDEST（避免对比失真）
-func (f *CallDataFuzzer) validateBaselinePath(result *simulator.ReplayResult, contractAddr common.Address, source string) error {
+func (f *CallDataFuzzer) validateBaselinePath(ctx context.Context, result *simulator.ReplayResult, contractAddr common.Address, source string, txHash common.Hash) error {
 	if result == nil {
 		return fmt.Errorf("[基准路径校验] %s 结果为空，无法校验目标合约", source)
 	}
@@ -2900,6 +2900,12 @@ func (f *CallDataFuzzer) validateBaselinePath(result *simulator.ReplayResult, co
 		return nil
 	}
 	if len(result.ContractJumpDests) == 0 {
+		if f.tryCustomTracerBaselineFallback(ctx, result, contractAddr, source, txHash, "空JUMPDEST") {
+			return nil
+		}
+		if f.tryCallTracerBaselineFallback(result, contractAddr, source, txHash, "空JUMPDEST") {
+			return nil
+		}
 		return fmt.Errorf("[基准路径校验] %s 未包含合约维度JUMPDEST，无法校验目标合约 %s", source, contractAddr.Hex())
 	}
 
@@ -2914,6 +2920,12 @@ func (f *CallDataFuzzer) validateBaselinePath(result *simulator.ReplayResult, co
 		}
 	}
 	if !found {
+		if f.tryCustomTracerBaselineFallback(ctx, result, contractAddr, source, txHash, "缺失目标合约") {
+			return nil
+		}
+		if f.tryCallTracerBaselineFallback(result, contractAddr, source, txHash, "缺失目标合约") {
+			return nil
+		}
 		if resolved, hits, mode := resolveDelegateCallTarget(result, contractAddr); resolved != "" {
 			if mode != "delegatecall-caller" && mode != "delegatecall-any" {
 				log.Printf("[Fuzzer]  基准路径未包含目标合约%s，但仅检测到非delegatecall调用 (mode=%s, resolved=%s)，跳过路径映射",
@@ -2944,6 +2956,55 @@ func (f *CallDataFuzzer) validateBaselinePath(result *simulator.ReplayResult, co
 		return fmt.Errorf("[基准路径校验] %s 未包含目标合约 %s (合约数量=%d, 合约分布=%v)", source, contractAddr.Hex(), len(contracts), contracts)
 	}
 	return nil
+}
+
+func (f *CallDataFuzzer) tryCallTracerBaselineFallback(
+	result *simulator.ReplayResult,
+	contractAddr common.Address,
+	source string,
+	txHash common.Hash,
+	reason string,
+) bool {
+	if f == nil || f.simulator == nil {
+		return false
+	}
+	if txHash == (common.Hash{}) {
+		return false
+	}
+	if !hasCallEdgeTarget(result, contractAddr) {
+		return false
+	}
+
+	pseudo, err := f.simulator.TraceTransactionWithCallTracer(txHash)
+	if err != nil || pseudo == nil || len(pseudo.ContractJumpDests) == 0 {
+		if err != nil {
+			log.Printf("[Fuzzer]  callTracer回退失败(%s): %v", reason, err)
+		}
+		return false
+	}
+	if findProtectedStartIndex(pseudo.ContractJumpDests, contractAddr) < 0 {
+		log.Printf("[Fuzzer]  callTracer路径未包含目标合约%s，无法回退(%s)", contractAddr.Hex(), reason)
+		return false
+	}
+
+	log.Printf("[Fuzzer]  基准路径缺失目标合约%s，使用callTracer伪路径继续 (%s/%s)",
+		contractAddr.Hex(), source, reason)
+
+	result.ContractJumpDests = pseudo.ContractJumpDests
+	result.JumpDests = pseudo.JumpDests
+	if idx := findProtectedStartIndex(result.ContractJumpDests, contractAddr); idx >= 0 {
+		result.ProtectedStartIndex = idx
+		end := idx
+		target := strings.ToLower(contractAddr.Hex())
+		for i := idx; i < len(result.ContractJumpDests); i++ {
+			if strings.EqualFold(result.ContractJumpDests[i].Contract, target) {
+				end = i + 1
+			}
+		}
+		result.ProtectedEndIndex = end
+	}
+
+	return true
 }
 
 func resolveDelegateCallTarget(result *simulator.ReplayResult, contractAddr common.Address) (string, int, string) {
@@ -3117,6 +3178,62 @@ func hasCallEdgeTarget(result *simulator.ReplayResult, contractAddr common.Addre
 	return false
 }
 
+func (f *CallDataFuzzer) tryCustomTracerBaselineFallback(
+	ctx context.Context,
+	result *simulator.ReplayResult,
+	contractAddr common.Address,
+	source string,
+	txHash common.Hash,
+	reason string,
+) bool {
+	if f == nil || f.simulator == nil {
+		return false
+	}
+	if txHash == (common.Hash{}) || contractAddr == (common.Address{}) {
+		return false
+	}
+
+	// 优先尝试仅记录受保护合约的路径，减少数据量
+	traceRes, err := f.simulator.TraceTransactionWithCustomTracer(ctx, txHash, contractAddr)
+	if err != nil {
+		log.Printf("[Fuzzer]  JS tracer回退失败(%s): %v", reason, err)
+		traceRes = nil
+	}
+
+	if traceRes == nil || findProtectedStartIndex(traceRes.ContractJumpDests, contractAddr) < 0 {
+		// 若配置要求全量路径，尝试recordAll模式作为补充
+		if f.recordFullTrace {
+			if traceAll, errAll := f.simulator.TraceTransactionWithCustomTracer(ctx, txHash, common.Address{}); errAll == nil {
+				traceRes = traceAll
+			} else {
+				log.Printf("[Fuzzer]  JS tracer全量回退失败(%s): %v", reason, errAll)
+			}
+		}
+	}
+
+	if traceRes == nil || len(traceRes.ContractJumpDests) == 0 {
+		return false
+	}
+	if findProtectedStartIndex(traceRes.ContractJumpDests, contractAddr) < 0 {
+		return false
+	}
+
+	log.Printf("[Fuzzer]  基准路径缺失目标合约%s，使用JS tracer路径继续 (%s/%s)",
+		contractAddr.Hex(), source, reason)
+
+	result.JumpDests = traceRes.JumpDests
+	result.ContractJumpDests = traceRes.ContractJumpDests
+	result.ProtectedStartIndex = traceRes.ProtectedStartIndex
+	result.ProtectedEndIndex = traceRes.ProtectedEndIndex
+	if len(traceRes.CallEdges) > 0 {
+		result.CallEdges = traceRes.CallEdges
+	}
+	if len(traceRes.CallTargets) > 0 {
+		result.CallTargets = traceRes.CallTargets
+	}
+	return true
+}
+
 func resolvePathContractAddr(result *simulator.ReplayResult, contractAddr common.Address) common.Address {
 	if result == nil || contractAddr == (common.Address{}) {
 		return contractAddr
@@ -3219,7 +3336,16 @@ func (f *CallDataFuzzer) getOriginalExecution(ctx context.Context, txHash common
 			}
 			log.Printf("[Fuzzer]  原始执行摘要(基于traceTransaction): success=%v, gas=%d, stateChanges=%d, jumpDests=%d, contractJumpDests=%d",
 				directResult.Success, directResult.GasUsed, len(directResult.StateChanges), len(directResult.JumpDests), len(directResult.ContractJumpDests))
-			if err := f.validateBaselinePath(directResult, contractAddr, "traceTransaction"); err != nil {
+			// 需要状态变更时，补充使用JS tracer获取stateChanges（geth tracer默认不含storage）
+			if f.localExecution && len(directResult.StateChanges) == 0 {
+				if stateRes, serr := f.simulator.TraceTransactionWithCustomTracer(ctx, txHash, common.Address{}); serr != nil {
+					log.Printf("[Fuzzer]  JS tracer获取stateChanges失败: %v", serr)
+				} else if len(stateRes.StateChanges) > 0 {
+					directResult.StateChanges = stateRes.StateChanges
+					log.Printf("[Fuzzer]  已补齐stateChanges: %d 个账户", len(stateRes.StateChanges))
+				}
+			}
+			if err := f.validateBaselinePath(ctx, directResult, contractAddr, "traceTransaction", txHash); err != nil {
 				return nil, nil, nil, err
 			}
 		}
@@ -3343,6 +3469,34 @@ func (f *CallDataFuzzer) executeFuzzing(
 	if targetSimEnabled {
 		log.Printf("[Fuzzer]  Target similarity mode: stop when finding %d valid results (sim >= %.4f)",
 			f.maxHighSimResults, f.targetSimilarity)
+	}
+
+	// 预执行原始调用，若prestate下回退则注入原始交易stateChanges修正环境
+	if f.localExecution && originalPath != nil && originalPath.Success && len(originalPath.StateChanges) > 0 && targetCall != nil {
+		callData, err := hexutil.Decode(targetCall.Input)
+		if err != nil {
+			log.Printf("[Fuzzer]  预执行原始调用解码失败，跳过stateChanges修正: %v", err)
+		} else {
+			value := big.NewInt(0)
+			if targetCall.Value != "" && targetCall.Value != "0x0" {
+				if v, vErr := hexutil.DecodeBig(targetCall.Value); vErr == nil {
+					value = v
+				}
+			}
+			preReq := &SimulationRequest{
+				From:          common.HexToAddress(targetCall.From),
+				To:            common.HexToAddress(targetCall.To),
+				CallData:      callData,
+				Value:         value,
+				BlockNumber:   simBlockNumber,
+				Timeout:       f.timeout,
+				StateOverride: stateOverride,
+			}
+			if simResult, simErr := f.simulateExecution(ctx, preReq, -1); simErr == nil && simResult != nil && !simResult.Success {
+				log.Printf("[Fuzzer]  prestate模拟revert，应用原始交易stateChanges(%d)修正StateOverride", len(originalPath.StateChanges))
+				stateOverride = applySimulatorStateChangesToOverride(stateOverride, originalPath.StateChanges)
+			}
+		}
 	}
 
 	// 预计算函数级基准路径，避免循环场景误用非目标函数起点

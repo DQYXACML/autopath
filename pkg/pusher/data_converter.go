@@ -8,6 +8,7 @@ import (
 
 	"autopath/pkg/fuzzer"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // DataConverter 数据转换器，负责链下到链上的数据格式转换
@@ -95,10 +96,8 @@ func (dc *DataConverter) parseParamType(paramType string) uint8 {
 
 	// 处理数组类型（含固定长度）
 	if idx := strings.Index(paramType, "["); idx != -1 && strings.HasSuffix(paramType, "]") {
-		baseType := paramType[:idx]
-		if val, ok := typeMap[baseType]; ok {
-			return val // 简化处理，使用基础类型
-		}
+		// 动态数组按bytes处理（链上会对动态参数进行hash）
+		return typeMap["bytes"]
 	}
 
 	// 处理固定大小的类型 (uint8, uint16, bytes4等)
@@ -121,6 +120,9 @@ func (dc *DataConverter) parseValueToBytes32(value string, paramType string) [32
 	var result [32]byte
 
 	value = strings.TrimSpace(value)
+	lowerType := strings.ToLower(strings.TrimSpace(paramType))
+	isArray := strings.Contains(lowerType, "[") && strings.HasSuffix(lowerType, "]")
+	isDynamic := isArray || lowerType == "bytes" || lowerType == "string"
 
 	// 处理不同类型
 	switch dc.parseParamType(paramType) {
@@ -141,8 +143,26 @@ func (dc *DataConverter) parseValueToBytes32(value string, paramType string) [32
 		}
 
 	case 5, 6: // BYTES, STRING
-		// 对于动态类型，存储keccak256哈希
-		hash := common.BytesToHash([]byte(value))
+		if isDynamic {
+			if isHexBytes32(value) {
+				decoded, err := hex.DecodeString(strings.TrimPrefix(value, "0x"))
+				if err == nil && len(decoded) == 32 {
+					copy(result[:], decoded)
+					return result
+				}
+			}
+			if strings.HasPrefix(value, "0x") {
+				if decoded, err := hex.DecodeString(strings.TrimPrefix(value, "0x")); err == nil {
+					hash := crypto.Keccak256Hash(decoded)
+					copy(result[:], hash.Bytes())
+					return result
+				}
+			}
+			hash := crypto.Keccak256Hash([]byte(value))
+			copy(result[:], hash.Bytes())
+			return result
+		}
+		hash := crypto.Keccak256Hash([]byte(value))
 		copy(result[:], hash.Bytes())
 
 	default: // UINT256, INT256
@@ -150,6 +170,13 @@ func (dc *DataConverter) parseValueToBytes32(value string, paramType string) [32
 	}
 
 	return result
+}
+
+func isHexBytes32(value string) bool {
+	if !strings.HasPrefix(value, "0x") {
+		return false
+	}
+	return len(value) == 66
 }
 
 // parseMultipleValues 解析多个值

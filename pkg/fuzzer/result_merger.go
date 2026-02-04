@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -336,6 +337,11 @@ func (m *ResultMerger) toBigInt(value interface{}) (*big.Int, bool) {
 func (m *ResultMerger) extractUniqueValues(values []ParameterValue) []string {
 	seen := make(map[string]bool)
 	unique := []string{}
+	paramType := ""
+	if len(values) > 0 {
+		paramType = values[0].Type
+	}
+	isDynamic := m.isDynamicParamType(paramType)
 
 	for _, v := range values {
 		var strVal string
@@ -345,7 +351,11 @@ func (m *ResultMerger) extractUniqueValues(values []ParameterValue) []string {
 				m.valueToString(v.RangeMin),
 				m.valueToString(v.RangeMax))
 		} else {
-			strVal = m.valueToString(v.Value)
+			if isDynamic {
+				strVal = m.valueToStringDynamic(v.Value, paramType)
+			} else {
+				strVal = m.valueToString(v.Value)
+			}
 		}
 
 		if !seen[strVal] {
@@ -364,6 +374,44 @@ func (m *ResultMerger) extractUniqueValues(values []ParameterValue) []string {
 	}
 
 	return unique
+}
+
+func (m *ResultMerger) isDynamicParamType(paramType string) bool {
+	if paramType == "" {
+		return false
+	}
+	lower := strings.ToLower(strings.TrimSpace(paramType))
+	if lower == "bytes" || lower == "string" {
+		return true
+	}
+	if strings.HasSuffix(lower, "[]") {
+		return true
+	}
+	return false
+}
+
+func (m *ResultMerger) valueToStringDynamic(value interface{}, paramType string) string {
+	paramType = strings.TrimSpace(paramType)
+	if paramType == "" {
+		return m.valueToString(value)
+	}
+
+	typ, err := abi.NewType(paramType, "", nil)
+	if err != nil {
+		return m.valueToString(value)
+	}
+
+	args := abi.Arguments{{Type: typ}}
+	encoded, err := args.Pack(value)
+	if err != nil {
+		return m.valueToString(value)
+	}
+	if len(encoded) >= 32 {
+		encoded = encoded[32:]
+	}
+
+	hash := crypto.Keccak256(encoded)
+	return "0x" + hex.EncodeToString(hash)
 }
 
 func (m *ResultMerger) appendAttackValues(values []string, paramType string, constraint *ParamConstraintInfo) []string {

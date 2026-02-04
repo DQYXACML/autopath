@@ -310,7 +310,7 @@ func (cc *ConstraintCollector) lookupConstraints(selectorHex string) []FunctionC
 	return nil
 }
 
-// buildExpressionRule 基于样本生成 ratio 或 linear 约束
+// buildExpressionRule 基于样本生成 linear 或 ratio 约束（优先 linear）
 func (cc *ConstraintCollector) buildExpressionRule(contract common.Address, selector []byte, samples []constraintSample) *ExpressionRule {
 	if len(samples) == 0 {
 		return nil
@@ -320,16 +320,16 @@ func (cc *ConstraintCollector) buildExpressionRule(contract common.Address, sele
 	now := time.Now()
 	scale := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil) // 1e18
 
-	// 先尝试 ratio 规则（单参数/单槽位）
-	if ratioRule := buildRatioRule(contract, selectorHex, samples, scale); ratioRule != nil {
-		ratioRule.GeneratedAt = now
-		return ratioRule
-	}
-
-	// 回退线性规则（简单稀疏超平面）
+	// 先尝试 linear 规则（简单稀疏超平面）
 	if linRule := buildLinearRule(contract, selectorHex, samples, scale); linRule != nil {
 		linRule.GeneratedAt = now
 		return linRule
+	}
+
+	// 回退 ratio 规则（单参数/单槽位）
+	if ratioRule := buildRatioRule(contract, selectorHex, samples, scale); ratioRule != nil {
+		ratioRule.GeneratedAt = now
+		return ratioRule
 	}
 
 	return nil
@@ -427,6 +427,18 @@ func buildLinearRule(contract common.Address, selector string, samples []constra
 
 	featureOrder, maxAbs := collectFeatureOrder(samples, contract)
 	if len(featureOrder) == 0 {
+		return nil
+	}
+	// 避免仅基于参数生成线性表达式规则：
+	// 参数量级通常很大且缺少状态上下文，易导致规则过严并误报。
+	hasState := false
+	for _, feat := range featureOrder {
+		if feat.kind == "state" {
+			hasState = true
+			break
+		}
+	}
+	if !hasState {
 		return nil
 	}
 

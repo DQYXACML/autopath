@@ -476,33 +476,34 @@ func (m *BlockchainMonitor) processTransaction(ctx context.Context, job transact
 		}
 	}
 
-	// 根据enableStateOverride决定是否进行RPC重放
-	var replayResult *simulator.ReplayResult
-	if m.sim != nil && m.enableStateOverride && override != nil {
-		// 【优化】检测是否是 Fork 后的新交易
-		isForkTransaction := m.forkBlockNumber > 0 && block.Number().Uint64() > m.forkBlockNumber
+		// 根据enableStateOverride决定是否进行RPC重放
+		var replayResult *simulator.ReplayResult
+		if m.sim != nil && m.enableStateOverride && override != nil {
+			// 【优化】检测是否是 Fork 后的新交易
+			isForkTransaction := m.forkBlockNumber > 0 && block.Number().Uint64() > m.forkBlockNumber
 
-		if isForkTransaction {
-			// 新交易：Anvil 当前状态已正确，无需 StateOverride
-			log.Printf("   [Simulator] 检测到 Fork 后的新交易（区块 %d > Fork %d），跳过 StateOverride",
-				block.Number().Uint64(), m.forkBlockNumber)
-
-			// 直接使用当前状态重放交易（不需要额外的 StateOverride）
-			replay, repErr := m.sim.ReplayTransactionWithOverride(ctx, tx, block.NumberU64(), nil, common.Address{})
-			if repErr != nil {
-				log.Printf("     回放交易失败: %v", repErr)
-			} else {
-				replayResult = replay
-			}
-		} else {
-			// 历史交易：使用prestate重放
+			// 优先使用prestate重放（即便是Fork后新交易，也需要恢复到交易前状态）
 			replay, repErr := m.sim.ReplayTransactionWithOverride(ctx, tx, block.NumberU64(), override, common.Address{})
 			if repErr != nil {
 				log.Printf("     回放交易获取状态变更失败: %v", repErr)
 			} else {
 				replayResult = replay
 			}
-		}
+
+			// Fork后新交易若prestate重放失败，降级为无StateOverride（保留原优化路径）
+			if isForkTransaction && (replayResult == nil || !replayResult.Success) {
+				if replayResult != nil && !replayResult.Success {
+					log.Printf("   [Simulator] Fork新交易使用prestate回放失败(success=false)，回退为无StateOverride重放")
+				} else {
+					log.Printf("   [Simulator] Fork新交易使用prestate回放失败(replayResult=nil)，回退为无StateOverride重放")
+				}
+				replay, repErr = m.sim.ReplayTransactionWithOverride(ctx, tx, block.NumberU64(), nil, common.Address{})
+				if repErr != nil {
+					log.Printf("     回放交易失败: %v", repErr)
+				} else {
+					replayResult = replay
+				}
+			}
 
 		// 处理回放结果
 		if replayResult != nil {
