@@ -2624,7 +2624,6 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	}
 
 	// 仅保留相似度>=阈值的组合进入规则生成路径
-	const ruleGenMinSimilarity = 0.6
 	if len(results) > 0 {
 		filtered := results[:0]
 		for _, r := range results {

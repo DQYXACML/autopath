@@ -315,6 +315,9 @@ func (cc *ConstraintCollector) buildExpressionRule(contract common.Address, sele
 	if len(samples) == 0 {
 		return nil
 	}
+	if averageSimilarity(samples) < ruleGenMinSimilarity {
+		return nil
+	}
 
 	selectorHex := "0x" + hex.EncodeToString(selector)
 	now := time.Now()
