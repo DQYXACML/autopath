@@ -6992,6 +6992,22 @@ func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, cont
 			report.ExpressionGenMs = cost
 		}
 	}
+
+	if report.ValidCombinations == 0 && len(report.ExpressionRules) == 0 {
+		if expr := f.constraintCollector.BuildExpressionRuleFallback(
+			contractAddr,
+			selector,
+			exprFallbackMinSimilarity,
+			exprFallbackMinSampleCount,
+		); expr != nil {
+			report.ExpressionRules = append(report.ExpressionRules, *expr)
+			if cost := f.constraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
+				report.ExpressionGenMs = cost
+			}
+			log.Printf("[Fuzzer]  ValidCombinations=0, generated fallback expression rule: selector=%s type=%s samples=%d avg=%.4f",
+				hexutil.Encode(selector), expr.Type, expr.SampleCount, report.AverageSimilarity)
+		}
+	}
 }
 
 // convertParamConstraintsToSummaries 将参数约束转成参数摘要

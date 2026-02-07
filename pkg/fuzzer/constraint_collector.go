@@ -137,7 +137,7 @@ func (cc *ConstraintCollector) RecordSample(
 
 	// 同步生成表达式规则（ratio/linear）
 	start := time.Now()
-	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key]); expr != nil {
+	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key], ruleGenMinSimilarity); expr != nil {
 		cc.exprs[key] = expr
 		cc.exprCost[key] = time.Since(start).Milliseconds()
 	}
@@ -148,6 +148,46 @@ func (cc *ConstraintCollector) RecordSample(
 	}
 
 	return rule
+}
+
+// BuildExpressionRuleFallback 当有效组合为0时，使用当前最佳样本窗口降级生成表达式规则。
+func (cc *ConstraintCollector) BuildExpressionRuleFallback(
+	contract common.Address,
+	selector []byte,
+	minAvgSimilarity float64,
+	minSamples int,
+) *ExpressionRule {
+	if cc == nil {
+		return nil
+	}
+	if minSamples <= 0 {
+		minSamples = exprFallbackMinSampleCount
+	}
+
+	key := cc.ruleKey(contract, selector)
+
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	samples := cc.samples[key]
+	if len(samples) < minSamples {
+		return nil
+	}
+
+	start := time.Now()
+	expr := cc.buildExpressionRule(contract, selector, samples, minAvgSimilarity)
+	if expr == nil {
+		return nil
+	}
+	if expr.Strategy != "" {
+		expr.Strategy = expr.Strategy + "_zero_valid_fallback"
+	} else {
+		expr.Strategy = "zero_valid_fallback"
+	}
+
+	cc.exprs[key] = expr
+	cc.exprCost[key] = time.Since(start).Milliseconds()
+	return expr
 }
 
 // GetRule 获取已生成的规则
@@ -311,11 +351,16 @@ func (cc *ConstraintCollector) lookupConstraints(selectorHex string) []FunctionC
 }
 
 // buildExpressionRule 基于样本生成 linear 或 ratio 约束（优先 linear）
-func (cc *ConstraintCollector) buildExpressionRule(contract common.Address, selector []byte, samples []constraintSample) *ExpressionRule {
+func (cc *ConstraintCollector) buildExpressionRule(
+	contract common.Address,
+	selector []byte,
+	samples []constraintSample,
+	minAvgSimilarity float64,
+) *ExpressionRule {
 	if len(samples) == 0 {
 		return nil
 	}
-	if averageSimilarity(samples) < ruleGenMinSimilarity {
+	if averageSimilarity(samples) < minAvgSimilarity {
 		return nil
 	}
 
