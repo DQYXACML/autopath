@@ -4,26 +4,16 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    
     "0xa608985f5b40cdf6862bec775207f84280a91e3a",
-    
     "0xd03d360dfc1dac7935e114d564a088077e6754a0",
-    
     "0xc73781107d086754314f7720ca14ab8c5ad035e4",
-    
     "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
-    
     "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-    
     "0x55d398326f99059fF775485246999027B3197955",
-    
     "0x687756C50f6B3172E29DF21C2537c37086b679A5",
-    
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
-    
   ],
   "invariants": [
-    
     {
       "id": "PATTERN_flash_change_001",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -31,30 +21,35 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.25,
-        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4"],
-        "slots": {"slot_1": {"index": "1", "severity": "critical", "threshold": 0.25}, "slot_11": {"index": "11", "severity": "critical", "threshold": 0.25}, "slot_12": {"index": "12", "severity": "critical", "threshold": 0.25}},
+        "contracts": [
+          "0xc73781107d086754314f7720ca14ab8c5ad035e4"
+        ],
+        "slots": {
+          "slot_1": {
+            "index": "1",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_11": {
+            "index": "11",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_12": {
+            "index": "12",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
         "formula": "abs(value_after - value_before) / value_before <= 0.25"
-        
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_flash_change_002",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -62,30 +57,30 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.25,
-        "contracts": ["0x55d398326f99059fF775485246999027B3197955"],
-        "slots": {"slot_0": {"index": "68593895021720662111744383906949511483711148596956706030159053753751192787893", "severity": "critical", "threshold": 0.25}},
-        "formula": "abs(value_after - value_before) / value_before <= 0.25"
-        
+        "threshold": 5.0,
+        "contracts": [
+          "0xa608985f5b40cdf6862bec775207f84280a91e3a"
+        ],
+        "slots": {
+          "slot_10": {
+            "index": "10",
+            "severity": "critical",
+            "threshold": 5.0
+          },
+          "slot_13": {
+            "index": "13",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_flash_change_003",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -93,30 +88,25 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 5.0,
-        "contracts": ["0xa608985f5b40cdf6862bec775207f84280a91e3a"],
-        "slots": {"slot_10": {"index": "10", "severity": "critical", "threshold": 5.0}, "slot_13": {"index": "13", "severity": "critical", "threshold": 5.0}},
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-        
+        "threshold": 0.25,
+        "contracts": [
+          "0x55d398326f99059fF775485246999027B3197955"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "68593895021720662111744383906949511483711148596956706030159053753751192787893",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_ratio_break_001",
       "name": "Ensure ratio stability between related values",
@@ -124,30 +114,28 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.3,
-        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4", "0x687756C50f6B3172E29DF21C2537c37086b679A5", "0x55d398326f99059fF775485246999027B3197955", "0xa608985f5b40cdf6862bec775207f84280a91e3a"],
-        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 0.3}},
+        "contracts": [
+          "0xc73781107d086754314f7720ca14ab8c5ad035e4",
+          "0x687756C50f6B3172E29DF21C2537c37086b679A5",
+          "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+          "0x55d398326f99059fF775485246999027B3197955"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 0.3
+          }
+        },
         "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
-        
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_001",
       "name": "Limit abnormal value growth rate",
@@ -155,30 +143,35 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 0.4,
-        "contracts": ["0xc73781107d086754314f7720ca14ab8c5ad035e4"],
-        "slots": {"slot_1": {"index": "1", "severity": "high", "threshold": 0.4}, "slot_11": {"index": "11", "severity": "high", "threshold": 0.4}, "slot_12": {"index": "12", "severity": "high", "threshold": 0.4}},
+        "contracts": [
+          "0xc73781107d086754314f7720ca14ab8c5ad035e4"
+        ],
+        "slots": {
+          "slot_1": {
+            "index": "1",
+            "severity": "high",
+            "threshold": 0.4
+          },
+          "slot_11": {
+            "index": "11",
+            "severity": "high",
+            "threshold": 0.4
+          },
+          "slot_12": {
+            "index": "12",
+            "severity": "high",
+            "threshold": 0.4
+          }
+        },
         "formula": "(value_after - value_before) / value_before <= 0.4"
-        
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_002",
       "name": "Limit abnormal value growth rate",
@@ -186,30 +179,25 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 1.09,
-        "contracts": ["0x687756C50f6B3172E29DF21C2537c37086b679A5"],
-        "slots": {"reserve1_slot": {"index": "9", "severity": "high", "threshold": 1.09}},
+        "contracts": [
+          "0x687756C50f6B3172E29DF21C2537c37086b679A5"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 1.09
+          }
+        },
         "formula": "(value_after - value_before) / value_before <= 1.09"
-        
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_003",
       "name": "Limit abnormal value growth rate",
@@ -217,62 +205,60 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         "threshold": 5.0,
-        "contracts": ["0xa608985f5b40cdf6862bec775207f84280a91e3a"],
-        "slots": {"slot_10": {"index": "10", "severity": "high", "threshold": 5.0}, "slot_13": {"index": "13", "severity": "high", "threshold": 5.0}},
+        "contracts": [
+          "0xa608985f5b40cdf6862bec775207f84280a91e3a"
+        ],
+        "slots": {
+          "slot_10": {
+            "index": "10",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_13": {
+            "index": "13",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
         "formula": "(value_after - value_before) / value_before <= 5.0"
-        
       },
-      "monitored_functions": ["setProxySync", "delegateCallReserves", "reserveMultiSync"]
+      "monitored_functions": [
+        "setProxySync",
+        "delegateCallReserves",
+        "reserveMultiSync"
+      ]
     }
-    
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
-      
       {
         "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
         "function": "setProxySync",
         "signature": "setProxySync(address)"
       },
-      
       {
         "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
         "function": "delegateCallReserves",
         "signature": "delegateCallReserves()"
       },
-      
       {
         "contract": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
         "function": "reserveMultiSync",
         "signature": "reserveMultiSync(address,uint256)"
       }
-      
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/ngfs",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -283,7 +269,118 @@
     "target_similarity": 0.95,
     "max_high_sim_results": 10,
     "unlimited_mode": true,
-    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "setProxySync(address)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+            "danger_threshold": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+            "attack_values": [
+              "0xa608985f5b40cdf6862bec775207f84280a91e3a"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          }
+        },
+        "reserveMultiSync(address,uint256)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+            "danger_threshold": "0xa608985f5b40cdf6862bec775207f84280a91e3a",
+            "attack_values": [
+              "0xa608985f5b40cdf6862bec775207f84280a91e3a"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "34737626771194857341520860095414151922411321526762087194074880176139670650880",
+            "danger_threshold": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "attack_values": [
+              "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+              "34737626771194857341520860095414151922411321526762087194074880176139670650880",
+              "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+            ],
+            "range": {
+              "min": "34737626771194857341520860095414151922411321526762087194074880176139670650880",
+              "max": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "balance"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "0xa608985f5b40cdf6862bec775207f84280a91e3a"
+        ],
+        "1": [
+          "17368813385597428670760430047707075961205660763381043597037440088069835325440",
+          "31263864094075374821244862603853287814094374056411083519073379724111374188544",
+          "34737626771194857341520860095414151922411321526762087194074880176139670650880",
+          "38211389448314346289549034622936118198576638361763500957888355759339308318720",
+          "52106440156792282798405201625140676799692797607817925746706332698623835373568",
+          "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+          "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+          "69475253542389714683041720190828303844822643053524174388149760352279341301760",
+          "104212880313584578452314757322203557935082333944936671671036615659590353158144",
+          "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "127371298161047825250331566767094462107154374115645276585502502618578588532736",
+          "173688133855974293135356477513031861779904976998460846059186376011869694459904",
+          "231584178474632390847141970017375815706539969331281128078915168015826259279870"
+        ]
+      }
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

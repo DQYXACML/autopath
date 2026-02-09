@@ -1,0 +1,251 @@
+{
+  "project_id": "HoppyFrogERC_exp",
+  "name": "HoppyFrogERC_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xaA6f337f16E6658d9c9599c967D3126051b6c726",
+    "0x676c3262e8f0fba0031a93ea74ff801b99ac177b",
+    "0xc976ed4b25e1e7019ff34fb54f4e63b1550b70c3",
+    "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D",
+    "0xE5c6F5fEF89B64f36BfcCb063962820136bAc42F",
+    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+    "0x53EeF67F96ccb71fB1750Df973fB9e8C82096759",
+    "0x8B75ce8e330bA0EE5fB3a2B47b9e9b4260C08438",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 1.0,
+        "contracts": [
+          "0xaA6f337f16E6658d9c9599c967D3126051b6c726"
+        ],
+        "slots": {
+          "slot_2": {
+            "index": "2",
+            "severity": "critical",
+            "threshold": 1.0
+          },
+          "slot_0": {
+            "index": "0",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 1.0"
+      },
+      "monitored_functions": [
+        "flash"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.18,
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "0xaA6f337f16E6658d9c9599c967D3126051b6c726",
+          "0xE5c6F5fEF89B64f36BfcCb063962820136bAc42F"
+        ],
+        "slots": {
+          "slot_2": {
+            "index": "2",
+            "severity": "high",
+            "threshold": 0.18
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.18"
+      },
+      "monitored_functions": [
+        "flash"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0xaA6f337f16E6658d9c9599c967D3126051b6c726",
+        "function": "flash",
+        "signature": "flash(address,uint256,uint256,bytes)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/hoppyfrogerc",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "HoppyFrogERC_exp",
+      "config_path": "pkg/invariants/configs/hoppyfrogerc_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "flash(address,uint256,uint256,bytes)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0xaa6f337f16e6658d9c9599c967d3126051b6c726",
+            "danger_threshold": "0xaa6f337f16e6658d9c9599c967d3126051b6c726",
+            "attack_values": [
+              "0xaa6f337f16e6658d9c9599c967d3126051b6c726"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
+          },
+          "2": {
+            "type": "uint256",
+            "safe_threshold": "530054151027684822007594187430814287516551370940098317539767782681346048",
+            "danger_threshold": "1766847170092282936288503959180432945171048944000557056678045278424399547",
+            "attack_values": [
+              "1766847170092282936288503959180432945171048944000557056678045278424399547",
+              "530054151027684822007594187430814287516551370940098317539767782681346048",
+              "1236793019064598055401952771426303061619734260800389939674631694897079682"
+            ],
+            "range": {
+              "min": "530054151027684822007594187430814287516551370940098317539767782681346048",
+              "max": "1766847170092282936288503959180432945171048944000557056678045278424399547"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "amount"
+          },
+          "3": {
+            "type": "bytes",
+            "safe_threshold": "\"123\"",
+            "danger_threshold": "\"123\"",
+            "attack_values": [
+              "0x313233"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "\"123\""
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "0xaa6f337f16e6658d9c9599c967d3126051b6c726"
+        ],
+        "2": [
+          "265027075513842411003797093715407143758275685470049158769883891340673024",
+          "477048735924916310382920384062666778284633312560152160305999858488049664",
+          "530054151027684822007594187430814287516551370940098317539767782681346048",
+          "583059566130453333632267990798961796748469429320044474773535706874642432",
+          "795081226541527282051248588854664898741931925220041352109303583897288704",
+          "883423585046141468092371594468244080795128689186618280832250124219449344",
+          "883423585046141468144251979590216472585524472000278528339022639212199773",
+          "1060108302055369644015188374861628575033102741880196635079535565362692096",
+          "1236793019064598055401952771426303061619734260800389939674631694897079682",
+          "1590162453083054760261926408543103667352283325679658207417214807295655936",
+          "1766847170092282936288503959180432945171048944000557056678045278424399547",
+          "1943531887101511308266989200163646525696650906306390419110393329083219968",
+          "2650270755138424404277114783404732242385386067559854842496750372658348032",
+          "3533694340184565872577007918360865890342097888001114113356090556848799094"
+        ],
+        "3": [
+          "0x313233"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

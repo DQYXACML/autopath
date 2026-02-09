@@ -1,6 +1,7 @@
 package fuzzer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -242,7 +243,9 @@ func loadConstraintRulesFromPath(filePath string) (*ConstraintRulesV2, error) {
 	}
 
 	var rules ConstraintRulesV2
-	if err := json.Unmarshal(data, &rules); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&rules); err != nil {
 		return nil, fmt.Errorf("failed to parse constraint rules: %w", err)
 	}
 

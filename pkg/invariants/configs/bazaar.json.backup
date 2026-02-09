@@ -1,0 +1,218 @@
+{
+  "project_id": "Bazaar_exp",
+  "name": "Bazaar_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xefb4e3Cc438eF2854727A7Df0d0baf844484EdaB",
+    "0x3cf5B87726Af770c94494E886d2A69c42A203884",
+    "0xd31c7a22f4e6f928f1d4adabbc08c7bf88a3e402",
+    "0x4300000000000000000000000000000000000004",
+    "0x86cba7808127d76deaC14ec26eF6000Aa78b2eBb",
+    "0xb66585C4E460D49154D50325CE60aDC44bc900E9",
+    "0x83acB050AA232F97810F32aFACDE003303465ca5",
+    "0xdC4A9779D6084C1ab3e815B67eD5e6780cCF4d90",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.25,
+        "contracts": [
+          "0x86cba7808127d76deaC14ec26eF6000Aa78b2eBb"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "90104667933694361572383036089304688617867447332657902809300826186007300895998",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "88489762615989702645935086453804222828906143409085752250306115293356029383656",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
+      },
+      "monitored_functions": [
+        "exitPool"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.3,
+        "contracts": [
+          "0xefb4e3Cc438eF2854727A7Df0d0baf844484EdaB",
+          "0xdC4A9779D6084C1ab3e815B67eD5e6780cCF4d90",
+          "0x86cba7808127d76deaC14ec26eF6000Aa78b2eBb",
+          "0x4300000000000000000000000000000000000004"
+        ],
+        "slots": {
+          "reserve1_slot": {
+            "index": "9",
+            "severity": "high",
+            "threshold": 0.3
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
+      },
+      "monitored_functions": [
+        "exitPool"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.25,
+        "contracts": [
+          "0x4300000000000000000000000000000000000004"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.25"
+      },
+      "monitored_functions": [
+        "exitPool"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0xefb4e3Cc438eF2854727A7Df0d0baf844484EdaB",
+        "function": "exitPool",
+        "signature": "exitPool(bytes32,address,address,ExitPoolRequest)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/bazaar",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "Bazaar_exp",
+      "config_path": "pkg/invariants/configs/bazaar_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "exitPool(bytes32,address,address,ExitPoolRequest)": {
+          "0": {
+            "type": "bytes32",
+            "safe_threshold": "9",
+            "danger_threshold": "9",
+            "attack_values": [
+              "TARGET_ID"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "TARGET_ID"
+          },
+          "2": {
+            "type": "address",
+            "safe_threshold": "0xefb4e3cc438ef2854727a7df0d0baf844484edab",
+            "danger_threshold": "0xefb4e3cc438ef2854727a7df0d0baf844484edab",
+            "attack_values": [
+              "0xefb4e3cc438ef2854727a7df0d0baf844484edab"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "payable(address(this))"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "2": [
+          "0xefb4e3cc438ef2854727a7df0d0baf844484edab"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

@@ -48,7 +48,7 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.1"
         
       },
-      "monitored_functions": ["getAmountOut", "hourBurn"]
+      "monitored_functions": ["hourBurn"]
     },
     
     {
@@ -79,7 +79,7 @@
         "formula": "(value_after - value_before) / value_before <= 0.16"
         
       },
-      "monitored_functions": ["getAmountOut", "hourBurn"]
+      "monitored_functions": ["hourBurn"]
     },
     
     {
@@ -110,19 +110,14 @@
         "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
         
       },
-      "monitored_functions": ["getAmountOut", "hourBurn"]
+      "monitored_functions": ["hourBurn"]
     }
     
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
-      
-      {
-        "contract": "0xe8a290c6fc6fa6c0b79c9cfae1878d195aeb59af",
-        "function": "getAmountOut",
-        "signature": "getAmountOut(uint256,bool)"
-      },
       
       {
         "contract": "0xe8a290c6fc6fa6c0b79c9cfae1878d195aeb59af",
@@ -131,14 +126,18 @@
       }
       
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
+    
     "output_path": "fuzzing_results/fil314",
+    
+    "record_full_trace": true,
+    
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {

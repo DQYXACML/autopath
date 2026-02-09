@@ -1,6 +1,7 @@
 package fuzzer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -26,12 +27,12 @@ type constraintSample struct {
 type ConstraintCollector struct {
 	mu              sync.Mutex
 	samples         map[string][]constraintSample // key: contract-selector
-	maxSimilarity   map[string]float64            // key: contract-selector -> max similarity
 	rules           map[string]*ConstraintRule
 	threshold       int
 	exprs           map[string]*ExpressionRule
 	exprCost        map[string]int64 // 表达式生成耗时(ms)
 	lastGenSample   map[string]int   // 记录每个key上次生成规则时的样本数，便于滑动窗口再生成
+	normalParamSets map[string]map[int]map[string]struct{}
 	constraintRules *ConstraintRulesV2
 	selectorToFunc  map[string]string
 	selectorToSig   map[string]string
@@ -50,14 +51,14 @@ func NewConstraintCollectorWithBasePath(threshold int, basePath string) *Constra
 		threshold = 10
 	}
 	return &ConstraintCollector{
-		samples:       make(map[string][]constraintSample),
-		maxSimilarity: make(map[string]float64),
-		rules:         make(map[string]*ConstraintRule),
-		exprs:         make(map[string]*ExpressionRule),
-		exprCost:      make(map[string]int64),
-		threshold:     threshold,
-		lastGenSample: make(map[string]int),
-		basePath:      basePath,
+		samples:         make(map[string][]constraintSample),
+		rules:           make(map[string]*ConstraintRule),
+		exprs:           make(map[string]*ExpressionRule),
+		exprCost:        make(map[string]int64),
+		threshold:       threshold,
+		lastGenSample:   make(map[string]int),
+		normalParamSets: make(map[string]map[int]map[string]struct{}),
+		basePath:        basePath,
 	}
 }
 
@@ -105,19 +106,9 @@ func (cc *ConstraintCollector) RecordSample(
 		}
 	}
 
-	if best, ok := cc.maxSimilarity[key]; ok {
-		if similarity > best+similarityEpsilon {
-			cc.samples[key] = nil
-			delete(cc.rules, key)
-			delete(cc.exprs, key)
-			delete(cc.exprCost, key)
-			delete(cc.lastGenSample, key)
-			cc.maxSimilarity[key] = similarity
-		} else if similarity < best-similarityEpsilon {
-			return nil
-		}
-	} else {
-		cc.maxSimilarity[key] = similarity
+	// 仅接收可用于规则生成的有效样本
+	if similarity+similarityEpsilon < ruleGenMinSimilarity {
+		return nil
 	}
 
 	cc.samples[key] = append(cc.samples[key], constraintSample{
@@ -140,11 +131,6 @@ func (cc *ConstraintCollector) RecordSample(
 	if expr := cc.buildExpressionRule(contract, selector, cc.samples[key], ruleGenMinSimilarity); expr != nil {
 		cc.exprs[key] = expr
 		cc.exprCost[key] = time.Since(start).Milliseconds()
-	}
-
-	// 保留滑动窗口：只保留最近 threshold 条样本，避免缓存无限增长
-	if len(cc.samples[key]) > cc.threshold {
-		cc.samples[key] = cc.samples[key][len(cc.samples[key])-cc.threshold:]
 	}
 
 	return rule
@@ -233,7 +219,7 @@ func (cc *ConstraintCollector) ResetSamples(contract common.Address, selector []
 	delete(cc.exprs, key)
 	delete(cc.exprCost, key)
 	delete(cc.lastGenSample, key)
-	delete(cc.maxSimilarity, key)
+	delete(cc.normalParamSets, key)
 }
 
 func (cc *ConstraintCollector) ruleKey(contract common.Address, selector []byte) string {
@@ -248,7 +234,7 @@ func (cc *ConstraintCollector) buildRule(contract common.Address, selector []byt
 		funcConstraints = cc.lookupConstraints(selectorHex)
 	}
 
-	paramRanges := cc.aggregateParamConstraintsWithRules(samples, funcConstraints)
+	paramRanges := cc.aggregateParamConstraintsWithRules(samples, funcConstraints, cc.ruleKey(contract, selector))
 	stateConstraints := aggregateStateConstraints(contract, samples)
 
 	return &ConstraintRule{
@@ -776,7 +762,7 @@ func averageSimilarity(samples []constraintSample) float64 {
 }
 
 // aggregateParamConstraintsWithRules 使用约束规则生成参数约束
-func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []constraintSample, funcConstraints []FunctionConstraint) []ParamConstraint {
+func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []constraintSample, funcConstraints []FunctionConstraint, ruleKey string) []ParamConstraint {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -784,6 +770,7 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 	// 使用第一条样本的参数长度为基准
 	paramCount := len(samples[0].params)
 	constraints := make([]ParamConstraint, paramCount)
+	normalValuesByParam := cc.loadNormalParamSets(ruleKey, funcConstraints, paramCount)
 
 	for i := 0; i < paramCount; i++ {
 		constraints[i].Index = samples[0].params[i].Index
@@ -800,8 +787,6 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			continue
 		}
 		isNumeric := (strings.HasPrefix(pc.Type, "uint") || strings.HasPrefix(pc.Type, "int")) && !strings.Contains(pc.Type, "[")
-
-		var minVal, maxVal *big.Int
 		numericValues := make(map[string]struct{})
 		valueSet := make(map[string]struct{})
 
@@ -814,25 +799,12 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			if isNumeric {
 				if bi := normalizeBigIntValue(val); bi != nil {
 					numericValues[bi.String()] = struct{}{}
-					if minVal == nil || bi.Cmp(minVal) < 0 {
-						minVal = new(big.Int).Set(bi)
-					}
-					if maxVal == nil || bi.Cmp(maxVal) > 0 {
-						maxVal = new(big.Int).Set(bi)
-					}
 				}
 			} else {
-				valueSet[ValueToString(val)] = struct{}{}
+				if key, ok := normalizeComparableParamValue(val, pc.Type); ok {
+					valueSet[key] = struct{}{}
+				}
 			}
-		}
-
-		if !isNumeric {
-			if len(valueSet) <= 1 && !allowSingleValueNonNumeric(pc.Type) {
-				log.Printf("[ConstraintCollector] 跳过单值非数值规则: param#%d value=%s", i, dedupValueSetSample(valueSet))
-				continue
-			}
-			pc.Values = dedupMapKeys(valueSet)
-			continue
 		}
 
 		// 查找参数的约束规则
@@ -841,15 +813,46 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 			for _, av := range paramConstraint.AttackValues {
 				if bi := normalizeBigIntValue(av); bi != nil {
 					numericValues[bi.String()] = struct{}{}
-					if minVal == nil || bi.Cmp(minVal) < 0 {
-						minVal = new(big.Int).Set(bi)
-					}
-					if maxVal == nil || bi.Cmp(maxVal) > 0 {
-						maxVal = new(big.Int).Set(bi)
-					}
 				}
 			}
 		}
+
+		// 正常样本扣除：将在正常历史中出现过的值从候选集合移除
+		if normalVals := normalValuesByParam[i]; len(normalVals) > 0 {
+			removed := 0
+			if isNumeric {
+				for normal := range normalVals {
+					if _, ok := numericValues[normal]; ok {
+						delete(numericValues, normal)
+						removed++
+					}
+				}
+			} else {
+				for normal := range normalVals {
+					if _, ok := valueSet[normal]; ok {
+						delete(valueSet, normal)
+						removed++
+					}
+				}
+			}
+			if removed > 0 {
+				log.Printf("[ConstraintCollector] 正常样本扣除: param#%d removed=%d", i, removed)
+			}
+		}
+
+		if !isNumeric {
+			if len(valueSet) == 0 {
+				continue
+			}
+			if len(valueSet) <= 1 && !allowSingleValueNonNumeric(pc.Type) {
+				log.Printf("[ConstraintCollector] 跳过单值非数值规则: param#%d value=%s", i, dedupValueSetSample(valueSet))
+				continue
+			}
+			pc.Values = dedupMapKeys(valueSet)
+			continue
+		}
+
+		minVal, maxVal := numericBoundsFromSet(numericValues)
 
 		if isNumeric && minVal != nil && maxVal != nil {
 			if len(numericValues) <= 1 && (paramConstraint == nil || paramConstraint.ConstraintType == "discrete_numeric") {
@@ -903,6 +906,191 @@ func (cc *ConstraintCollector) aggregateParamConstraintsWithRules(samples []cons
 	}
 
 	return constraints
+}
+
+type contractCallHistoryFile struct {
+	Txs []contractCallHistoryTx `json:"txs"`
+}
+
+type contractCallHistoryTx struct {
+	Function string                     `json:"function"`
+	Params   []contractCallHistoryParam `json:"params"`
+}
+
+type contractCallHistoryParam struct {
+	Type  string      `json:"type"`
+	Value interface{} `json:"value"`
+}
+
+func (cc *ConstraintCollector) loadNormalParamSets(ruleKey string, funcConstraints []FunctionConstraint, paramCount int) map[int]map[string]struct{} {
+	if cc == nil {
+		return nil
+	}
+	if cached, ok := cc.normalParamSets[ruleKey]; ok {
+		return cached
+	}
+
+	normalSets := make(map[int]map[string]struct{})
+	historyPath := cc.findContractCallHistoryPath()
+	if historyPath == "" {
+		cc.normalParamSets[ruleKey] = normalSets
+		return normalSets
+	}
+
+	history, err := loadContractCallHistory(historyPath)
+	if err != nil {
+		log.Printf("[ConstraintCollector] 加载正常样本失败: %v", err)
+		cc.normalParamSets[ruleKey] = normalSets
+		return normalSets
+	}
+
+	targetFuncs := collectTargetFunctions(funcConstraints)
+	for _, tx := range history.Txs {
+		if len(targetFuncs) > 0 {
+			fn := strings.ToLower(strings.TrimSpace(tx.Function))
+			if _, ok := targetFuncs[fn]; !ok {
+				continue
+			}
+		}
+		for idx, p := range tx.Params {
+			if idx >= paramCount {
+				break
+			}
+			key, ok := normalizeComparableParamValue(p.Value, p.Type)
+			if !ok || key == "" {
+				continue
+			}
+			if normalSets[idx] == nil {
+				normalSets[idx] = make(map[string]struct{})
+			}
+			normalSets[idx][key] = struct{}{}
+		}
+	}
+
+	cc.normalParamSets[ruleKey] = normalSets
+	if len(normalSets) > 0 {
+		log.Printf("[ConstraintCollector] 已加载正常样本用于扣除: params=%d source=%s", len(normalSets), historyPath)
+	}
+	return normalSets
+}
+
+func (cc *ConstraintCollector) findContractCallHistoryPath() string {
+	if cc == nil || cc.basePath == "" || cc.projectID == "" {
+		return ""
+	}
+
+	pattern := filepath.Join(cc.basePath, "DeFiHackLabs", "extracted_contracts", "*", cc.projectID, "contract_call_history.json")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		fi, errI := os.Stat(matches[i])
+		fj, errJ := os.Stat(matches[j])
+		if errI != nil && errJ != nil {
+			return matches[i] > matches[j]
+		}
+		if errI != nil {
+			return false
+		}
+		if errJ != nil {
+			return true
+		}
+		return fi.ModTime().After(fj.ModTime())
+	})
+
+	return matches[0]
+}
+
+func loadContractCallHistory(path string) (*contractCallHistoryFile, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
+	var history contractCallHistoryFile
+	if err := dec.Decode(&history); err != nil {
+		return nil, err
+	}
+	return &history, nil
+}
+
+func collectTargetFunctions(funcConstraints []FunctionConstraint) map[string]struct{} {
+	targets := make(map[string]struct{})
+	for _, c := range funcConstraints {
+		if fn := strings.ToLower(strings.TrimSpace(c.Function)); fn != "" {
+			targets[fn] = struct{}{}
+		}
+		sig := strings.ToLower(strings.TrimSpace(c.Signature))
+		if sig == "" {
+			continue
+		}
+		if idx := strings.Index(sig, "("); idx > 0 {
+			targets[sig[:idx]] = struct{}{}
+		}
+	}
+	return targets
+}
+
+func normalizeComparableParamValue(val interface{}, paramType string) (string, bool) {
+	lowerType := strings.ToLower(strings.TrimSpace(paramType))
+	isNumeric := (strings.HasPrefix(lowerType, "uint") || strings.HasPrefix(lowerType, "int")) && !strings.Contains(lowerType, "[")
+	if isNumeric {
+		if bi := normalizeBigIntValue(val); bi != nil {
+			return bi.String(), true
+		}
+		return "", false
+	}
+
+	if strings.HasPrefix(lowerType, "address") {
+		switch v := val.(type) {
+		case common.Address:
+			return strings.ToLower(v.Hex()), true
+		case string:
+			addr := common.HexToAddress(v)
+			if addr == (common.Address{}) {
+				return "", false
+			}
+			return strings.ToLower(addr.Hex()), true
+		default:
+			str := ValueToString(v)
+			if str == "" || str == "null" {
+				return "", false
+			}
+			addr := common.HexToAddress(str)
+			if addr == (common.Address{}) {
+				return "", false
+			}
+			return strings.ToLower(addr.Hex()), true
+		}
+	}
+
+	str := ValueToString(val)
+	if str == "" || str == "null" {
+		return "", false
+	}
+	return str, true
+}
+
+func numericBoundsFromSet(values map[string]struct{}) (*big.Int, *big.Int) {
+	var minVal, maxVal *big.Int
+	for raw := range values {
+		bi := normalizeBigIntValue(raw)
+		if bi == nil {
+			continue
+		}
+		if minVal == nil || bi.Cmp(minVal) < 0 {
+			minVal = new(big.Int).Set(bi)
+		}
+		if maxVal == nil || bi.Cmp(maxVal) > 0 {
+			maxVal = new(big.Int).Set(bi)
+		}
+	}
+	return minVal, maxVal
 }
 
 // pickParamConstraint 从多条函数约束中挑选对指定参数最严格的阈值
@@ -1125,8 +1313,32 @@ func normalizeBigIntValue(val interface{}) *big.Int {
 		return big.NewInt(int64(v))
 	case int64:
 		return big.NewInt(v)
+	case int32:
+		return big.NewInt(int64(v))
 	case uint64:
 		return new(big.Int).SetUint64(v)
+	case uint32:
+		return big.NewInt(int64(v))
+	case uint:
+		return new(big.Int).SetUint64(uint64(v))
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return big.NewInt(i)
+		}
+		if f, err := v.Float64(); err == nil {
+			if f == float64(int64(f)) {
+				return big.NewInt(int64(f))
+			}
+		}
+	case float64:
+		if v == float64(int64(v)) {
+			return big.NewInt(int64(v))
+		}
+	case float32:
+		fv := float64(v)
+		if fv == float64(int64(fv)) {
+			return big.NewInt(int64(fv))
+		}
 	case string:
 		base := 10
 		s := v

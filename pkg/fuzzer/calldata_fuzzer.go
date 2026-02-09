@@ -5030,15 +5030,6 @@ func (f *CallDataFuzzer) worker(
 			if f.sampleRecorder != nil {
 				f.sampleRecorder.Reset()
 			}
-			if f.constraintCollector != nil && len(recordedSelectors) > 0 {
-				for sel := range recordedSelectors {
-					selBytes, err := hexutil.Decode(sel)
-					if err != nil || len(selBytes) < 4 {
-						continue
-					}
-					f.constraintCollector.ResetSamples(contractAddr, selBytes[:4])
-				}
-			}
 			for sel := range recordedSelectors {
 				delete(recordedSelectors, sel)
 			}
@@ -5049,22 +5040,26 @@ func (f *CallDataFuzzer) worker(
 			if targetSelectorHex != "" {
 				recordedSelectors[targetSelectorHex] = struct{}{}
 			}
-			if f.constraintCollector != nil {
-				if rule := f.constraintCollector.RecordSample(contractAddr, selector, ruleParamValues, simResult.StateChanges, similarity); rule != nil {
-					log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
-				}
-			}
-			// 同步记录连锁调用样本，便于为其他受保护函数生成表达式规则
 			if len(observedCalls) > 0 {
 				for _, oc := range observedCalls {
-					if oc.selector == "" || len(oc.params) == 0 {
+					if oc.selector == "" {
 						continue
 					}
 					selKey := strings.ToLower(oc.selector)
 					if selKey != "" {
 						recordedSelectors[selKey] = struct{}{}
 					}
-					if f.constraintCollector == nil {
+				}
+			}
+		}
+
+		if f.constraintCollector != nil && similarity >= ruleGenMinSimilarity {
+			if rule := f.constraintCollector.RecordSample(contractAddr, selector, ruleParamValues, simResult.StateChanges, similarity); rule != nil {
+				log.Printf("[Worker %d]  已生成约束规则: %s selector=%s 样本=%d", workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount)
+			}
+			if len(observedCalls) > 0 {
+				for _, oc := range observedCalls {
+					if oc.selector == "" || len(oc.params) == 0 {
 						continue
 					}
 					if strings.EqualFold(oc.selector, targetSelectorHex) {

@@ -4,28 +4,17 @@
   "chain_id": 1,
   "rpc_url": "ws://localhost:8545",
   "contracts": [
-    
     "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
-    
     "0x1abe06f451e2d569b3e9123baf33b51f68878656",
-    
     "0xd775fd7b76424a553e4adce6c2f99be419ce8d41",
-    
     "0x7012aF43F8a3c1141Ee4e955CC568Ad2af59C3fa",
-    
     "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
-    
     "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-    
     "0x1eFB3f88Bc88f03FD1804A5C53b7141bbEf5dED8",
-    
     "0xce88686553686DA562CE7Cea497CE749DA109f9F",
-    
     "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
-    
   ],
   "invariants": [
-    
     {
       "id": "PATTERN_flash_change_001",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -33,30 +22,30 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.07,
-        "contracts": ["0x7012aF43F8a3c1141Ee4e955CC568Ad2af59C3fa"],
-        "slots": {"slot_0": {"index": "16731330402544519451694114529694666255007386943313644220196694039692195970808", "severity": "critical", "threshold": 0.07}},
-        "formula": "abs(value_after - value_before) / value_before <= 0.07"
-        
+        "threshold": 0.25,
+        "contracts": [
+          "0xd775fd7b76424a553e4adce6c2f99be419ce8d41"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "16",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "1",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     },
-    
     {
       "id": "PATTERN_flash_change_002",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -64,30 +53,30 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.07,
-        "contracts": ["0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"],
-        "slots": {"slot_0": {"index": "80576796340438297722326083836827200204699456253387087751824699121104068339558", "severity": "critical", "threshold": 0.07}, "slot_1": {"index": "18429964254187503623053804344966409401777849806678300658211958682324194161532", "severity": "critical", "threshold": 0.07}},
-        "formula": "abs(value_after - value_before) / value_before <= 0.07"
-        
+        "threshold": 0.25,
+        "contracts": [
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "80576796340438297722326083836827200204699456253387087751824699121104068339558",
+            "severity": "critical",
+            "threshold": 0.25
+          },
+          "slot_1": {
+            "index": "18429964254187503623053804344966409401777849806678300658211958682324194161532",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     },
-    
     {
       "id": "PATTERN_flash_change_003",
       "name": "Prevent extreme value changes (flash loan attack)",
@@ -95,30 +84,25 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.07,
-        "contracts": ["0xd775fd7b76424a553e4adce6c2f99be419ce8d41"],
-        "slots": {"slot_0": {"index": "0", "severity": "critical", "threshold": 0.07}, "slot_1": {"index": "1", "severity": "critical", "threshold": 0.07}},
-        "formula": "abs(value_after - value_before) / value_before <= 0.07"
-        
+        "threshold": 0.25,
+        "contracts": [
+          "0x7012aF43F8a3c1141Ee4e955CC568Ad2af59C3fa"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "16731330402544519451694114529694666255007386943313644220196694039692195970808",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.25"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     },
-    
     {
       "id": "PATTERN_ratio_break_001",
       "name": "Ensure ratio stability between related values",
@@ -126,30 +110,38 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.09,
-        "contracts": ["0x7012aF43F8a3c1141Ee4e955CC568Ad2af59C3fa", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47", "0xd775fd7b76424a553e4adce6c2f99be419ce8d41"],
-        "slots": {"slot_0": {"index": "0", "severity": "high", "threshold": 0.09}, "slot_1": {"index": "1", "severity": "high", "threshold": 0.09}, "slot_16": {"index": "16", "severity": "high", "threshold": 0.09}},
-        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.09"
-        
+        "threshold": 0.3,
+        "contracts": [
+          "0xd775fd7b76424a553e4adce6c2f99be419ce8d41",
+          "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+          "0x7012aF43F8a3c1141Ee4e955CC568Ad2af59C3fa"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "0",
+            "severity": "high",
+            "threshold": 0.3
+          },
+          "slot_1": {
+            "index": "1",
+            "severity": "high",
+            "threshold": 0.3
+          },
+          "slot_16": {
+            "index": "16",
+            "severity": "high",
+            "threshold": 0.3
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.3"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_001",
       "name": "Limit abnormal value growth rate",
@@ -157,30 +149,30 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.12,
-        "contracts": ["0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"],
-        "slots": {"slot_0": {"index": "80576796340438297722326083836827200204699456253387087751824699121104068339558", "severity": "high", "threshold": 0.12}, "slot_1": {"index": "18429964254187503623053804344966409401777849806678300658211958682324194161532", "severity": "high", "threshold": 0.12}},
-        "formula": "(value_after - value_before) / value_before <= 0.12"
-        
+        "threshold": 0.4,
+        "contracts": [
+          "0xd775fd7b76424a553e4adce6c2f99be419ce8d41"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "0",
+            "severity": "high",
+            "threshold": 0.4
+          },
+          "slot_1": {
+            "index": "1",
+            "severity": "high",
+            "threshold": 0.4
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.4"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     },
-    
     {
       "id": "PATTERN_monotonic_increase_002",
       "name": "Limit abnormal value growth rate",
@@ -188,80 +180,60 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        "threshold": 0.12,
-        "contracts": ["0xd775fd7b76424a553e4adce6c2f99be419ce8d41"],
-        "slots": {"slot_0": {"index": "0", "severity": "high", "threshold": 0.12}, "slot_1": {"index": "1", "severity": "high", "threshold": 0.12}},
-        "formula": "(value_after - value_before) / value_before <= 0.12"
-        
+        "threshold": 0.4,
+        "contracts": [
+          "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "80576796340438297722326083836827200204699456253387087751824699121104068339558",
+            "severity": "high",
+            "threshold": 0.4
+          },
+          "slot_1": {
+            "index": "18429964254187503623053804344966409401777849806678300658211958682324194161532",
+            "severity": "high",
+            "threshold": 0.4
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.4"
       },
-      "monitored_functions": ["mint", "mint", "burn", "mint", "burn", "mint"]
+      "monitored_functions": [
+        "burn",
+        "mint",
+        "burn"
+      ]
     }
-    
   ],
   "fuzzing_config": {
     "enabled": true,
+    "target_function_fallback": false,
     "target_functions": [
-      
-      {
-        "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
-        "function": "mint",
-        "signature": "mint(address,address,uint256,uint256)"
-      },
-      
-      {
-        "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
-        "function": "mint",
-        "signature": "mint(address,address,uint256,uint256)"
-      },
-      
       {
         "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
         "function": "burn",
-        "signature": "burn(address,address,uint256,uint256)"
+        "signature": "burn(address)"
       },
-      
       {
         "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
         "function": "mint",
-        "signature": "mint(address,address,uint256,uint256)"
+        "signature": "mint(address)"
       },
-      
       {
         "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
         "function": "burn",
-        "signature": "burn(address,address,uint256,uint256)"
-      },
-      
-      {
-        "contract": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
-        "function": "mint",
-        "signature": "mint(address,address,uint256,uint256)"
+        "signature": "burn(address)"
       }
-      
     ],
-    "threshold": 0.1,
+    "threshold": 0.7,
     "max_variations": 5000,
     "workers": 20,
-    "timeout_seconds": 300,
+    "timeout_seconds": 60,
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
     "output_path": "fuzzing_results/yield",
+    "record_full_trace": true,
     "param_mutation_rate": 0.3,
     "save_high_similarity": true,
     "invariant_check": {
@@ -272,7 +244,86 @@
     "target_similarity": 0.95,
     "max_high_sim_results": 10,
     "unlimited_mode": true,
-    "seed_config": {"adaptive_config": {"convergence_rate": 0.02, "enabled": true, "high_sim_threshold": 0.8, "max_iterations": 5, "medium_sim_threshold": 0.6, "range_strategies": {"high_similarity": [1, 2, 5], "low_similarity": [50, 100, 200], "medium_similarity": [5, 10, 20, 50]}, "unlimited_mode": true, "zone_gap_absolute": 1000, "zone_gap_percent": 0.1, "zone_threshold": 0.75}, "enabled": true}
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "mint(address)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
+            "danger_threshold": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
+            "attack_values": [
+              "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(YieldStrategy_2)"
+          }
+        },
+        "burn(address)": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
+            "danger_threshold": "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47",
+            "attack_values": [
+              "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "0x3b4ffd93ce5fcf97e61aa8275ec241c76cc01a47"
+        ]
+      }
+    }
   },
   "alert_config": {
     "webhook_url": "http://localhost:9000/alerts",

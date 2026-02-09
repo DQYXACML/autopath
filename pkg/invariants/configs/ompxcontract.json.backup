@@ -1,0 +1,283 @@
+{
+  "project_id": "OMPxContract_exp",
+  "name": "OMPxContract_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x09a80172ed7335660327cd664876b5df6fe06108",
+    "0x40d115198d71cab59668b51dd112a07d273d5831",
+    "0xfaddf57d079b01e53d1fe3476cc83e9bcc705854",
+    "0x633B041C41f61D04089880D7B5C7ED0F10fF6f85",
+    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "0xce88686553686DA562CE7Cea497CE749DA109f9F",
+    "0x959951c51b3e4B4eaa55a13D1d761e14Ad0A1d6a",
+    "0x9dF0C6b0066D5317aA5b38B36850548DaCCa6B4e",
+    "0x3078303030303030303030303030303030303030"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x09a80172ed7335660327cd664876b5df6fe06108"
+        ],
+        "slots": {
+          "slot_14": {
+            "index": "14",
+            "severity": "critical",
+            "threshold": 5.0
+          },
+          "slot_18": {
+            "index": "18",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "purchase",
+        "buyBack"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x09a80172ed7335660327cd664876b5df6fe06108"
+        ],
+        "slots": {
+          "reserve0_slot": {
+            "index": "8",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "purchase",
+        "buyBack"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x09a80172ed7335660327cd664876b5df6fe06108"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "purchase",
+        "buyBack"
+      ]
+    },
+    {
+      "id": "CROSS_balance_conservation",
+      "name": "Balance transfer conservation between contracts",
+      "type": "balance_conservation",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.01,
+        "contracts": [
+          "0x40d115198d71cab59668b51dd112a07d273d5831",
+          "0x09a80172ed7335660327cd664876b5df6fe06108"
+        ],
+        "slots": {},
+        "formula": "abs(balance_change_A + balance_change_B) <= gas_tolerance"
+      },
+      "monitored_functions": [
+        "purchase",
+        "buyBack"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0x09a80172ed7335660327cd664876b5df6fe06108",
+        "function": "purchase",
+        "signature": "purchase(uint256,uint256)"
+      },
+      {
+        "contract": "0x09a80172ed7335660327cd664876b5df6fe06108",
+        "function": "buyBack",
+        "signature": "buyBack(uint256,uint256)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/ompxcontract",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "OMPxContract_exp",
+      "config_path": "pkg/invariants/configs/ompxcontract_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "buyBack(uint256,uint256)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "133649828571428560044032",
+            "danger_threshold": "3118496000000000000574900",
+            "attack_values": [
+              "3118496000000000000574900",
+              "133649828571428560044032",
+              "1559248000000000000287450"
+            ],
+            "range": {
+              "min": "133649828571428560044032",
+              "max": "3118496000000000000574900"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "IERC20(OMPX).balanceOf(address(this))"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "935548799999999987417088",
+            "danger_threshold": "3118496000000000000574900",
+            "attack_values": [
+              "3118496000000000000574900",
+              "935548799999999987417088",
+              "2182947200000000000402430"
+            ],
+            "range": {
+              "min": "935548799999999987417088",
+              "max": "3118496000000000000574900"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "1"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "66824914285714280022016",
+          "120284845714285707395072",
+          "133649828571428560044032",
+          "147014811428571429470208",
+          "200474742857142840066048",
+          "267299657142857120088064",
+          "1559248000000000000287450",
+          "1559248000000000113246208",
+          "2806646400000000364904448",
+          "3118496000000000000574900",
+          "3430345600000000624951296",
+          "4677744000000000071303168",
+          "6236992000000000001149800"
+        ],
+        "1": [
+          "1",
+          "467774399999999993708544",
+          "841993920000000002097152",
+          "935548799999999987417088",
+          "1029103680000000106954752",
+          "1403323199999999914016768",
+          "1559248000000000000287450",
+          "1559248000000000113246208",
+          "1871097599999999974834176",
+          "2182947200000000000402430",
+          "2806646400000000364904448",
+          "3118496000000000000574900",
+          "3430345600000000624951296",
+          "4677744000000000071303168",
+          "6236992000000000001149800"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

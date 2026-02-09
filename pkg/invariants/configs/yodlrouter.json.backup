@@ -1,0 +1,221 @@
+{
+  "project_id": "YodlRouter_exp",
+  "name": "YodlRouter_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xe3a0bc3483ae5a04db7ef2954315133a6f7d228e",
+    "0xedee6379fe90bd9b85d8d0b767d4a6deb0dc9dcf",
+    "0x802cfff8d7cb27879e00496843bb69361ff09ab3",
+    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "0x5322BFF39339eDa261Bf878Fa7d92791Cc969Bb0",
+    "0xa7b7d4ebF1F5035F3b289139baDa62f981f2916E",
+    "0x2c349022df145C1a2eD895B5577905e6F1Bc7881",
+    "0x96D0F726FD900E199680277aAaD326fbdebc6BF9",
+    "0xd9db270c1b5e3bd161e8c8503c55ceabee709552",
+    "0x800c32eaa2a6c93cf4cb51794450ed77fbfbb172"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "40226549229576280186288884461007683697683156381046293517882284572523656760074",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "transferFee"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0xe3a0bc3483ae5a04db7ef2954315133a6f7d228e",
+        "function": "transferFee",
+        "signature": "transferFee(uint256,uint256,address,address,address)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/yodlrouter",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "YodlRouter_exp",
+      "config_path": "pkg/invariants/configs/yodlrouter_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "transferFee(uint256,uint256,address,address,address)": {
+          "0": {
+            "type": "uint256",
+            "safe_threshold": "1000000",
+            "danger_threshold": "45588747326",
+            "attack_values": [
+              "45588747326",
+              "1219608225",
+              "1000000000",
+              "1000000"
+            ],
+            "range": {
+              "min": "1000000",
+              "max": "45588747326"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "amount"
+          },
+          "1": {
+            "type": "uint256",
+            "safe_threshold": "10000",
+            "danger_threshold": "10000",
+            "attack_values": [
+              "10000"
+            ],
+            "range": {
+              "min": "10000",
+              "max": "10000"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "feeBps"
+          },
+          "2": {
+            "type": "address",
+            "safe_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "danger_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "attack_values": [
+              "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "token"
+          },
+          "3": {
+            "type": "address",
+            "safe_threshold": "0x96d0f726fd900e199680277aaad326fbdebc6bf9",
+            "danger_threshold": "0x2c349022df145c1a2ed895b5577905e6f1bc7881",
+            "attack_values": [
+              "0x96d0f726fd900e199680277aaad326fbdebc6bf9",
+              "0x5322bff39339eda261bf878fa7d92791cc969bb0",
+              "0xa7b7d4ebf1f5035f3b289139bada62f981f2916e",
+              "0x2c349022df145c1a2ed895b5577905e6f1bc7881"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "from"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "1": [
+          "5000",
+          "9000",
+          "10000",
+          "11000",
+          "15000",
+          "20000"
+        ],
+        "2": [
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "3": [
+          "0xa7b7d4ebf1f5035f3b289139bada62f981f2916e",
+          "0x96d0f726fd900e199680277aaad326fbdebc6bf9",
+          "0x5322bff39339eda261bf878fa7d92791cc969bb0",
+          "0x2c349022df145c1a2ed895b5577905e6f1bc7881"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

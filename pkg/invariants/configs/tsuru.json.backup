@@ -1,0 +1,260 @@
+{
+  "project_id": "TSURU_exp",
+  "name": "TSURU_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0x75Ac62EA5D058A7F88f0C3a5F8f73195277c93dA",
+    "0x7A5Eb99C993f4C075c222F9327AbC7426cFaE386",
+    "0xa2209b48506c4e7f3a879ec1c1c2c4ee16c2c017",
+    "0x913b1658dd001dFF93D3AF2A657523F1eed53917",
+    "0x4200000000000000000000000000000000000006",
+    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x75Ac62EA5D058A7F88f0C3a5F8f73195277c93dA"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "111141141965367953891251968560572836771628463321627031873536160722001862685576",
+            "severity": "critical",
+            "threshold": 0.1
+          },
+          "slot_1": {
+            "index": "88978693094876282901979132822004708562182916891058221400776344777276531102798",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "onERC1155Received"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x75Ac62EA5D058A7F88f0C3a5F8f73195277c93dA"
+        ],
+        "slots": {
+          "slot_2": {
+            "index": "2",
+            "severity": "high",
+            "threshold": 0.5
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.5"
+      },
+      "monitored_functions": [
+        "onERC1155Received"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0x75Ac62EA5D058A7F88f0C3a5F8f73195277c93dA",
+        "function": "onERC1155Received",
+        "signature": "onERC1155Received(address,address,uint256,uint256,bytes)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/tsuru",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "TSURU_exp",
+      "config_path": "pkg/invariants/configs/tsuru_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "onERC1155Received(address,address,uint256,uint256,uint256[])": {
+          "0": {
+            "type": "address",
+            "safe_threshold": "0x0000000000000000000000000000000000000000",
+            "danger_threshold": "0x0000000000000000000000000000000000000000",
+            "attack_values": [
+              "0x0000000000000000000000000000000000000000"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(0)"
+          },
+          "1": {
+            "type": "address",
+            "safe_threshold": "0x75ac62ea5d058a7f88f0c3a5f8f73195277c93da",
+            "danger_threshold": "0x75ac62ea5d058a7f88f0c3a5f8f73195277c93da",
+            "attack_values": [
+              "0x75ac62ea5d058a7f88f0c3a5f8f73195277c93da"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "address(this)"
+          },
+          "2": {
+            "type": "uint256",
+            "safe_threshold": "0",
+            "danger_threshold": "0",
+            "attack_values": [
+              "0"
+            ],
+            "range": {
+              "min": "0",
+              "max": "0"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "0"
+          },
+          "3": {
+            "type": "uint256",
+            "safe_threshold": "79223879999999995635826688",
+            "danger_threshold": "264079600000000000000000000",
+            "attack_values": [
+              "264079600000000000000000000",
+              "79223879999999995635826688",
+              "184855720000000000000000000"
+            ],
+            "range": {
+              "min": "79223879999999995635826688",
+              "max": "264079600000000000000000000"
+            },
+            "mutation_strategy": "progressive_approach",
+            "confidence": 0.75,
+            "value_expr": "418"
+          }
+        },
+        "onERC1155Received(address,address,uint256,uint256,bytes)": {
+          "4": {
+            "type": "bytes",
+            "safe_threshold": "12",
+            "danger_threshold": "12",
+            "attack_values": [
+              "new bytes(0)"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "new bytes(0)"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "0": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "1": [
+          "0x75ac62ea5d058a7f88f0c3a5f8f73195277c93da"
+        ],
+        "3": [
+          "418",
+          "39611939999999997817913344",
+          "71301491999999999508217856",
+          "79223879999999995635826688",
+          "87146268000000008943304704",
+          "118835819999999993453740032",
+          "132039800000000000000000000",
+          "132039800000000004179623936",
+          "158447759999999991271653376",
+          "184855720000000000000000000",
+          "237671640000000021267218432",
+          "264079600000000000000000000",
+          "290487560000000029811015680",
+          "396119399999999978179133440",
+          "528159200000000000000000000"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}
