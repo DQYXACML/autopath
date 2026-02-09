@@ -36,16 +36,17 @@ func main() {
 		localExecution = flag.Bool("local-execution", false, "使用本地EVM执行模式替代RPC调用（更快但需要更多内存）")
 
 		// Autopatch Oracle 推送相关
-		oracleEnabled   = flag.Bool("oracle.enabled", false, "是否启用链上Autopatch推送")
-		oracleModule    = flag.String("oracle.module", "", "ParamCheckModule 合约地址")
-		oraclePK        = flag.String("oracle.pk", "", "用于推送交易的私钥(0x...)，需被模块授权")
-		oracleChainID   = flag.Int64("oracle.chainid", 31337, "链ID")
-		oracleThreshold = flag.Float64("oracle.threshold", 0.8, "推送相似度阈值[0,1]")
-		oracleBatch     = flag.Int("oracle.batch", 1, "批量推送大小")
-		oracleFlush     = flag.Duration("oracle.flush_interval", 30*time.Second, "定期Flush间隔")
-		oracleMaxRules  = flag.Int("oracle.max_rules", 20, "每个函数最多写入的规则数")
-		oracleCompress  = flag.Bool("oracle.compress_ranges", true, "是否启用范围压缩")
-		oracleMaxValues = flag.Int("oracle.max_values_per_param", 10, "每个参数最多保留的离散值")
+		oracleEnabled        = flag.Bool("oracle.enabled", false, "是否启用链上Autopatch推送")
+		oracleModule         = flag.String("oracle.module", "", "ParamCheckModule 合约地址")
+		oraclePK             = flag.String("oracle.pk", "", "用于推送交易的私钥(0x...)，需被模块授权")
+		oracleChainID        = flag.Int64("oracle.chainid", 31337, "链ID")
+		oracleThreshold      = flag.Float64("oracle.threshold", 0.8, "推送相似度阈值[0,1]")
+		oraclePushCandidates = flag.Bool("oracle.push_candidates", false, "允许低相似度候选规则上链")
+		oracleBatch          = flag.Int("oracle.batch", 1, "批量推送大小")
+		oracleFlush          = flag.Duration("oracle.flush_interval", 30*time.Second, "定期Flush间隔")
+		oracleMaxRules       = flag.Int("oracle.max_rules", 20, "每个函数最多写入的规则数")
+		oracleCompress       = flag.Bool("oracle.compress_ranges", true, "是否启用范围压缩")
+		oracleMaxValues      = flag.Int("oracle.max_values_per_param", 10, "每个参数最多保留的离散值")
 
 		// 规则导出相关
 		ruleExportPath   = flag.String("rule.export_path", "test/Lodestar/scripts/data/firewall-rules.json", "规则导出路径")
@@ -159,22 +160,23 @@ func main() {
 			log.Fatalf("Oracle enabled but module or private key not provided")
 		}
 		oracleCfg := &monitor.OracleConfig{
-			Enabled:           true,
-			ModuleAddress:     *oracleModule,
-			PrivateKey:        *oraclePK,
-			RPCURL:            *rpcURL,
-			ChainID:           *oracleChainID,
-			PushThreshold:     *oracleThreshold,
-			BatchSize:         *oracleBatch,
-			FlushInterval:     *oracleFlush,
-			MaxRulesPerFunc:   *oracleMaxRules,
-			CompressRanges:    *oracleCompress,
-			MaxValuesPerParam: *oracleMaxValues,
-			AutoPush:          true,
-			ProjectMapping:    map[string]string{},
-			RuleExportPath:    *ruleExportPath,
-			EnableRuleExport:  *ruleExportEnable,
-			RuleExportFormat:  *ruleExportFormat,
+			Enabled:            true,
+			ModuleAddress:      *oracleModule,
+			PrivateKey:         *oraclePK,
+			RPCURL:             *rpcURL,
+			ChainID:            *oracleChainID,
+			PushThreshold:      *oracleThreshold,
+			BatchSize:          *oracleBatch,
+			FlushInterval:      *oracleFlush,
+			MaxRulesPerFunc:    *oracleMaxRules,
+			CompressRanges:     *oracleCompress,
+			MaxValuesPerParam:  *oracleMaxValues,
+			AutoPush:           true,
+			AllowCandidatePush: *oraclePushCandidates,
+			ProjectMapping:     map[string]string{},
+			RuleExportPath:     *ruleExportPath,
+			EnableRuleExport:   *ruleExportEnable,
+			RuleExportFormat:   *ruleExportFormat,
 		}
 		// 尝试自动构造 ProjectMapping（cToken -> DomainProject）
 		type fwOut struct {

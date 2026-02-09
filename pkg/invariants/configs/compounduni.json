@@ -37,11 +37,11 @@
       "parameters": {
         "threshold": 0.05,
         "contracts": [
-          "0x39AA39c021dfbaE8faC545936693aC917d5E7563"
+          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
         ],
         "slots": {
           "slot_0": {
-            "index": "33390263423249324045101084823203284235917193235826243352123546153557653314573",
+            "index": "59117466412162506550059207072488077507276415900827911855542178413730728601597",
             "severity": "critical",
             "threshold": 0.05
           }
@@ -49,7 +49,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -64,41 +63,11 @@
       "parameters": {
         "threshold": 0.05,
         "contracts": [
-          "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B"
+          "0x39AA39c021dfbaE8faC545936693aC917d5E7563"
         ],
         "slots": {
           "slot_0": {
-            "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_1": {
-            "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_2": {
-            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_3": {
-            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_4": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_5": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
-            "severity": "critical",
-            "threshold": 0.05
-          },
-          "slot_6": {
-            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
+            "index": "33390263423249324045101084823203284235917193235826243352123546153557653314573",
             "severity": "critical",
             "threshold": 0.05
           }
@@ -106,7 +75,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -121,16 +89,41 @@
       "parameters": {
         "threshold": 0.05,
         "contracts": [
-          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
+          "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B"
         ],
         "slots": {
           "slot_0": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
             "severity": "critical",
             "threshold": 0.05
           },
           "slot_1": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
+            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_2": {
+            "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_3": {
+            "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_4": {
+            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_5": {
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743668",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_6": {
+            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
             "severity": "critical",
             "threshold": 0.05
           }
@@ -138,7 +131,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -153,11 +145,16 @@
       "parameters": {
         "threshold": 0.05,
         "contracts": [
-          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+          "0x35A18000230DA775CAc24873d00Ff85BccdeD550"
         ],
         "slots": {
           "slot_0": {
-            "index": "59117466412162506550059207072488077507276415900827911855542178413730728601597",
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
+            "severity": "critical",
+            "threshold": 0.05
+          },
+          "slot_1": {
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
             "severity": "critical",
             "threshold": 0.05
           }
@@ -165,7 +162,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 0.05"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -197,7 +193,6 @@
         "formula": "abs(value_after - value_before) / value_before <= 4.8"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -212,11 +207,12 @@
       "parameters": {
         "threshold": 0.06,
         "contracts": [
+          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
           "0x39AA39c021dfbaE8faC545936693aC917d5E7563",
           "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B",
           "0x35A18000230DA775CAc24873d00Ff85BccdeD550",
-          "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
+          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+          "0x1d42064Fc4Beb5F8aAF85F4617AE8b3b5B8Bd801"
         ],
         "slots": {
           "slot_4": {
@@ -228,7 +224,6 @@
         "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.06"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -247,27 +242,27 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
+            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
             "severity": "high",
             "threshold": 0.08
           },
           "slot_1": {
-            "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
+            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
             "severity": "high",
             "threshold": 0.08
           },
           "slot_2": {
-            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
+            "index": "46702163444414144314421432864497958874280975540530600915089064683084209658237",
             "severity": "high",
             "threshold": 0.08
           },
           "slot_3": {
-            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
+            "index": "41533572996778478170710693766371040855062940273509889432138282700811186921931",
             "severity": "high",
             "threshold": 0.08
           },
           "slot_4": {
-            "index": "98351358435808640777548822383587404740104505437580708094595751890684495743667",
+            "index": "46328047691231730057551482790770579392557640136411606895667664769967636041783",
             "severity": "high",
             "threshold": 0.08
           },
@@ -277,7 +272,7 @@
             "threshold": 0.08
           },
           "slot_6": {
-            "index": "31249702659805867297136064438157939309222858555600055031391475794829624607380",
+            "index": "35564050930217024959701357462017185563367660892891392582268348707105068707306",
             "severity": "high",
             "threshold": 0.08
           }
@@ -285,7 +280,6 @@
         "formula": "(value_after - value_before) / value_before <= 0.08"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -304,12 +298,12 @@
         ],
         "slots": {
           "slot_0": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
             "severity": "high",
             "threshold": 0.08
           },
           "slot_1": {
-            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159189",
+            "index": "26255029659577561060979300208245038356745475154506987326704947016395741159190",
             "severity": "high",
             "threshold": 0.08
           }
@@ -317,7 +311,6 @@
         "formula": "(value_after - value_before) / value_before <= 0.08"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -344,7 +337,6 @@
         "formula": "(value_after - value_before) / value_before <= 4.82"
       },
       "monitored_functions": [
-        "getUnderlyingPrice",
         "pokeFailedOverPrice",
         "activateFailover",
         "deactivateFailover"
@@ -353,13 +345,8 @@
   ],
   "fuzzing_config": {
     "enabled": true,
-    "target_function_fallback": false,
+    "target_function_fallback": true,
     "target_functions": [
-      {
-        "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
-        "function": "getUnderlyingPrice",
-        "signature": "getUnderlyingPrice(address)"
-      },
       {
         "contract": "0x50ce56A3239671Ab62f185704Caedf626352741e",
         "function": "pokeFailedOverPrice",
@@ -383,6 +370,7 @@
     "auto_trigger": false,
     "min_similarity": 0.7,
     "print_realtime": true,
+    "similarity_scope": "full",
     "output_path": "fuzzing_results/compounduni",
     "record_full_trace": true,
     "param_mutation_rate": 0.3,
@@ -426,265 +414,39 @@
         "zone_threshold": 0.75
       },
       "enabled": true,
-      "constraint_ranges": {
-        "flashLoan(address,address[],uint256[],uint256)": {
-          "1": {
-            "type": "address[]",
-            "safe_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-            "danger_threshold": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-            "attack_values": [
-              "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-            ],
-            "range": {
-              "min": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-              "max": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "tokens"
-          },
-          "2": {
-            "type": "uint256[]",
-            "safe_threshold": "193020254960",
-            "danger_threshold": "193020254960",
-            "attack_values": [
-              "193020254960"
-            ],
-            "range": {
-              "min": "193020254960",
-              "max": "193020254960"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "amounts"
-          },
-          "3": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [
-              "0"
-            ],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "bytes(\"\")"
-          }
-        },
-        "transfer(address,uint256)": {
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "193020254960",
-            "danger_threshold": "194293561859",
-            "attack_values": [
-              "193020254960",
-              "194293561859"
-            ],
-            "range": {
-              "min": "193020254960",
-              "max": "194293561859"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "AMOUNT"
-          }
-        },
-        "approve(address,uint256)": {
-          "0": {
-            "type": "address",
-            "safe_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-            "danger_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-            "attack_values": [
-              "0x39aa39c021dfbae8fac545936693ac917d5e7563"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(cUSDC)"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "193020254960",
-            "danger_threshold": "193020254960",
-            "attack_values": [
-              "193020254960"
-            ],
-            "range": {
-              "min": "193020254960",
-              "max": "193020254960"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "AMOUNT"
-          }
-        },
-        "mint(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "193020254960",
-            "danger_threshold": "193020254960",
-            "attack_values": [
-              "193020254960"
-            ],
-            "range": {
-              "min": "193020254960",
-              "max": "193020254960"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "AMOUNT"
-          }
-        },
-        "enterMarkets(address[])": {
-          "0": {
-            "type": "address[]",
-            "safe_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-            "danger_threshold": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-            "attack_values": [
-              "0x39aa39c021dfbae8fac545936693ac917d5e7563"
-            ],
-            "range": {
-              "min": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-              "max": "0x39aa39c021dfbae8fac545936693ac917d5e7563"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "cTokens"
-          }
-        },
-        "getUnderlyingPrice(address)": {
-          "0": {
-            "type": "address",
-            "safe_threshold": "0x35a18000230da775cac24873d00ff85bccded550",
-            "danger_threshold": "0x35a18000230da775cac24873d00ff85bccded550",
-            "attack_values": [
-              "0x35a18000230da775cac24873d00ff85bccded550"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(cUniToken)"
-          }
-        },
-        "borrow(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "10",
-            "danger_threshold": "19788000000000000000000",
-            "attack_values": [
-              "10",
-              "19788000000000000000000"
-            ],
-            "range": {
-              "min": "10",
-              "max": "19788000000000000000000"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "max_UNI_borrow"
-          }
-        },
-        "swap(address,bool,int256,uint160,bytes)": {
-          "1": {
-            "type": "bool",
-            "safe_threshold": "True",
-            "danger_threshold": "False",
-            "attack_values": [
-              "True",
-              "False"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "false"
-          },
-          "2": {
-            "type": "int256",
-            "safe_threshold": "65855246851492826558",
-            "danger_threshold": "65855246851492826558",
-            "attack_values": [
-              "65855246851492826558"
-            ],
-            "range": {
-              "min": "65855246851492826558",
-              "max": "65855246851492826558"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "int256(WETH.balanceOf(address(this)))"
-          },
-          "3": {
-            "type": "uint160",
-            "safe_threshold": "1461446703485210103287273052203988822378723970341",
-            "danger_threshold": "1461446703485210103287273052203988822378723970341",
-            "attack_values": [
-              "1461446703485210103287273052203988822378723970341"
-            ],
-            "range": {
-              "min": "1461446703485210103287273052203988822378723970341",
-              "max": "1461446703485210103287273052203988822378723970341"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341"
-          },
-          "4": {
-            "type": "bytes",
-            "safe_threshold": "9",
-            "danger_threshold": "9",
-            "attack_values": [
-              "bytes(\"\")"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "bytes(\"\")"
-          }
-        }
-      },
-      "range_mutation_config": {
-        "focus_percentiles": [
-          50,
-          75,
-          90,
-          95,
-          99,
-          100
-        ],
-        "boundary_exploration": true,
-        "step_count": 20,
-        "random_within_range_ratio": 0.3
-      },
       "attack_seeds": {
         "1": [
-          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-          "True"
+          "tokens"
+        ],
+        "2": [
+          "amounts"
         ],
         "3": [
-          "21047564370",
-          "37885615866",
-          "42095128740",
-          "46304641614",
-          "63142693110",
-          "84190257480",
-          "730723351742605051643636526101994411189361985170",
-          "730723351742605087996922951667892174463659147264",
-          "1315302033136689255750027410530223948981392637952",
-          "1461446703485210103287273052203988822378723970341",
-          "1607591373833731258496941225354708140451254239232",
-          "2192170055227815263990768855003676523390977441792",
-          "2922893406970420206574546104407977644757447940682"
-        ],
-        "0": [
-          "0x39aa39c021dfbae8fac545936693ac917d5e7563",
-          "0x35a18000230da775cac24873d00ff85bccded550"
-        ],
-        "4": [
           "bytes(\"\")"
         ]
+      },
+      "range_config": {
+        "numeric_range_percent": [
+          1,
+          2,
+          5,
+          10,
+          20,
+          50,
+          100
+        ],
+        "address_mutation_types": [
+          "original",
+          "bitflip_1",
+          "bitflip_2",
+          "nearby"
+        ],
+        "boundary_exploration": true
+      },
+      "weights": {
+        "seed_based": 0.6,
+        "random": 0.2,
+        "boundary": 0.2
       }
     }
   },

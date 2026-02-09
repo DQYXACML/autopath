@@ -1,0 +1,438 @@
+{
+  "project_id": "OTSeaStaking_exp",
+  "name": "OTSeaStaking_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xF2c8e860ca12Cde3F3195423eCf54427A4f30916",
+    "0x000000003704BC4ffb86000046721f44Ef3DBABe",
+    "0xd11eE5A6a9EbD9327360D7A82e40d2F8C314e985",
+    "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "0x5da151b95657e788076d04d56234bd93e409cb09",
+    "0x75eabb7cB05A5057E092fDBBD86fb801B4d02B1f",
+    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "0x0adEDC7487c59eCe60178Cf69b8DF7E3c4730d90",
+    "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+    "0x07c9d3a8bea400ee1980880fb7f4e3532e56612f",
+    "0x5AeC8469414332d62Bf5058fb91F2f8457e5C5CB"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0xd11eE5A6a9EbD9327360D7A82e40d2F8C314e985"
+        ],
+        "slots": {
+          "slot_10": {
+            "index": "10",
+            "severity": "critical",
+            "threshold": 0.1
+          },
+          "slot_11": {
+            "index": "11",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_002",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x5da151b95657e788076d04d56234bd93e409cb09"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "49189421752474749000015119875374083679703229878205724097542651089469161502902",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_003",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0xF2c8e860ca12Cde3F3195423eCf54427A4f30916"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "68024505907463862979374346059071090961116290400410912031789879523571419740823",
+            "severity": "critical",
+            "threshold": 0.1
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_ratio_break_001",
+      "name": "Ensure ratio stability between related values",
+      "type": "ratio_stability",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.12,
+        "contracts": [
+          "0xd11eE5A6a9EbD9327360D7A82e40d2F8C314e985",
+          "0x5da151b95657e788076d04d56234bd93e409cb09",
+          "0xF2c8e860ca12Cde3F3195423eCf54427A4f30916",
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "slots": {
+          "slot_10": {
+            "index": "10",
+            "severity": "high",
+            "threshold": 0.12
+          },
+          "slot_11": {
+            "index": "11",
+            "severity": "high",
+            "threshold": 0.12
+          }
+        },
+        "formula": "abs(ratio_after - ratio_before) / ratio_before <= 0.12"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_001",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.16,
+        "contracts": [
+          "0xd11eE5A6a9EbD9327360D7A82e40d2F8C314e985"
+        ],
+        "slots": {
+          "slot_10": {
+            "index": "10",
+            "severity": "high",
+            "threshold": 0.16
+          },
+          "slot_11": {
+            "index": "11",
+            "severity": "high",
+            "threshold": 0.16
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.16"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.5,
+        "contracts": [
+          "0x5da151b95657e788076d04d56234bd93e409cb09"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "96201774891043841019400813048163589281991670046780255922265161520850369324234",
+            "severity": "high",
+            "threshold": 0.5
+          },
+          "slot_1": {
+            "index": "49189421752474749000015119875374083679703229878205724097542651089469161502902",
+            "severity": "high",
+            "threshold": 0.5
+          },
+          "slot_2": {
+            "index": "108683523006652454490198655355875959941193115081011211642739053658085835381421",
+            "severity": "high",
+            "threshold": 0.5
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.5"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_001",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x34BCcF4aF03870265Fe99cEc262524F343Cca7ff"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_002",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x000000003704BC4ffb86000046721f44Ef3DBABe"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    },
+    {
+      "id": "PATTERN_reentrancy_balance_003",
+      "name": "Limit balance changes to prevent reentrancy attacks",
+      "type": "balance_change_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "slots": {},
+        "formula": "abs(balance_after - balance_before) / balance_before <= 0.1"
+      },
+      "monitored_functions": [
+        "withdraw",
+        "claim"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0xF2c8e860ca12Cde3F3195423eCf54427A4f30916",
+        "function": "withdraw",
+        "signature": "withdraw(uint256[],address)"
+      },
+      {
+        "contract": "0xF2c8e860ca12Cde3F3195423eCf54427A4f30916",
+        "function": "claim",
+        "signature": "claim(uint256[],address)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/otseastaking",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "OTSeaStaking_exp",
+      "config_path": "pkg/invariants/configs/otseastaking_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "withdraw(uint256[],address)": {
+          "0": {
+            "type": "uint256[]",
+            "safe_threshold": "0",
+            "danger_threshold": "70",
+            "attack_values": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30",
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "37",
+              "38",
+              "39",
+              "40",
+              "41",
+              "42",
+              "43",
+              "70",
+              "44",
+              "45",
+              "46",
+              "47",
+              "48",
+              "49",
+              "50",
+              "51",
+              "52",
+              "53",
+              "54",
+              "55",
+              "56",
+              "57",
+              "58",
+              "59",
+              "60",
+              "61",
+              "62",
+              "63",
+              "64"
+            ],
+            "range": {
+              "min": "0",
+              "max": "70"
+            },
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.3,
+            "value_expr": "indexes"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {}
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}

@@ -86,18 +86,23 @@
       "severity": "critical",
       "enabled": true,
       "parameters": {
-        "threshold": 0.15,
+        "threshold": 5.0,
         "contracts": [
-          "0x650b940a1033B8A1b1873f78730FcFC73ec11f1f"
+          "0x55d398326f99059fF775485246999027B3197955"
         ],
         "slots": {
           "slot_0": {
-            "index": "36664877822783583673384385682984557485362118112873439430055119862313751128665",
+            "index": "39714810191188322281822936549879073014096951292024452512568141814035609931552",
             "severity": "critical",
-            "threshold": 0.15
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
+            "severity": "critical",
+            "threshold": 5.0
           }
         },
-        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -112,11 +117,26 @@
       "parameters": {
         "threshold": 0.15,
         "contracts": [
-          "0xb2cf43E119BFC41554c4445f1867dc9F4cf69deD"
+          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
         ],
         "slots": {
-          "slot_11": {
-            "index": "11",
+          "slot_0": {
+            "index": "83050917703159969176343855545544421571974083503256800335611573490315573535668",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_1": {
+            "index": "20050129588964852296160018953009146189131983856905858188527090144179059424394",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_2": {
+            "index": "69944166867689655407427602913532323216931125981774401616680607814388439065867",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_3": {
+            "index": "44482745365495138932428588937127693174261740624959270009544676810229822373071",
             "severity": "critical",
             "threshold": 0.15
           }
@@ -129,99 +149,6 @@
     },
     {
       "id": "PATTERN_flash_change_003",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.15,
-        "contracts": [
-          "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
-            "severity": "critical",
-            "threshold": 0.15
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.15"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_004",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.15,
-        "contracts": [
-          "0xfD36E2c2a6789Db23113685031d7F16329158384"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "24510355293894232091129649541526399868983879500410115064414239742634108858351",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_1": {
-            "index": "85507335066336485003054046679530977763091383649769414685221512248296194063116",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_2": {
-            "index": "99138208802911202531604763463510847679459066055117358422026157331841437053452",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_3": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_4": {
-            "index": "84670170296795866451903630501580320328807852634606164937709167887961651330378",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_5": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_6": {
-            "index": "19449193070619403126286052430791185992507519179413172124175643675527308113842",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_7": {
-            "index": "59917094406864601841613607669884763353360710846780075596278213064134873661761",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_8": {
-            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_9": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
-            "severity": "critical",
-            "threshold": 0.15
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 0.15"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_005",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -245,7 +172,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_006",
+      "id": "PATTERN_flash_change_004",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -253,96 +180,11 @@
       "parameters": {
         "threshold": 0.15,
         "contracts": [
-          "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
+          "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47"
         ],
         "slots": {
           "slot_0": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290928",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_1": {
-            "index": "76720694573756502840471022819537351682106635365838262766445619837729732151978",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_10": {
-            "index": "103101651644562750397096252292337913366951687263600750911842661507451300420376",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_11": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_12": {
-            "index": "13505729548910616665822316463571042897185821260883507423298371922295541529204",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_13": {
-            "index": "14833336866357952231888464702883994812829884799336990932595156028556781814480",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_14": {
-            "index": "27391168730514073295996541149608719683560110753199041656033997004053146053563",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_15": {
-            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_16": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_17": {
-            "index": "51911797379066046289960022843940019624369774420432634488684194274529565525975",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_2": {
-            "index": "92920595854393050527642830396128758008017849079650634959660611585367349627448",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_3": {
-            "index": "107248678306754542486280275998069122460028701275689754611027313694804087678870",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_4": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290929",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_5": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290930",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_6": {
-            "index": "29791026297912055657171410856643109267649239923022702721267326072716982596210",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_7": {
-            "index": "111008894511949230479262204300373632045861782416649299490600928212196214250726",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_8": {
-            "index": "43984987826851242223001582372847987836313467884002313341118020757431384996444",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_9": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
+            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
             "severity": "critical",
             "threshold": 0.15
           }
@@ -354,31 +196,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_007",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x5F4a5252880b393a8cc4c01bBA4486Cf7a76075A"
-        ],
-        "slots": {
-          "slot_11": {
-            "index": "11",
-            "severity": "critical",
-            "threshold": 5.0
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_008",
+      "id": "PATTERN_flash_change_005",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -402,55 +220,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_009",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e"
-        ],
-        "slots": {
-          "slot_11": {
-            "index": "11",
-            "severity": "critical",
-            "threshold": 5.0
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_010",
-      "name": "Prevent extreme value changes (flash loan attack)",
-      "type": "flash_change_prevention",
-      "severity": "critical",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x514e2A29e98D49C676c93c5805cb83891CE6a9F5"
-        ],
-        "slots": {
-          "slot_11": {
-            "index": "11",
-            "severity": "critical",
-            "threshold": 5.0
-          }
-        },
-        "formula": "abs(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_flash_change_011",
+      "id": "PATTERN_flash_change_006",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -458,26 +228,11 @@
       "parameters": {
         "threshold": 0.15,
         "contracts": [
-          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
+          "0x650b940a1033B8A1b1873f78730FcFC73ec11f1f"
         ],
         "slots": {
           "slot_0": {
-            "index": "20050129588964852296160018953009146189131983856905858188527090144179059424394",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_1": {
-            "index": "44482745365495138932428588937127693174261740624959270009544676810229822373071",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_2": {
-            "index": "69944166867689655407427602913532323216931125981774401616680607814388439065867",
-            "severity": "critical",
-            "threshold": 0.15
-          },
-          "slot_3": {
-            "index": "83050917703159969176343855545544421571974083503256800335611573490315573535668",
+            "index": "36664877822783583673384385682984557485362118112873439430055119862313751128665",
             "severity": "critical",
             "threshold": 0.15
           }
@@ -489,7 +244,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_012",
+      "id": "PATTERN_flash_change_007",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -513,7 +268,31 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_013",
+      "id": "PATTERN_flash_change_008",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.15,
+        "contracts": [
+          "0xb2cf43E119BFC41554c4445f1867dc9F4cf69deD"
+        ],
+        "slots": {
+          "slot_11": {
+            "index": "11",
+            "severity": "critical",
+            "threshold": 0.15
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_009",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -537,7 +316,7 @@
       ]
     },
     {
-      "id": "PATTERN_flash_change_014",
+      "id": "PATTERN_flash_change_010",
       "name": "Prevent extreme value changes (flash loan attack)",
       "type": "flash_change_prevention",
       "severity": "critical",
@@ -545,21 +324,242 @@
       "parameters": {
         "threshold": 5.0,
         "contracts": [
-          "0x55d398326f99059fF775485246999027B3197955"
+          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e"
         ],
         "slots": {
-          "slot_0": {
-            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
-            "severity": "critical",
-            "threshold": 5.0
-          },
-          "slot_1": {
-            "index": "39714810191188322281822936549879073014096951292024452512568141814035609931552",
+          "slot_11": {
+            "index": "11",
             "severity": "critical",
             "threshold": 5.0
           }
         },
         "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_011",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x514e2A29e98D49C676c93c5805cb83891CE6a9F5"
+        ],
+        "slots": {
+          "slot_11": {
+            "index": "11",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_012",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.15,
+        "contracts": [
+          "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "103101651644562750397096252292337913366951687263600750911842661507451300420376",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_1": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_10": {
+            "index": "107248678306754542486280275998069122460028701275689754611027313694804087678870",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_11": {
+            "index": "29791026297912055657171410856643109267649239923022702721267326072716982596210",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_12": {
+            "index": "14833336866357952231888464702883994812829884799336990932595156028556781814480",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_13": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290930",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_14": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290929",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_15": {
+            "index": "13505729548910616665822316463571042897185821260883507423298371922295541529204",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_16": {
+            "index": "111008894511949230479262204300373632045861782416649299490600928212196214250726",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_17": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_2": {
+            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_3": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_4": {
+            "index": "43984987826851242223001582372847987836313467884002313341118020757431384996444",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_5": {
+            "index": "51911797379066046289960022843940019624369774420432634488684194274529565525975",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_6": {
+            "index": "27391168730514073295996541149608719683560110753199041656033997004053146053563",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_7": {
+            "index": "92920595854393050527642830396128758008017849079650634959660611585367349627448",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_8": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290928",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_9": {
+            "index": "76720694573756502840471022819537351682106635365838262766445619837729732151978",
+            "severity": "critical",
+            "threshold": 0.15
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_013",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x5F4a5252880b393a8cc4c01bBA4486Cf7a76075A"
+        ],
+        "slots": {
+          "slot_11": {
+            "index": "11",
+            "severity": "critical",
+            "threshold": 5.0
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_flash_change_014",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.15,
+        "contracts": [
+          "0xfD36E2c2a6789Db23113685031d7F16329158384"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_1": {
+            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_2": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_3": {
+            "index": "19449193070619403126286052430791185992507519179413172124175643675527308113842",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_4": {
+            "index": "84670170296795866451903630501580320328807852634606164937709167887961651330378",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_5": {
+            "index": "85507335066336485003054046679530977763091383649769414685221512248296194063116",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_6": {
+            "index": "59917094406864601841613607669884763353360710846780075596278213064134873661761",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_7": {
+            "index": "24510355293894232091129649541526399868983879500410115064414239742634108858351",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_8": {
+            "index": "99138208802911202531604763463510847679459066055117358422026157331841437053452",
+            "severity": "critical",
+            "threshold": 0.15
+          },
+          "slot_9": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
+            "severity": "critical",
+            "threshold": 0.15
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.15"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -574,21 +574,21 @@
       "parameters": {
         "threshold": 0.18,
         "contracts": [
-          "0x650b940a1033B8A1b1873f78730FcFC73ec11f1f",
-          "0xb2cf43E119BFC41554c4445f1867dc9F4cf69deD",
-          "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
-          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-          "0xfD36E2c2a6789Db23113685031d7F16329158384",
+          "0x55d398326f99059fF775485246999027B3197955",
+          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
           "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+          "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
+          "0xB51F589BD9f69a0089c315521EE2FC848bAB6C0c",
+          "0x650b940a1033B8A1b1873f78730FcFC73ec11f1f",
+          "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+          "0xb2cf43E119BFC41554c4445f1867dc9F4cf69deD",
+          "0x8fBCC81E5983d8347495468122c65E2Dc274eed9",
+          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e",
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "0x514e2A29e98D49C676c93c5805cb83891CE6a9F5",
           "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
           "0x5F4a5252880b393a8cc4c01bBA4486Cf7a76075A",
-          "0xB51F589BD9f69a0089c315521EE2FC848bAB6C0c",
-          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e",
-          "0x514e2A29e98D49C676c93c5805cb83891CE6a9F5",
-          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
-          "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
-          "0x8fBCC81E5983d8347495468122c65E2Dc274eed9",
-          "0x55d398326f99059fF775485246999027B3197955"
+          "0xfD36E2c2a6789Db23113685031d7F16329158384"
         ],
         "slots": {
           "slot_11": {
@@ -615,6 +615,98 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0x55d398326f99059fF775485246999027B3197955"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "39714810191188322281822936549879073014096951292024452512568141814035609931552",
+            "severity": "high",
+            "threshold": 5.0
+          },
+          "slot_1": {
+            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_002",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.24,
+        "contracts": [
+          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "83050917703159969176343855545544421571974083503256800335611573490315573535668",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_1": {
+            "index": "20050129588964852296160018953009146189131983856905858188527090144179059424394",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_2": {
+            "index": "69944166867689655407427602913532323216931125981774401616680607814388439065867",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_3": {
+            "index": "44482745365495138932428588937127693174261740624959270009544676810229822373071",
+            "severity": "high",
+            "threshold": 0.24
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 0.24"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_003",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
+        "threshold": 5.0,
+        "contracts": [
+          "0xB51F589BD9f69a0089c315521EE2FC848bAB6C0c"
+        ],
+        "slots": {
+          "slot_11": {
+            "index": "11",
+            "severity": "high",
+            "threshold": 5.0
+          }
+        },
+        "formula": "(value_after - value_before) / value_before <= 5.0"
+      },
+      "monitored_functions": [
+        "enterMarkets"
+      ]
+    },
+    {
+      "id": "PATTERN_monotonic_increase_004",
+      "name": "Limit abnormal value growth rate",
+      "type": "growth_rate_limit",
+      "severity": "high",
+      "enabled": true,
+      "parameters": {
         "threshold": 0.24,
         "contracts": [
           "0xb2cf43E119BFC41554c4445f1867dc9F4cf69deD"
@@ -633,7 +725,7 @@
       ]
     },
     {
-      "id": "PATTERN_monotonic_increase_002",
+      "id": "PATTERN_monotonic_increase_005",
       "name": "Limit abnormal value growth rate",
       "type": "growth_rate_limit",
       "severity": "high",
@@ -641,223 +733,16 @@
       "parameters": {
         "threshold": 0.24,
         "contracts": [
-          "0xfD36E2c2a6789Db23113685031d7F16329158384"
+          "0x8fBCC81E5983d8347495468122c65E2Dc274eed9"
         ],
         "slots": {
-          "slot_0": {
-            "index": "24510355293894232091129649541526399868983879500410115064414239742634108858351",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_1": {
-            "index": "85507335066336485003054046679530977763091383649769414685221512248296194063116",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_2": {
-            "index": "99138208802911202531604763463510847679459066055117358422026157331841437053452",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_3": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_4": {
-            "index": "84670170296795866451903630501580320328807852634606164937709167887961651330378",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_5": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_6": {
-            "index": "19449193070619403126286052430791185992507519179413172124175643675527308113842",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_7": {
-            "index": "59917094406864601841613607669884763353360710846780075596278213064134873661761",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_8": {
-            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
-            "severity": "high",
-            "threshold": 0.24
-          },
-          "slot_9": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
+          "slot_13": {
+            "index": "13",
             "severity": "high",
             "threshold": 0.24
           }
         },
         "formula": "(value_after - value_before) / value_before <= 0.24"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_003",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 0.11,
-        "contracts": [
-          "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-        ],
-        "slots": {
-          "slot_0": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290928",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_1": {
-            "index": "76720694573756502840471022819537351682106635365838262766445619837729732151978",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_10": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_11": {
-            "index": "103101651644562750397096252292337913366951687263600750911842661507451300420376",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_12": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_13": {
-            "index": "13505729548910616665822316463571042897185821260883507423298371922295541529204",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_14": {
-            "index": "14833336866357952231888464702883994812829884799336990932595156028556781814480",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_15": {
-            "index": "27391168730514073295996541149608719683560110753199041656033997004053146053563",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_16": {
-            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_17": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_18": {
-            "index": "51911797379066046289960022843940019624369774420432634488684194274529565525975",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_2": {
-            "index": "92920595854393050527642830396128758008017849079650634959660611585367349627448",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_3": {
-            "index": "107248678306754542486280275998069122460028701275689754611027313694804087678870",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_4": {
-            "index": "56041761105864507788527041772763760605016465975263045187342211938411007809280",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_5": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290929",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_6": {
-            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290930",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_7": {
-            "index": "29791026297912055657171410856643109267649239923022702721267326072716982596210",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_8": {
-            "index": "111008894511949230479262204300373632045861782416649299490600928212196214250726",
-            "severity": "high",
-            "threshold": 0.11
-          },
-          "slot_9": {
-            "index": "43984987826851242223001582372847987836313467884002313341118020757431384996444",
-            "severity": "high",
-            "threshold": 0.11
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 0.11"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_004",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0x5F4a5252880b393a8cc4c01bBA4486Cf7a76075A"
-        ],
-        "slots": {
-          "slot_11": {
-            "index": "11",
-            "severity": "high",
-            "threshold": 5.0
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 5.0"
-      },
-      "monitored_functions": [
-        "enterMarkets"
-      ]
-    },
-    {
-      "id": "PATTERN_monotonic_increase_005",
-      "name": "Limit abnormal value growth rate",
-      "type": "growth_rate_limit",
-      "severity": "high",
-      "enabled": true,
-      "parameters": {
-        "threshold": 5.0,
-        "contracts": [
-          "0xB51F589BD9f69a0089c315521EE2FC848bAB6C0c"
-        ],
-        "slots": {
-          "slot_11": {
-            "index": "11",
-            "severity": "high",
-            "threshold": 5.0
-          }
-        },
-        "formula": "(value_after - value_before) / value_before <= 5.0"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -918,33 +803,108 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.24,
+        "threshold": 0.11,
         "contracts": [
-          "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
+          "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
         ],
         "slots": {
           "slot_0": {
-            "index": "20050129588964852296160018953009146189131983856905858188527090144179059424394",
+            "index": "103101651644562750397096252292337913366951687263600750911842661507451300420376",
             "severity": "high",
-            "threshold": 0.24
+            "threshold": 0.11
           },
           "slot_1": {
-            "index": "44482745365495138932428588937127693174261740624959270009544676810229822373071",
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
             "severity": "high",
-            "threshold": 0.24
+            "threshold": 0.11
+          },
+          "slot_10": {
+            "index": "107248678306754542486280275998069122460028701275689754611027313694804087678870",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_11": {
+            "index": "29791026297912055657171410856643109267649239923022702721267326072716982596210",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_12": {
+            "index": "14833336866357952231888464702883994812829884799336990932595156028556781814480",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_13": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290930",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_14": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290929",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_15": {
+            "index": "13505729548910616665822316463571042897185821260883507423298371922295541529204",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_16": {
+            "index": "56041761105864507788527041772763760605016465975263045187342211938411007809280",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_17": {
+            "index": "111008894511949230479262204300373632045861782416649299490600928212196214250726",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_18": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
+            "severity": "high",
+            "threshold": 0.11
           },
           "slot_2": {
-            "index": "69944166867689655407427602913532323216931125981774401616680607814388439065867",
+            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
             "severity": "high",
-            "threshold": 0.24
+            "threshold": 0.11
           },
           "slot_3": {
-            "index": "83050917703159969176343855545544421571974083503256800335611573490315573535668",
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
             "severity": "high",
-            "threshold": 0.24
+            "threshold": 0.11
+          },
+          "slot_4": {
+            "index": "43984987826851242223001582372847987836313467884002313341118020757431384996444",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_5": {
+            "index": "51911797379066046289960022843940019624369774420432634488684194274529565525975",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_6": {
+            "index": "27391168730514073295996541149608719683560110753199041656033997004053146053563",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_7": {
+            "index": "92920595854393050527642830396128758008017849079650634959660611585367349627448",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_8": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290928",
+            "severity": "high",
+            "threshold": 0.11
+          },
+          "slot_9": {
+            "index": "76720694573756502840471022819537351682106635365838262766445619837729732151978",
+            "severity": "high",
+            "threshold": 0.11
           }
         },
-        "formula": "(value_after - value_before) / value_before <= 0.24"
+        "formula": "(value_after - value_before) / value_before <= 0.11"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -957,18 +917,18 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 0.24,
+        "threshold": 5.0,
         "contracts": [
-          "0x8fBCC81E5983d8347495468122c65E2Dc274eed9"
+          "0x5F4a5252880b393a8cc4c01bBA4486Cf7a76075A"
         ],
         "slots": {
-          "slot_13": {
-            "index": "13",
+          "slot_11": {
+            "index": "11",
             "severity": "high",
-            "threshold": 0.24
+            "threshold": 5.0
           }
         },
-        "formula": "(value_after - value_before) / value_before <= 0.24"
+        "formula": "(value_after - value_before) / value_before <= 5.0"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -981,23 +941,63 @@
       "severity": "high",
       "enabled": true,
       "parameters": {
-        "threshold": 5.0,
+        "threshold": 0.24,
         "contracts": [
-          "0x55d398326f99059fF775485246999027B3197955"
+          "0xfD36E2c2a6789Db23113685031d7F16329158384"
         ],
         "slots": {
           "slot_0": {
-            "index": "105549046499690788736737856256854639862664803677677977370325881720533984738876",
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290926",
             "severity": "high",
-            "threshold": 5.0
+            "threshold": 0.24
           },
           "slot_1": {
-            "index": "39714810191188322281822936549879073014096951292024452512568141814035609931552",
+            "index": "64015643468377020561390108497449216167800493740282119537984017936360829744311",
             "severity": "high",
-            "threshold": 5.0
+            "threshold": 0.24
+          },
+          "slot_2": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290925",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_3": {
+            "index": "19449193070619403126286052430791185992507519179413172124175643675527308113842",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_4": {
+            "index": "84670170296795866451903630501580320328807852634606164937709167887961651330378",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_5": {
+            "index": "85507335066336485003054046679530977763091383649769414685221512248296194063116",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_6": {
+            "index": "59917094406864601841613607669884763353360710846780075596278213064134873661761",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_7": {
+            "index": "24510355293894232091129649541526399868983879500410115064414239742634108858351",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_8": {
+            "index": "99138208802911202531604763463510847679459066055117358422026157331841437053452",
+            "severity": "high",
+            "threshold": 0.24
+          },
+          "slot_9": {
+            "index": "28005681114615028410422056777197538551913050242241794293804492908708222290927",
+            "severity": "high",
+            "threshold": 0.24
           }
         },
-        "formula": "(value_after - value_before) / value_before <= 5.0"
+        "formula": "(value_after - value_before) / value_before <= 0.24"
       },
       "monitored_functions": [
         "enterMarkets"
@@ -1048,8 +1048,8 @@
       "parameters": {
         "threshold": 0.01,
         "contracts": [
-          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e"
+          "0xB5aAaCcFd69EA45b1A5Aa7E9c7a5e0DB2ce4357e",
+          "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
         ],
         "slots": {},
         "formula": "abs(balance_change_A + balance_change_B) <= gas_tolerance"
@@ -1120,287 +1120,6 @@
       },
       "enabled": true,
       "constraint_ranges": {
-        "flashLoan(uint256,uint256,address,uint256[])": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "7_001_000_000_000_000_000"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [
-              "0"
-            ],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "0"
-          },
-          "2": {
-            "type": "address",
-            "safe_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "danger_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "attack_values": [
-              "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(this)"
-          },
-          "3": {
-            "type": "uint256[]",
-            "safe_threshold": "1",
-            "danger_threshold": "1",
-            "attack_values": [
-              "1"
-            ],
-            "range": {
-              "min": "1",
-              "max": "1"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "new bytes(1)"
-          }
-        },
-        "swap(uint256,uint256,address,uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [
-              "0"
-            ],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "0"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "682141659754090840970512520279180210897446243119756235556011783111517300326"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "1000"
-          },
-          "2": {
-            "type": "address",
-            "safe_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "danger_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "attack_values": [
-              "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(this)"
-          },
-          "3": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "682141659754090840970512520279180210897446243119756235556011783111517300326"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "data"
-          }
-        },
-        "transfer(address,uint256)": {
-          "0": {
-            "type": "address",
-            "safe_threshold": "0x8fbcc81e5983d8347495468122c65e2dc274eed9",
-            "danger_threshold": "0x8fbcc81e5983d8347495468122c65e2dc274eed9",
-            "attack_values": [
-              "0x8fbcc81e5983d8347495468122c65e2dc274eed9"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(dLINK)"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "487244042681493457836080371627985864926747316514111596825722702222512357376"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "11_499_999_999_999_999_999_998"
-          }
-        },
-        "flash(address,uint256,uint256,uint256[])": {
-          "0": {
-            "type": "address",
-            "safe_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "danger_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "attack_values": [
-              "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(this)"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "70_000_000_000_000_000_000_000"
-          },
-          "2": {
-            "type": "uint256",
-            "safe_threshold": "0",
-            "danger_threshold": "0",
-            "attack_values": [
-              "0"
-            ],
-            "range": {
-              "min": "0",
-              "max": "0"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.2,
-            "value_expr": "0"
-          },
-          "3": {
-            "type": "uint256[]",
-            "safe_threshold": "1",
-            "danger_threshold": "1",
-            "attack_values": [
-              "1"
-            ],
-            "range": {
-              "min": "1",
-              "max": "1"
-            },
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "new bytes(1)"
-          }
-        },
-        "flashLoan(uint256,uint256,address,uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "312_497_349_377_117_598_837"
-          },
-          "1": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "154_451_704_908_346_387_787_280"
-          },
-          "2": {
-            "type": "address",
-            "safe_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "danger_threshold": "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2",
-            "attack_values": [
-              "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-            ],
-            "range": null,
-            "mutation_strategy": "explore_danger_zone",
-            "confidence": 0.3,
-            "value_expr": "address(this)"
-          },
-          "3": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "data"
-          }
-        },
         "enterMarkets(address[])": {
           "0": {
             "type": "address[]",
@@ -1409,127 +1128,10 @@
             "attack_values": [
               "0x8fbcc81e5983d8347495468122c65e2dc274eed9"
             ],
-            "range": {
-              "min": "0x8fbcc81e5983d8347495468122c65e2dc274eed9",
-              "max": "0x8fbcc81e5983d8347495468122c65e2dc274eed9"
-            },
+            "range": null,
             "mutation_strategy": "explore_danger_zone",
             "confidence": 0.3,
             "value_expr": "tokenList1"
-          }
-        },
-        "mint(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "487244042681493457836080371627985864926747316514111596825722702222512357376"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "2"
-          }
-        },
-        "withdraw(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "312_497_349_377_117_598_837"
-          }
-        },
-        "borrow(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "487244042681493457836080371627985864926747316514111596825722702222512357376"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "911_577_468_904_829_524_350"
-          }
-        },
-        "redeemUnderlying(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "11_499_999_999_999_999_999_898"
-          }
-        },
-        "repayBorrow(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "487244042681493457836080371627985864926747316514111596825722702222512357376"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "11_500_000_000_000_000_000_000"
-          }
-        },
-        "redeem(uint256)": {
-          "0": {
-            "type": "uint256",
-            "safe_threshold": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-            "danger_threshold": "974488085362986915672160743255971729853494633028223193651445404445024714752",
-            "attack_values": [
-              "974488085362986915672160743255971729853494633028223193651445404445024714752",
-              "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "292346425608896074701648222976791518956048389908466958095433621333507414425"
-            ],
-            "range": {
-              "min": "292346425608896064658285446358102296818785312776200692331664910191052193792",
-              "max": "974488085362986915672160743255971729853494633028223193651445404445024714752"
-            },
-            "mutation_strategy": "progressive_approach",
-            "confidence": 0.75,
-            "value_expr": "1_320_879_335_222"
           }
         }
       },
@@ -1546,51 +1148,7 @@
         "step_count": 20,
         "random_within_range_ratio": 0.3
       },
-      "attack_seeds": {
-        "1": [
-          "59",
-          "1000",
-          "7001000000000000000",
-          "11499999999999999999998",
-          "70000000000000000000000",
-          "154451704908346387787280",
-          "146173212804448032329142723179051148409392656388100346165832455095526096896",
-          "263111783048006453170775513412947456068275242932447490216614063600719364096",
-          "292346425608896064658285446358102296818785312776200692331664910191052193792",
-          "292346425608896074701648222976791518956048389908466958095433621333507414425",
-          "321581068169785676145795379303257137569295382619953894446715756781385023488",
-          "438519638413344071879021227990430389885020276333635374088075587430440239104",
-          "487244042681493457836080371627985864926747316514111596825722702222512357376",
-          "584692851217792129316570892716204593637570625552401384663329820382104387584",
-          "682141659754090840970512520279180210897446243119756235556011783111517300326",
-          "877039276826688244191670222167753001142671323989933405813838286285432684544",
-          "974488085362986915672160743255971729853494633028223193651445404445024714752",
-          "1071936893899285687586279030531082679936948713389175639126739634029168951296",
-          "1461732128044480373508241114883957594780241949542334790477168106667537072128",
-          "1948976170725973831344321486511943459706989266056446387302890808890049429504"
-        ],
-        "2": [
-          "0x5e5e28029ef37fc97ffb763c4ac1f532bbd4c7a2"
-        ],
-        "3": [
-          "1",
-          "2",
-          "146173212804448032329142723179051148409392656388100346165832455095526096896",
-          "263111783048006453170775513412947456068275242932447490216614063600719364096",
-          "292346425608896064658285446358102296818785312776200692331664910191052193792",
-          "292346425608896074701648222976791518956048389908466958095433621333507414425",
-          "321581068169785676145795379303257137569295382619953894446715756781385023488",
-          "438519638413344071879021227990430389885020276333635374088075587430440239104",
-          "487244042681493457836080371627985864926747316514111596825722702222512357376",
-          "584692851217792129316570892716204593637570625552401384663329820382104387584",
-          "682141659754090840970512520279180210897446243119756235556011783111517300326",
-          "877039276826688244191670222167753001142671323989933405813838286285432684544",
-          "974488085362986915672160743255971729853494633028223193651445404445024714752",
-          "1071936893899285687586279030531082679936948713389175639126739634029168951296",
-          "1461732128044480373508241114883957594780241949542334790477168106667537072128",
-          "1948976170725973831344321486511943459706989266056446387302890808890049429504"
-        ]
-      }
+      "attack_seeds": {}
     }
   },
   "alert_config": {

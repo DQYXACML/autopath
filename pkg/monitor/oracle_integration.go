@@ -37,19 +37,20 @@ type OracleIntegration struct {
 
 // OracleConfig Oracle集成配置
 type OracleConfig struct {
-	Enabled           bool              `json:"enabled"`
-	ModuleAddress     string            `json:"module_address"`
-	PrivateKey        string            `json:"private_key"`
-	RPCURL            string            `json:"rpc_url"`
-	ChainID           int64             `json:"chain_id"`
-	PushThreshold     float64           `json:"push_threshold"`
-	BatchSize         int               `json:"batch_size"`
-	FlushInterval     time.Duration     `json:"flush_interval"`
-	MaxRulesPerFunc   int               `json:"max_rules_per_func"`
-	CompressRanges    bool              `json:"compress_ranges"`
-	MaxValuesPerParam int               `json:"max_values_per_param"`
-	AutoPush          bool              `json:"auto_push"`
-	ProjectMapping    map[string]string `json:"project_mapping"` // contract -> project address
+	Enabled            bool              `json:"enabled"`
+	ModuleAddress      string            `json:"module_address"`
+	PrivateKey         string            `json:"private_key"`
+	RPCURL             string            `json:"rpc_url"`
+	ChainID            int64             `json:"chain_id"`
+	PushThreshold      float64           `json:"push_threshold"`
+	BatchSize          int               `json:"batch_size"`
+	FlushInterval      time.Duration     `json:"flush_interval"`
+	MaxRulesPerFunc    int               `json:"max_rules_per_func"`
+	CompressRanges     bool              `json:"compress_ranges"`
+	MaxValuesPerParam  int               `json:"max_values_per_param"`
+	AutoPush           bool              `json:"auto_push"`
+	AllowCandidatePush bool              `json:"allow_candidate_push"`
+	ProjectMapping     map[string]string `json:"project_mapping"` // contract -> project address
 
 	// 规则导出配置
 	RuleExportPath   string `json:"rule_export_path"`
@@ -121,6 +122,22 @@ func (oi *OracleIntegration) ProcessFuzzingResult(
 	funcSig, err := oi.normalizeReportSignature(report)
 	if err != nil {
 		return fmt.Errorf("normalize report signature failed: %w", err)
+	}
+
+	// overlap召回候选规则：默认仅导出链下规则；若开启AllowCandidatePush则允许进入推送队列。
+	if report.CandidateOnly && !oi.config.AllowCandidatePush {
+		if oi.ruleExporter != nil && len(report.ExpressionRules) > 0 {
+			projectAddr, _ := oi.getProjectAddress(report.ContractAddress)
+			if err := oi.ruleExporter.ExportExpressionRules(projectAddr, funcSig, report.ExpressionRules); err != nil {
+				log.Printf("[OracleIntegration] Export candidate expression rules failed: %v", err)
+			}
+		}
+		log.Printf("[OracleIntegration] Candidate-only report, skipping push (contract=%s, selector=%s)", report.ContractAddress.Hex(), report.FunctionSig)
+		return nil
+	}
+	if report.CandidateOnly && oi.config.AllowCandidatePush {
+		log.Printf("[OracleIntegration] Candidate-only report promoted for push (priority=%s, contract=%s, selector=%s)",
+			report.RulePriority, report.ContractAddress.Hex(), report.FunctionSig)
 	}
 
 	// 检查是否满足推送条件
@@ -298,6 +315,55 @@ func (oi *OracleIntegration) FlushBuffer(ctx context.Context) error {
 	return nil
 }
 
+func reportPriorityRank(report *fuzzer.AttackParameterReport) int {
+	if report == nil {
+		return 0
+	}
+	switch strings.ToUpper(strings.TrimSpace(report.RulePriority)) {
+	case "P0_HIGH_SIM":
+		return 4
+	case "P1_MEDIUM_SIM":
+		return 3
+	case "P2_LOW_SIM_OVERLAP", "P2_OVERLAP_RECALL":
+		return 2
+	case "P3_LOW_SIM":
+		return 1
+	default:
+		if report.CandidateOnly {
+			return 2
+		}
+		if report.MaxSimilarity >= 0.8 {
+			return 4
+		}
+		if report.MaxSimilarity >= 0.6 {
+			return 3
+		}
+		return 1
+	}
+}
+
+func shouldPreferReport(candidate, current *fuzzer.AttackParameterReport) bool {
+	if candidate == nil {
+		return false
+	}
+	if current == nil {
+		return true
+	}
+
+	candRank := reportPriorityRank(candidate)
+	currRank := reportPriorityRank(current)
+	if candRank != currRank {
+		return candRank > currRank
+	}
+
+	const similarityEpsilon = 1e-6
+	diff := candidate.MaxSimilarity - current.MaxSimilarity
+	if diff > similarityEpsilon || (diff >= -similarityEpsilon && diff <= similarityEpsilon) {
+		return true
+	}
+	return false
+}
+
 // groupReports 分组报告
 func (oi *OracleIntegration) groupReports(reports []*fuzzer.AttackParameterReport) map[string][]*fuzzer.AttackParameterReport {
 	grouped := make(map[string][]*fuzzer.AttackParameterReport)
@@ -317,8 +383,6 @@ func (oi *OracleIntegration) pushGroup(ctx context.Context, key string, reports 
 		return nil
 	}
 
-	const similarityEpsilon = 1e-6
-
 	var best *fuzzer.AttackParameterReport
 	for _, report := range reports {
 		if report == nil {
@@ -328,8 +392,7 @@ func (oi *OracleIntegration) pushGroup(ctx context.Context, key string, reports 
 			best = report
 			continue
 		}
-		diff := report.MaxSimilarity - best.MaxSimilarity
-		if diff > similarityEpsilon || (diff >= -similarityEpsilon && diff <= similarityEpsilon) {
+		if shouldPreferReport(report, best) {
 			best = report
 		}
 	}

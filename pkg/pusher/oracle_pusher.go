@@ -174,11 +174,15 @@ func (p *OraclePusher) ProcessFuzzingReport(
 		log.Printf("[OraclePusher] Warning: Report lacks invariant check, proceeding with caution")
 	}
 
-	// 检查相似度阈值
-	if report.MaxSimilarity < p.config.PushThreshold {
+	// 检查相似度阈值（候选规则允许绕过阈值，保障低相似样本可上链）
+	if !report.CandidateOnly && report.MaxSimilarity < p.config.PushThreshold {
 		log.Printf("[OraclePusher] Similarity %.2f below threshold %.2f, skipping",
 			report.MaxSimilarity, p.config.PushThreshold)
 		return nil
+	}
+	if report.CandidateOnly && report.MaxSimilarity < p.config.PushThreshold {
+		log.Printf("[OraclePusher] Candidate-only push bypass similarity threshold (sim=%.4f < %.4f, priority=%s)",
+			report.MaxSimilarity, p.config.PushThreshold, report.RulePriority)
 	}
 
 	// 检查推送频率限制
@@ -299,10 +303,14 @@ func (p *OraclePusher) pushGroup(ctx context.Context, key string, requests []*Pu
 	hasExpr := len(exprRules) > 0
 	hasParams := len(best.Report.ValidParameters) > 0
 
-	// 相似度过滤
-	if best.Report.MaxSimilarity < p.config.PushThreshold {
+	// 相似度过滤（候选规则允许绕过阈值）
+	if !best.Report.CandidateOnly && best.Report.MaxSimilarity < p.config.PushThreshold {
 		log.Printf("[OraclePusher] Group %s similarity %.2f below threshold %.2f, skipping", key, best.Report.MaxSimilarity, p.config.PushThreshold)
 		return nil
+	}
+	if best.Report.CandidateOnly && best.Report.MaxSimilarity < p.config.PushThreshold {
+		log.Printf("[OraclePusher] Group %s candidate-only bypass similarity threshold (sim=%.4f < %.4f, priority=%s)",
+			key, best.Report.MaxSimilarity, p.config.PushThreshold, best.Report.RulePriority)
 	}
 
 	if hasExpr {

@@ -441,6 +441,8 @@ type CallDataFuzzer struct {
 
 	// 约束收集器（高相似样本生成规则）
 	constraintCollector *ConstraintCollector
+	// overlap召回样本收集器（仅用于候选规则导出，不参与链上推送）
+	candidateConstraintCollector *ConstraintCollector
 
 	// 样本记录器（正/负样本与连锁调用）
 	sampleRecorder *sampleRecorder
@@ -487,37 +489,38 @@ func NewCallDataFuzzer(config *Config) (*CallDataFuzzer, error) {
 	basePath := resolveBasePath()
 
 	fuzzer := &CallDataFuzzer{
-		parser:                  NewABIParser(),
-		generator:               gen,
-		comparator:              NewPathComparator(),
-		merger:                  NewResultMergerWithBasePath(basePath),
-		tracer:                  NewTransactionTracer(rpcClient),
-		threshold:               config.Threshold,
-		maxWorkers:              config.Workers,
-		timeout:                 config.Timeout,
-		client:                  client,
-		rpcClient:               rpcClient,
-		stats:                   &FuzzerStats{StartTime: time.Now()},
-		invariantEvaluator:      &EmptyInvariantEvaluator{}, // 默认使用空实现
-		enableInvariantCheck:    config.InvariantCheck.Enabled,
-		skipInvariantForHighSim: skipInv,
-		seedConfig:              config.SeedConfig,        // 新增：种子配置
-		symbolicExtractor:       nil,                      // 延迟初始化
-		symbolicSolver:          nil,                      // 延迟初始化
-		targetSimilarity:        config.TargetSimilarity,  //  无限制模式配置
-		maxHighSimResults:       config.MaxHighSimResults, //  无限制模式配置
-		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
-		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
-		targetFunctionFallback:  config.TargetFunctionFallback,
-		projectID:               config.ProjectID,
-		baselineStatePath:       config.BaselineStatePath,
-		strictPrestate:          config.StrictPrestate,
-		attackStateCodeOnly:     config.AttackStateCodeOnly,
-		localExecution:          config.LocalExecution, //  本地执行模式
-		recordFullTrace:         config.RecordFullTrace,
-		similarityScope:         config.SimilarityScope,
-		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
-		sampleRecorder:          newSampleRecorder(),
+		parser:                       NewABIParser(),
+		generator:                    gen,
+		comparator:                   NewPathComparator(),
+		merger:                       NewResultMergerWithBasePath(basePath),
+		tracer:                       NewTransactionTracer(rpcClient),
+		threshold:                    config.Threshold,
+		maxWorkers:                   config.Workers,
+		timeout:                      config.Timeout,
+		client:                       client,
+		rpcClient:                    rpcClient,
+		stats:                        &FuzzerStats{StartTime: time.Now()},
+		invariantEvaluator:           &EmptyInvariantEvaluator{}, // 默认使用空实现
+		enableInvariantCheck:         config.InvariantCheck.Enabled,
+		skipInvariantForHighSim:      skipInv,
+		seedConfig:                   config.SeedConfig,        // 新增：种子配置
+		symbolicExtractor:            nil,                      // 延迟初始化
+		symbolicSolver:               nil,                      // 延迟初始化
+		targetSimilarity:             config.TargetSimilarity,  //  无限制模式配置
+		maxHighSimResults:            config.MaxHighSimResults, //  无限制模式配置
+		unlimitedMode:                config.UnlimitedMode,     //  无限制模式配置
+		entryCallProtectedOnly:       config.EntryCallProtectedOnly,
+		targetFunctionFallback:       config.TargetFunctionFallback,
+		projectID:                    config.ProjectID,
+		baselineStatePath:            config.BaselineStatePath,
+		strictPrestate:               config.StrictPrestate,
+		attackStateCodeOnly:          config.AttackStateCodeOnly,
+		localExecution:               config.LocalExecution, //  本地执行模式
+		recordFullTrace:              config.RecordFullTrace,
+		similarityScope:              config.SimilarityScope,
+		constraintCollector:          NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
+		candidateConstraintCollector: NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
+		sampleRecorder:               newSampleRecorder(),
 	}
 	if fuzzer.merger != nil {
 		fuzzer.merger.SetProjectID(config.ProjectID)
@@ -596,37 +599,38 @@ func NewCallDataFuzzerWithClients(config *Config, rpcClient *rpc.Client, client 
 	basePath := resolveBasePath()
 
 	fuzzer := &CallDataFuzzer{
-		parser:                  NewABIParser(),
-		generator:               gen,
-		comparator:              NewPathComparator(),
-		merger:                  NewResultMergerWithBasePath(basePath),
-		tracer:                  NewTransactionTracer(rpcClient),
-		threshold:               config.Threshold,
-		maxWorkers:              config.Workers,
-		timeout:                 config.Timeout,
-		client:                  client,
-		rpcClient:               rpcClient,
-		stats:                   &FuzzerStats{StartTime: time.Now()},
-		invariantEvaluator:      &EmptyInvariantEvaluator{}, // 默认使用空实现
-		enableInvariantCheck:    config.InvariantCheck.Enabled,
-		skipInvariantForHighSim: skipInv,
-		seedConfig:              config.SeedConfig,        // 新增：种子配置
-		symbolicExtractor:       nil,                      // 延迟初始化
-		symbolicSolver:          nil,                      // 延迟初始化
-		targetSimilarity:        config.TargetSimilarity,  //  无限制模式配置
-		maxHighSimResults:       config.MaxHighSimResults, //  无限制模式配置
-		unlimitedMode:           config.UnlimitedMode,     //  无限制模式配置
-		entryCallProtectedOnly:  config.EntryCallProtectedOnly,
-		targetFunctionFallback:  config.TargetFunctionFallback,
-		projectID:               config.ProjectID,
-		baselineStatePath:       config.BaselineStatePath,
-		strictPrestate:          config.StrictPrestate,
-		attackStateCodeOnly:     config.AttackStateCodeOnly,
-		localExecution:          config.LocalExecution, //  本地执行模式
-		recordFullTrace:         config.RecordFullTrace,
-		similarityScope:         config.SimilarityScope,
-		constraintCollector:     NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
-		sampleRecorder:          newSampleRecorder(),
+		parser:                       NewABIParser(),
+		generator:                    gen,
+		comparator:                   NewPathComparator(),
+		merger:                       NewResultMergerWithBasePath(basePath),
+		tracer:                       NewTransactionTracer(rpcClient),
+		threshold:                    config.Threshold,
+		maxWorkers:                   config.Workers,
+		timeout:                      config.Timeout,
+		client:                       client,
+		rpcClient:                    rpcClient,
+		stats:                        &FuzzerStats{StartTime: time.Now()},
+		invariantEvaluator:           &EmptyInvariantEvaluator{}, // 默认使用空实现
+		enableInvariantCheck:         config.InvariantCheck.Enabled,
+		skipInvariantForHighSim:      skipInv,
+		seedConfig:                   config.SeedConfig,        // 新增：种子配置
+		symbolicExtractor:            nil,                      // 延迟初始化
+		symbolicSolver:               nil,                      // 延迟初始化
+		targetSimilarity:             config.TargetSimilarity,  //  无限制模式配置
+		maxHighSimResults:            config.MaxHighSimResults, //  无限制模式配置
+		unlimitedMode:                config.UnlimitedMode,     //  无限制模式配置
+		entryCallProtectedOnly:       config.EntryCallProtectedOnly,
+		targetFunctionFallback:       config.TargetFunctionFallback,
+		projectID:                    config.ProjectID,
+		baselineStatePath:            config.BaselineStatePath,
+		strictPrestate:               config.StrictPrestate,
+		attackStateCodeOnly:          config.AttackStateCodeOnly,
+		localExecution:               config.LocalExecution, //  本地执行模式
+		recordFullTrace:              config.RecordFullTrace,
+		similarityScope:              config.SimilarityScope,
+		constraintCollector:          NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
+		candidateConstraintCollector: NewConstraintCollectorWithProject(10, basePath, config.ProjectID),
+		sampleRecorder:               newSampleRecorder(),
 	}
 	if fuzzer.merger != nil {
 		fuzzer.merger.SetProjectID(config.ProjectID)
@@ -5075,6 +5079,34 @@ func (f *CallDataFuzzer) worker(
 				}
 			}
 		}
+
+		// overlap召回通道：核心路径高度重叠但adjusted分数偏低时，仅收集候选规则样本。
+		if f.candidateConstraintCollector != nil &&
+			overlapSim >= overlapRecallMinSimilarity &&
+			similarity+similarityEpsilon < ruleGenMinSimilarity {
+			if rule := f.candidateConstraintCollector.RecordSample(contractAddr, selector, ruleParamValues, simResult.StateChanges, overlapSim); rule != nil {
+				log.Printf("[Worker %d]  已更新overlap候选规则: %s selector=%s 样本=%d (overlap=%.4f adjusted=%.4f)",
+					workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount, overlapSim, similarity)
+			}
+			if len(observedCalls) > 0 {
+				for _, oc := range observedCalls {
+					if oc.selector == "" || len(oc.params) == 0 {
+						continue
+					}
+					if strings.EqualFold(oc.selector, targetSelectorHex) {
+						continue
+					}
+					selBytes, err := hexutil.Decode(oc.selector)
+					if err != nil || len(selBytes) < 4 {
+						continue
+					}
+					if rule := f.candidateConstraintCollector.RecordSample(contractAddr, selBytes[:4], oc.params, simResult.StateChanges, overlapSim); rule != nil {
+						log.Printf("[Worker %d]  已更新overlap候选规则: %s selector=%s 样本=%d (overlap=%.4f adjusted=%.4f)",
+							workerID, contractAddr.Hex(), rule.FunctionSelector, rule.SampleCount, overlapSim, similarity)
+					}
+				}
+			}
+		}
 		resultMutex.Unlock()
 
 		//  检查是否达到目标相似度
@@ -5156,13 +5188,12 @@ func normalizeSingleParam(val interface{}, typeStr string) interface{} {
 		case typeStr == "address":
 			return normalizeAddress(val)
 		case strings.HasPrefix(typeStr, "uint"):
-			if typeStr == "uint8" {
-				if v, ok := normalizeUint8(val); ok {
-					return v
-				}
+			if normalized := normalizeUnsignedForABI(val, typeStr); normalized != nil {
+				return normalized
 			}
-			if bi := normalizeBigInt(val); bi != nil {
-				return bi
+		case strings.HasPrefix(typeStr, "int"):
+			if normalized := normalizeSignedForABI(val, typeStr); normalized != nil {
+				return normalized
 			}
 		case strings.HasPrefix(typeStr, "bytes"):
 			size := parseFixedBytesSize(typeStr)
@@ -5454,6 +5485,117 @@ func normalizeBigInt(val interface{}) *big.Int {
 		return new(big.Int).SetBytes(v)
 	}
 	return nil
+}
+
+func normalizeUnsignedForABI(val interface{}, typeStr string) interface{} {
+	bi := normalizeBigInt(val)
+	if bi == nil {
+		return nil
+	}
+
+	bits := parseIntegerBitSize(typeStr, "uint")
+	if bits <= 0 {
+		return nil
+	}
+
+	bounded := clampUnsignedBigInt(bi, bits)
+	switch {
+	case bits <= 8:
+		return uint8(bounded.Uint64())
+	case bits <= 16:
+		return uint16(bounded.Uint64())
+	case bits <= 32:
+		return uint32(bounded.Uint64())
+	case bits <= 64:
+		return bounded.Uint64()
+	default:
+		return bounded
+	}
+}
+
+func normalizeSignedForABI(val interface{}, typeStr string) interface{} {
+	bi := normalizeBigInt(val)
+	if bi == nil {
+		return nil
+	}
+
+	bits := parseIntegerBitSize(typeStr, "int")
+	if bits <= 0 {
+		return nil
+	}
+
+	bounded := clampSignedBigInt(bi, bits)
+	switch {
+	case bits <= 8:
+		return int8(bounded.Int64())
+	case bits <= 16:
+		return int16(bounded.Int64())
+	case bits <= 32:
+		return int32(bounded.Int64())
+	case bits <= 64:
+		return bounded.Int64()
+	default:
+		return bounded
+	}
+}
+
+func parseIntegerBitSize(typeStr string, prefix string) int {
+	if !strings.HasPrefix(typeStr, prefix) {
+		return 0
+	}
+
+	sizePart := strings.TrimPrefix(typeStr, prefix)
+	if sizePart == "" {
+		return 256
+	}
+
+	bits, err := strconv.Atoi(sizePart)
+	if err != nil || bits <= 0 {
+		return 256
+	}
+
+	return bits
+}
+
+func clampUnsignedBigInt(v *big.Int, bits int) *big.Int {
+	if v == nil {
+		return nil
+	}
+	if bits <= 0 {
+		return new(big.Int).Set(v)
+	}
+
+	if v.Sign() < 0 {
+		return big.NewInt(0)
+	}
+
+	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(bits)), big.NewInt(1))
+	if v.Cmp(max) > 0 {
+		return max
+	}
+
+	return new(big.Int).Set(v)
+}
+
+func clampSignedBigInt(v *big.Int, bits int) *big.Int {
+	if v == nil {
+		return nil
+	}
+	if bits <= 0 {
+		return new(big.Int).Set(v)
+	}
+
+	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(bits-1)), big.NewInt(1))
+	min := new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), uint(bits-1)))
+
+	if v.Cmp(max) > 0 {
+		return max
+	}
+	if v.Cmp(min) < 0 {
+		return min
+	}
+
+	return new(big.Int).Set(v)
 }
 
 func normalizeBytes(val interface{}) []byte {
@@ -6968,41 +7110,88 @@ func (f *CallDataFuzzer) resetAttemptStats() {
 
 // 应用约束规则到报告（若收集到足够样本）
 func (f *CallDataFuzzer) applyConstraintRule(report *AttackParameterReport, contractAddr common.Address, selector []byte) {
-	if report == nil || f.constraintCollector == nil {
+	if report == nil {
 		return
 	}
-	rule := f.constraintCollector.GetRule(contractAddr, selector)
-	if rule != nil {
-		summaries := convertParamConstraintsToSummaries(rule.ParamConstraints)
-		if len(summaries) > 0 {
-			report.ValidParameters = summaries
-		}
-		report.ConstraintRule = rule
-	}
 
-	// 附带表达式约束（ratio/linear）
-	if expr := f.constraintCollector.GetExpressionRule(contractAddr, selector); expr != nil {
-		report.ExpressionRules = append(report.ExpressionRules, *expr)
-		if cost := f.constraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
-			report.ExpressionGenMs = cost
+	if f.constraintCollector != nil {
+		rule := f.constraintCollector.GetRule(contractAddr, selector)
+		if rule != nil {
+			summaries := convertParamConstraintsToSummaries(rule.ParamConstraints)
+			if len(summaries) > 0 {
+				report.ValidParameters = summaries
+			}
+			report.ConstraintRule = rule
 		}
-	}
 
-	if report.ValidCombinations == 0 && len(report.ExpressionRules) == 0 {
-		if expr := f.constraintCollector.BuildExpressionRuleFallback(
-			contractAddr,
-			selector,
-			exprFallbackMinSimilarity,
-			exprFallbackMinSampleCount,
-		); expr != nil {
+		// 附带表达式约束（ratio/linear）
+		if expr := f.constraintCollector.GetExpressionRule(contractAddr, selector); expr != nil {
 			report.ExpressionRules = append(report.ExpressionRules, *expr)
 			if cost := f.constraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
 				report.ExpressionGenMs = cost
 			}
-			log.Printf("[Fuzzer]  ValidCombinations=0, generated fallback expression rule: selector=%s type=%s samples=%d avg=%.4f",
-				hexutil.Encode(selector), expr.Type, expr.SampleCount, report.AverageSimilarity)
+		}
+
+		if report.ValidCombinations == 0 && len(report.ExpressionRules) == 0 {
+			if expr := f.constraintCollector.BuildExpressionRuleFallback(
+				contractAddr,
+				selector,
+				exprFallbackMinSimilarity,
+				exprFallbackMinSampleCount,
+			); expr != nil {
+				report.ExpressionRules = append(report.ExpressionRules, *expr)
+				if cost := f.constraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
+					report.ExpressionGenMs = cost
+				}
+				log.Printf("[Fuzzer]  ValidCombinations=0, generated fallback expression rule: selector=%s type=%s samples=%d avg=%.4f",
+					hexutil.Encode(selector), expr.Type, expr.SampleCount, report.AverageSimilarity)
+			}
 		}
 	}
+
+	// overlap召回通道：当核心路径重叠度高但adjusted分数不足时，导出候选表达式规则（不推链）。
+	if report.ValidCombinations == 0 && len(report.ExpressionRules) == 0 &&
+		f.candidateConstraintCollector != nil &&
+		report.RawMaxSimilarity >= overlapRecallMinSimilarity &&
+		report.MaxSimilarity+similarityEpsilon < ruleGenMinSimilarity {
+		if expr := f.candidateConstraintCollector.BuildExpressionRuleFallback(
+			contractAddr,
+			selector,
+			overlapCandidateMinAvgSim,
+			exprFallbackMinSampleCount,
+		); expr != nil {
+			if expr.Strategy != "" {
+				expr.Strategy = expr.Strategy + "_overlap_recall_candidate"
+			} else {
+				expr.Strategy = "overlap_recall_candidate"
+			}
+			report.ExpressionRules = append(report.ExpressionRules, *expr)
+			report.CandidateOnly = true
+			if cost := f.candidateConstraintCollector.GetExpressionGenCost(contractAddr, selector); cost > 0 {
+				report.ExpressionGenMs = cost
+			}
+			log.Printf("[Fuzzer]  overlap-recall candidate generated: selector=%s type=%s samples=%d adjusted_max=%.4f overlap_max=%.4f",
+				hexutil.Encode(selector), expr.Type, expr.SampleCount, report.MaxSimilarity, report.RawMaxSimilarity)
+		}
+	}
+
+	report.RulePriority = classifyRulePriority(report.MaxSimilarity, report.RawMaxSimilarity, report.CandidateOnly)
+}
+
+func classifyRulePriority(adjustedMax float64, overlapMax float64, candidateOnly bool) string {
+	if candidateOnly {
+		return "P2_OVERLAP_RECALL"
+	}
+	if adjustedMax >= rulePriorityHighSimilarity {
+		return "P0_HIGH_SIM"
+	}
+	if adjustedMax >= rulePriorityMidSimilarity {
+		return "P1_MEDIUM_SIM"
+	}
+	if overlapMax >= overlapRecallMinSimilarity {
+		return "P2_LOW_SIM_OVERLAP"
+	}
+	return "P3_LOW_SIM"
 }
 
 // convertParamConstraintsToSummaries 将参数约束转成参数摘要

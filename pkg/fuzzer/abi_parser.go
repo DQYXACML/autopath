@@ -261,6 +261,27 @@ func (p *ABIParser) encodeValue(value interface{}) ([]byte, error) {
 		// 右对齐
 		copy(encoded[32-len(bytes):], bytes)
 
+	case uint:
+		return p.encodeValue(new(big.Int).SetUint64(uint64(v)))
+	case uint64:
+		return p.encodeValue(new(big.Int).SetUint64(v))
+	case uint32:
+		return p.encodeValue(new(big.Int).SetUint64(uint64(v)))
+	case uint16:
+		return p.encodeValue(new(big.Int).SetUint64(uint64(v)))
+	case uint8:
+		return p.encodeValue(new(big.Int).SetUint64(uint64(v)))
+	case int:
+		return p.encodeValue(big.NewInt(int64(v)))
+	case int64:
+		return p.encodeValue(big.NewInt(v))
+	case int32:
+		return p.encodeValue(big.NewInt(int64(v)))
+	case int16:
+		return p.encodeValue(big.NewInt(int64(v)))
+	case int8:
+		return p.encodeValue(big.NewInt(int64(v)))
+
 	case common.Address:
 		// 地址编码
 		copy(encoded[12:], v.Bytes())

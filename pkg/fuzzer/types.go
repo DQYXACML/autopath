@@ -60,6 +60,10 @@ type AttackParameterReport struct {
 	// 有效参数组合
 	ValidParameters []ParameterSummary `json:"valid_parameters"`
 	ExpressionRules []ExpressionRule   `json:"expression_rules,omitempty"`
+	// 候选规则（overlap召回）仅导出不推链。
+	CandidateOnly bool `json:"candidate_only,omitempty"`
+	// 规则优先级（P0/P1/P2/P3），用于推送排序与审计。
+	RulePriority string `json:"rule_priority,omitempty"`
 	// 由连锁调用样本派生的报告（仅用于展示/区分）
 	DerivedFromChained bool `json:"derived_from_chained,omitempty"`
 
