@@ -2627,8 +2627,12 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		log.Printf("[Fuzzer] Found %d valid combinations", len(results))
 	}
 
-	// 仅保留相似度>=阈值的组合进入规则生成路径
+	// 仅保留相似度>=阈值的组合进入规则生成路径。
+	// 若有效组合不足（默认<10），回补“相似度Top-N”样本用于规则生成，避免无规则可出。
 	if len(results) > 0 {
+		rawResults := make([]FuzzingResult, len(results))
+		copy(rawResults, results)
+
 		filtered := results[:0]
 		for _, r := range results {
 			if r.Similarity >= ruleGenMinSimilarity {
@@ -2637,6 +2641,19 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 		}
 		results = filtered
 		log.Printf("[Fuzzer] Selected %d rule-gen combinations (sim >= %.2f, max=%.4f)", len(results), ruleGenMinSimilarity, bestSimilarity)
+
+		if len(results) < ruleGenMinSampleCount && len(rawResults) > len(results) {
+			topN := resolveRuleGenFallbackTopN()
+			if topN < ruleGenMinSampleCount {
+				topN = ruleGenMinSampleCount
+			}
+			topResults := pickTopResultsBySimilarity(rawResults, topN)
+			if len(topResults) > 0 {
+				results = topResults
+				log.Printf("[Fuzzer]  有效组合不足(%d<%d)，启用Top-%d回补生成规则 (best=%.4f, tail=%.4f)",
+					len(filtered), ruleGenMinSampleCount, len(results), results[0].Similarity, results[len(results)-1].Similarity)
+			}
+		}
 	}
 
 	// 步骤5: 生成报告
@@ -2722,6 +2739,36 @@ func (f *CallDataFuzzer) fuzzSingleTargetCall(
 	log.Printf("[Fuzzer] Fuzzing completed in %v", f.stats.EndTime.Sub(f.stats.StartTime))
 
 	return report, nil
+}
+
+func resolveRuleGenFallbackTopN() int {
+	topN := ruleGenFallbackTopN
+	if raw := strings.TrimSpace(os.Getenv("AUTOPATH_RULE_GEN_TOPN")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			topN = parsed
+		}
+	}
+	if topN <= 0 {
+		topN = ruleGenFallbackTopN
+	}
+	return topN
+}
+
+func pickTopResultsBySimilarity(results []FuzzingResult, limit int) []FuzzingResult {
+	if len(results) == 0 || limit <= 0 {
+		return nil
+	}
+
+	sorted := make([]FuzzingResult, len(results))
+	copy(sorted, results)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return sorted[i].Similarity > sorted[j].Similarity
+	})
+
+	if limit > len(sorted) {
+		limit = len(sorted)
+	}
+	return sorted[:limit]
 }
 
 // buildFallbackReportForCall 兜底报告已禁用，保留入口以便记录原因

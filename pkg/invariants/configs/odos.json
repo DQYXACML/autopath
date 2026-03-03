@@ -1,0 +1,170 @@
+{
+  "project_id": "ODOS_exp",
+  "name": "ODOS_exp Firewall Monitor",
+  "chain_id": 1,
+  "rpc_url": "ws://localhost:8545",
+  "contracts": [
+    "0xb6333e994fd02a9255e794c177efbdeb1fe779c7",
+    "0x4015d786e33c1842c3e4d27792098e4a3612fc0e",
+    "0x22a7da241a39f189a8aec269a6f11a238b6086fc",
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "0x2ce6311ddae708829bc0784c967b7d77d19fd779"
+  ],
+  "invariants": [
+    {
+      "id": "PATTERN_flash_change_001",
+      "name": "Prevent extreme value changes (flash loan attack)",
+      "type": "flash_change_prevention",
+      "severity": "critical",
+      "enabled": true,
+      "parameters": {
+        "threshold": 0.1,
+        "contracts": [
+          "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+        ],
+        "slots": {
+          "slot_0": {
+            "index": "112608754849082142809318926621919487171846225487323147701519066153336967863387",
+            "severity": "critical",
+            "threshold": 0.1
+          },
+          "slot_1": {
+            "index": "114090134945872675573844398883678493837170945604230436960070792119745656572360",
+            "severity": "critical",
+            "threshold": 0.25
+          }
+        },
+        "formula": "abs(value_after - value_before) / value_before <= 0.1"
+      },
+      "monitored_functions": [
+        "isValidSigImpl"
+      ]
+    }
+  ],
+  "fuzzing_config": {
+    "enabled": true,
+    "target_function_fallback": false,
+    "target_functions": [
+      {
+        "contract": "0xb6333e994fd02a9255e794c177efbdeb1fe779c7",
+        "function": "isValidSigImpl",
+        "signature": "isValidSigImpl(address,bytes32,bytes,bool)"
+      }
+    ],
+    "threshold": 0.7,
+    "max_variations": 5000,
+    "workers": 20,
+    "timeout_seconds": 60,
+    "auto_trigger": false,
+    "min_similarity": 0.7,
+    "print_realtime": true,
+    "output_path": "fuzzing_results/odos",
+    "record_full_trace": true,
+    "param_mutation_rate": 0.3,
+    "save_high_similarity": true,
+    "invariant_check": {
+      "enabled": true,
+      "project_id": "ODOS_exp",
+      "config_path": "pkg/invariants/configs/odos_exp.json"
+    },
+    "target_similarity": 0.95,
+    "max_high_sim_results": 10,
+    "unlimited_mode": true,
+    "seed_config": {
+      "adaptive_config": {
+        "convergence_rate": 0.02,
+        "enabled": true,
+        "high_sim_threshold": 0.8,
+        "max_iterations": 5,
+        "medium_sim_threshold": 0.6,
+        "range_strategies": {
+          "high_similarity": [
+            1,
+            2,
+            5
+          ],
+          "low_similarity": [
+            50,
+            100,
+            200
+          ],
+          "medium_similarity": [
+            5,
+            10,
+            20,
+            50
+          ]
+        },
+        "unlimited_mode": true,
+        "zone_gap_absolute": 1000,
+        "zone_gap_percent": 0.1,
+        "zone_threshold": 0.75
+      },
+      "enabled": true,
+      "constraint_ranges": {
+        "isValidSigImpl(address,bytes32,bytes,bool)": {
+          "1": {
+            "type": "bytes32",
+            "safe_threshold": "0",
+            "danger_threshold": "32",
+            "attack_values": [
+              "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "0x0"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "bytes32(0x0)"
+          },
+          "2": {
+            "type": "bytes",
+            "safe_threshold": "320",
+            "danger_threshold": "320",
+            "attack_values": [
+              "0x000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000044a9059cbb0000000000000000000000007fa9385be102ac3eac297483dd6233d62b3e149600000000000000000000000000000000000000000000000000000003a08a84a500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000000000000000000000000000000000000006492649264926492649264926492649264926492649264926492649264926492"
+            ],
+            "range": null,
+            "mutation_strategy": "explore_danger_zone",
+            "confidence": 0.2,
+            "value_expr": "signature"
+          }
+        }
+      },
+      "range_mutation_config": {
+        "focus_percentiles": [
+          50,
+          75,
+          90,
+          95,
+          99,
+          100
+        ],
+        "boundary_exploration": true,
+        "step_count": 20,
+        "random_within_range_ratio": 0.3
+      },
+      "attack_seeds": {
+        "2": [
+          "0x000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000044a9059cbb0000000000000000000000007fa9385be102ac3eac297483dd6233d62b3e149600000000000000000000000000000000000000000000000000000003a08a84a500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000000000000000000000000000000000000006492649264926492649264926492649264926492649264926492649264926492"
+        ]
+      }
+    }
+  },
+  "alert_config": {
+    "webhook_url": "http://localhost:9000/alerts",
+    "alert_on_invariant_violation": true,
+    "alert_on_suspicious_pattern": true,
+    "min_severity": "medium"
+  },
+  "monitoring_config": {
+    "block_polling_interval_ms": 1000,
+    "tx_buffer_size": 100,
+    "enable_historical_analysis": true
+  },
+  "oracle_config": {
+    "pusher_private_key_env": "ORACLE_PRIVATE_KEY",
+    "param_check_module_address": "0x0000000000000000000000000000000000000000",
+    "auto_push_rules": true,
+    "rule_approval_required": false
+  }
+}
